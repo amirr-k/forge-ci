@@ -1,104 +1,186 @@
 package dev.forgeci.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayOutputStream;
+import dev.forgeci.testsupport.GitTestRepository;
 import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
+@DisabledOnOs(OS.WINDOWS)
 class PlanCommandTest {
 
-    private static final String DEMO_FORGECI_YML =
-            """
-            version: 1
-
-            project:
-              name: forge-ci-demo
-
-            tasks:
-              catalog:build:
-                inputs:
-                  - "services/catalog/**"
-                command: ["echo", "build catalog"]
-
-              pricing:test:
-                inputs:
-                  - "services/pricing/**"
-                command: ["echo", "test pricing"]
-
-              pricing:build:
-                depends_on:
-                  - "pricing:test"
-                inputs:
-                  - "services/pricing/**"
-                command: ["echo", "build pricing"]
-
-              checkout:integration:
-                depends_on:
-                  - "pricing:build"
-                inputs:
-                  - "services/checkout/**"
-                command: ["echo", "integration checkout"]
-            """;
-
-    private Path originalCwd;
-
-    @BeforeEach
-    void rememberCwd() {
-        originalCwd = Path.of("").toAbsolutePath();
-    }
-
-    @AfterEach
-    void restoreCwd() {
-        System.setProperty("user.dir", originalCwd.toString());
-    }
-
     @Test
-    void printsAffectedClosureForDemoFixture(@TempDir Path projectDir) throws IOException {
-        Files.writeString(projectDir.resolve("forgeci.yml"), DEMO_FORGECI_YML);
-        System.setProperty("user.dir", projectDir.toString());
+    void selectsOnlyTheTasksALeafChangeAffects(@TempDir Path directory) throws IOException {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            Files.writeString(directory.resolve("services/accounts/AccountService.java"), "edited\n");
 
-        String output = run("plan", "--changed", "services/pricing/src/main/java/PriceCalculator.java");
+            CliFixture.Result result = fixture.run("plan");
 
-        assertTrue(output.contains("Changed files"));
-        assertTrue(output.contains("services/pricing/src/main/java/PriceCalculator.java"));
-        assertTrue(output.contains("pricing:test"));
-        assertTrue(output.contains("pricing:build"));
-        assertTrue(output.contains("checkout:integration"));
-        assertTrue(output.contains("Unaffected tasks"));
-        assertTrue(output.contains("catalog:build"));
-        assertTrue(output.contains("Plan: 3 affected, 1 unaffected"));
-    }
-
-    @Test
-    void exitsNonZeroForMissingForgeciYml(@TempDir Path projectDir) {
-        System.setProperty("user.dir", projectDir.toString());
-
-        CommandLine cli = new CommandLine(new ForgeCli());
-        int exitCode = cli.execute("plan", "--changed", "some/file.txt");
-
-        assertEquals(1, exitCode);
-    }
-
-    private String run(String... args) {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        PrintStream original = System.out;
-        System.setOut(new PrintStream(buffer, true, StandardCharsets.UTF_8));
-        try {
-            int exitCode = new CommandLine(new ForgeCli()).execute(args);
-            assertEquals(0, exitCode);
-        } finally {
-            System.setOut(original);
+            assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
+            assertTrue(result.out().contains("services/accounts/AccountService.java"), result.out());
+            assertTrue(result.out().contains("accounts:test            RUN      source changed"), result.out());
+            assertFalse(result.out().contains("pricing:test"), result.out());
+            assertTrue(result.out().contains("Plan: 1 run, 0 cached, 3 unaffected"), result.out());
         }
-        return buffer.toString(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void followsTheGraphForASharedCoreChange(@TempDir Path directory) throws IOException {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            Files.writeString(directory.resolve("services/shared/Money.java"), "edited\n");
+
+            CliFixture.Result result = fixture.run("plan");
+
+            assertTrue(result.out().contains("shared:build             RUN      source changed"), result.out());
+            assertTrue(
+                    result.out().contains("pricing:test             RUN      shared:build output may change"),
+                    result.out());
+            assertTrue(
+                    result.out().contains("pricing:build            RUN      pricing:test output may change"),
+                    result.out());
+            assertTrue(result.out().contains("Plan: 3 run, 0 cached, 1 unaffected"), result.out());
+        }
+    }
+
+    @Test
+    void printsTheSpecifiedSectionsInOrder(@TempDir Path directory) throws IOException {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            Files.writeString(directory.resolve("services/pricing/PriceCalculator.java"), "edited\n");
+
+            String out = fixture.run("plan").out();
+
+            assertTrue(out.startsWith("ForgeCI plan\n\nChanged files\n"), out);
+            assertTrue(out.indexOf("Changed files") < out.indexOf("Affected tasks"), out);
+            assertTrue(out.indexOf("Affected tasks") < out.indexOf("Plan: "), out);
+            // nothing may be reported as reused until there is a verified cache to reuse from
+            assertFalse(out.contains("Reused tasks"), out);
+            assertFalse(out.contains("CACHED\n"), out);
+        }
+    }
+
+    @Test
+    void reportsACleanTreeAsNothingToDo(@TempDir Path directory) {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            CliFixture.Result result = fixture.run("plan");
+
+            assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
+            assertTrue(result.out().contains("Changed files\n  (none)"), result.out());
+            assertTrue(result.out().contains("Plan: 0 run, 0 cached, 4 unaffected"), result.out());
+        }
+    }
+
+    @Test
+    void selectsEverythingForAFullBuild(@TempDir Path directory) {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            CliFixture.Result result = fixture.run("plan", "--all");
+
+            assertTrue(result.out().contains("Full build requested"), result.out());
+            assertTrue(result.out().contains("Plan: 4 run, 0 cached, 0 unaffected"), result.out());
+        }
+    }
+
+    @Test
+    void comparesAgainstAnEarlierRevisionOnRequest(@TempDir Path directory) {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            fixture
+                    .repository()
+                    .write("services/pricing/PriceCalculator.java", "edited\n")
+                    .commitAll("edit pricing");
+
+            CliFixture.Result result = fixture.run("plan", "--base", "HEAD~1");
+
+            assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
+            assertTrue(result.out().contains("services/pricing/PriceCalculator.java"), result.out());
+            assertTrue(result.out().contains("Plan: 2 run, 0 cached, 2 unaffected"), result.out());
+        }
+    }
+
+    @Test
+    void rebuildsEverythingWhenTheConfigurationChanges(@TempDir Path directory) throws IOException {
+        try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
+            Files.writeString(
+                    directory.resolve("forgeci.yml"), CliFixture.DEMO_CONFIG.replace("1m", "2m"));
+
+            CliFixture.Result result = fixture.run("plan");
+
+            assertTrue(result.out().contains("forgeci.yml changed"), result.out());
+            assertTrue(result.out().contains("Plan: 4 run, 0 cached, 0 unaffected"), result.out());
+        }
+    }
+
+    @Test
+    void explainsAMissingConfigurationWithoutAStackTrace(@TempDir Path directory) {
+        GitTestRepository.initialize(directory).write("README.md", "hi\n").commitAll("init");
+        try (CliFixture fixture = new CliFixture(directory)) {
+            CliFixture.Result result = fixture.run("plan");
+
+            assertEquals(ExitCode.USER_ERROR, result.exitCode());
+            assertTrue(result.err().contains("no forgeci.yml in"), result.err());
+            assertTrue(result.err().contains("forge init"), result.err());
+            assertFalse(result.err().contains("\tat dev.forgeci"), result.err());
+        }
+    }
+
+    @Test
+    void explainsAnInvalidConfigurationWithItsLocation(@TempDir Path directory) {
+        GitTestRepository.initialize(directory)
+                .write("forgeci.yml", "version: 1\nproject:\n  name: broken\ntasks:\n  a:build:\n    command: \"make all\"\n")
+                .commitAll("init");
+        try (CliFixture fixture = new CliFixture(directory)) {
+            CliFixture.Result result = fixture.run("plan");
+
+            assertEquals(ExitCode.USER_ERROR, result.exitCode());
+            assertTrue(result.err().contains("tasks.a:build.command"), result.err());
+            assertTrue(result.err().contains("must be a list of arguments"), result.err());
+            assertFalse(result.err().contains("\tat dev.forgeci"), result.err());
+        }
+    }
+
+    @Test
+    void explainsADirectoryThatIsNotARepository(@TempDir Path directory) throws IOException {
+        Files.writeString(directory.resolve("forgeci.yml"), CliFixture.DEMO_CONFIG);
+        try (CliFixture fixture = new CliFixture(directory)) {
+            CliFixture.Result result = fixture.run("plan");
+
+            assertEquals(ExitCode.USER_ERROR, result.exitCode());
+            assertTrue(result.err().contains("not inside a Git repository"), result.err());
+        }
+    }
+
+    @Test
+    void reportsACycleWithTheFullPath(@TempDir Path directory) {
+        GitTestRepository.initialize(directory)
+                .write(
+                        "forgeci.yml",
+                        """
+                        version: 1
+
+                        project:
+                          name: cyclic
+
+                        tasks:
+                          frontend:build:
+                            depends_on: ["api:generate"]
+                            command: ["sh", "-c", "true"]
+
+                          api:generate:
+                            depends_on: ["frontend:build"]
+                            command: ["sh", "-c", "true"]
+                        """)
+                .commitAll("init");
+        try (CliFixture fixture = new CliFixture(directory)) {
+            CliFixture.Result result = fixture.run("plan");
+
+            assertEquals(ExitCode.USER_ERROR, result.exitCode());
+            assertTrue(result.err().contains("Cycle detected:"), result.err());
+            assertTrue(result.err().contains(" -> "), result.err());
+        }
     }
 }

@@ -1,0 +1,68 @@
+#!/bin/sh
+# Runs the ForgeCI CLI from a clone with no install step: resolves a Java 21+ runtime, builds the
+# CLI on first use, then execs it so the caller's working directory (the project being planned)
+# stays the process working directory.
+set -eu
+
+FORGE_HOME=$(cd "$(dirname "$0")" && pwd)
+MINIMUM_JAVA=21
+LAUNCHER="$FORGE_HOME/apps/cli/build/install/forge/bin/forge"
+
+java_feature() {
+    if [ ! -x "$1/bin/java" ]; then
+        echo 0
+        return
+    fi
+    feature=$("$1/bin/java" -version 2>&1 |
+        awk -F'"' '/ version "/ { split($2, v, /[._-]/); if (v[1] == 1) print v[2]; else print v[1]; exit }')
+    echo "${feature:-0}"
+}
+
+java_home_candidates() {
+    if [ -n "${JAVA_HOME:-}" ]; then
+        echo "$JAVA_HOME"
+    fi
+    if command -v java >/dev/null 2>&1; then
+        (cd "$(dirname "$(command -v java)")/.." && pwd)
+    fi
+    if [ -x /usr/libexec/java_home ]; then
+        /usr/libexec/java_home -v "$MINIMUM_JAVA+" 2>/dev/null || true
+    fi
+    # conventional install locations, so a clean clone works without setting JAVA_HOME first
+    for directory in \
+        /opt/homebrew/opt/openjdk@* \
+        /usr/local/opt/openjdk@* \
+        /usr/lib/jvm/* \
+        /Library/Java/JavaVirtualMachines/*/Contents/Home \
+        "$HOME"/.sdkman/candidates/java/* \
+        "$HOME"/.gradle/jdks/*/*; do
+        if [ -d "$directory" ]; then
+            echo "$directory"
+        fi
+    done
+}
+
+resolve_java_home() {
+    java_home_candidates | while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        if [ "$(java_feature "$candidate")" -ge "$MINIMUM_JAVA" ]; then
+            echo "$candidate"
+            break
+        fi
+    done
+}
+
+JAVA_HOME=$(resolve_java_home)
+if [ -z "$JAVA_HOME" ]; then
+    echo "forge: no Java $MINIMUM_JAVA+ runtime found." >&2
+    echo "forge: install one and set JAVA_HOME to it, then run forge again." >&2
+    exit 2
+fi
+export JAVA_HOME
+
+if [ ! -x "$LAUNCHER" ]; then
+    echo "forge: building the CLI (first run only)" >&2
+    (cd "$FORGE_HOME" && ./gradlew --quiet :apps:cli:installDist)
+fi
+
+exec "$LAUNCHER" "$@"
