@@ -1,0 +1,27 @@
+# Gradle / Java
+.gradle/
+build/
+out/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Node / frontend (ui/)
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Docker / local infra
+*.pid
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+*.iml
+.vscode/
