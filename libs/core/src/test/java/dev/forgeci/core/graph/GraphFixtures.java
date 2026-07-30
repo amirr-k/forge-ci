@@ -8,12 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Hand-built {@link ForgeConfig} fixtures shared by core's graph tests. */
-final class GraphFixtures {
+/** Hand-built {@link ForgeConfig} fixtures shared by core's tests. */
+public final class GraphFixtures {
 
     private GraphFixtures() {}
 
-    static TaskDefinition task(String name, List<String> dependsOn, List<String> inputs) {
+    public static TaskDefinition task(String name, List<String> dependsOn, List<String> inputs) {
         return new TaskDefinition(
                 name, dependsOn, inputs, List.of(), List.of("echo", name), List.of(), "10m", true);
     }
@@ -26,7 +26,7 @@ final class GraphFixtures {
      * checkout:integration         depends on pricing:build, inputs under services/checkout/**
      * storefront:build             (no deps, inputs under services/storefront/**)
      */
-    static ForgeConfig demoConfig() {
+    public static ForgeConfig demoConfig() {
         Map<String, TaskDefinition> tasks = new LinkedHashMap<>();
         tasks.put("catalog:build", task("catalog:build", List.of(), List.of("services/catalog/**")));
         tasks.put("accounts:test", task("accounts:test", List.of(), List.of("services/accounts/**")));
@@ -45,7 +45,7 @@ final class GraphFixtures {
         return new ForgeConfig(1, new ProjectInfo("demo"), new Defaults("10m", true), tasks);
     }
 
-    static ForgeConfig cyclicConfig() {
+    public static ForgeConfig cyclicConfig() {
         Map<String, TaskDefinition> tasks = new LinkedHashMap<>();
         tasks.put("frontend:build", task("frontend:build", List.of("api:generate"), List.of()));
         tasks.put("api:generate", task("api:generate", List.of("frontend:build"), List.of()));
