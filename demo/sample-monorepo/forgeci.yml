@@ -1,0 +1,88 @@
+version: 1
+
+project:
+  name: sample-monorepo
+
+defaults:
+  timeout: 2m
+  cacheable: true
+
+tasks:
+  shared:build:
+    inputs:
+      - "services/shared/**"
+    outputs:
+      - "build/shared/**"
+    command: ["./scripts/task", "build", "shared"]
+
+  accounts:test:
+    inputs:
+      - "services/accounts/**"
+    outputs:
+      - "build/accounts/**"
+    command: ["./scripts/task", "test", "accounts"]
+
+  catalog:build:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/catalog/**"
+    outputs:
+      - "build/catalog/**"
+    command: ["./scripts/task", "build", "catalog"]
+
+  payments:build:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/payments/**"
+    outputs:
+      - "build/payments/**"
+    command: ["./scripts/task", "build", "payments"]
+
+  pricing:test:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/pricing/**"
+    outputs:
+      - "build/pricing/test.txt"
+    command: ["./scripts/task", "test", "pricing"]
+
+  pricing:build:
+    depends_on:
+      - "pricing:test"
+    inputs:
+      - "services/pricing/**"
+    outputs:
+      - "build/pricing/build.txt"
+    command: ["./scripts/task", "build", "pricing"]
+
+  storefront:build:
+    depends_on:
+      - "catalog:build"
+    inputs:
+      - "services/storefront/**"
+    outputs:
+      - "build/storefront/**"
+    command: ["./scripts/task", "build", "storefront"]
+
+  checkout:integration:
+    depends_on:
+      - "pricing:build"
+      - "payments:build"
+      - "catalog:build"
+    inputs:
+      - "services/checkout/**"
+    outputs:
+      - "build/checkout/**"
+    command: ["./scripts/task", "integration", "checkout"]
+
+  verify:contracts:
+    depends_on:
+      - "checkout:integration"
+    inputs:
+      - "contracts/**"
+    outputs:
+      - "build/contracts/**"
+    command: ["./scripts/task", "verify", "contracts"]

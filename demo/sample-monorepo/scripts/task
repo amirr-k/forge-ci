@@ -1,0 +1,27 @@
+#!/bin/sh
+# Stand-in for a real compile/test/package step: takes long enough to see concurrency, writes a
+# deterministic output file, and fails when a module contains the BROKEN marker (the demo's failing
+# test). Kept to POSIX sh so the bundled demo runs the same on a laptop and in CI.
+set -eu
+
+kind=$1
+module=$2
+
+if [ "$module" = "contracts" ]; then
+  sources=contracts
+else
+  sources="services/$module"
+fi
+
+echo "$module: $kind starting"
+
+if [ -d "$sources" ] && grep -rl BROKEN "$sources" >/dev/null 2>&1; then
+  echo "$module: $kind FAILED — BROKEN marker in $(grep -rl BROKEN "$sources" | head -1)" >&2
+  exit 1
+fi
+
+sleep 1
+
+mkdir -p "build/$module"
+echo "$kind $module" > "build/$module/$kind.txt"
+echo "$module: $kind ok"

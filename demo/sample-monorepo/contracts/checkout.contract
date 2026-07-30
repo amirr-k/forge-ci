@@ -1,0 +1,4 @@
+# consumer contract verified by verify:contracts
+POST /checkout
+  request: { accountId, sku, currency }
+  response: { authorized: boolean, total: Money }
