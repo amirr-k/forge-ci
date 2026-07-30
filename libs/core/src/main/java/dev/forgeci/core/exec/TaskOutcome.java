@@ -17,6 +17,11 @@ public record TaskOutcome(String task, TaskStatus status, Integer exitCode, Dura
         return new TaskOutcome(task, TaskStatus.SUCCEEDED, 0, duration, "");
     }
 
+    /** A task satisfied by restoring a verified cache hit instead of running its command. */
+    public static TaskOutcome cached(String task) {
+        return new TaskOutcome(task, TaskStatus.SUCCEEDED, 0, Duration.ZERO, "restored from cache");
+    }
+
     public static TaskOutcome failed(String task, int exitCode, Duration duration) {
         return new TaskOutcome(task, TaskStatus.FAILED, exitCode, duration, "exit code " + exitCode);
     }
