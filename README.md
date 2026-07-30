@@ -6,16 +6,19 @@ everything else. Change one file, rebuild only what that change affects.
 
 ## Status
 
-Local mode works: `forge init`, `forge plan`, `forge run`, and `forge
-doctor` run against a real repository with no other services — no control
-plane, no Docker, no database. `forge plan` reads changed files from Git
-and prints the affected-task closure; `forge run` executes it with bounded
-concurrency, dependency ordering, per-task timeouts, and streamed
-task-prefixed logs.
+Local mode works: `forge init`, `forge plan`, `forge run`, `forge explain`,
+and `forge doctor` run against a real repository with no other services —
+no control plane, no Docker, no database. `forge plan` reads changed files
+from Git and prints the affected-task closure; `forge run` executes it with
+bounded concurrency, dependency ordering, per-task timeouts, and streamed
+task-prefixed logs. A local content-addressed cache verifies and restores a
+task's declared outputs instead of rerunning it whenever its inputs,
+command, dependencies, and toolchain all still match a prior run; `forge
+explain <task>` shows the cache key, its contributor breakdown, and why a
+task ran or was reused.
 
-Not built yet: the content-addressed cache and `forge explain` (so nothing
-is ever reported as reused), remote execution, distributed workers, and the
-public demo UI.
+Not built yet: remote execution, distributed workers, and the public demo
+UI.
 
 ## Requirements
 
@@ -52,6 +55,10 @@ cd demo/sample-monorepo
 
 # a full build, for a first run with nothing to reuse
 ../../forge run --all
+
+# run it again: every task restores from cache instead of rerunning
+../../forge run --all
+../../forge explain shared:build
 
 # a leaf-module change: one task
 echo "// tweak" >> services/accounts/src/main/java/AccountService.java
