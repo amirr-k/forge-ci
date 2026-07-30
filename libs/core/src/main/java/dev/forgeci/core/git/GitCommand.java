@@ -30,20 +30,20 @@ final class GitCommand {
                             + "). Install Git and make sure it is on your PATH.");
         }
 
-        // stderr is drained concurrently so a chatty git can never fill its pipe and deadlock us
-        StringBuilder stderr = new StringBuilder();
-        Thread drain = new Thread(() -> stderr.append(readFully(process.getErrorStream())));
-        drain.setDaemon(true);
-        drain.start();
+        // both streams are drained concurrently: a chatty git must never fill a pipe and deadlock us,
+        // and waiting on the process itself is what makes the timeout below able to fire
+        StringBuffer stdout = new StringBuffer();
+        StringBuffer stderr = new StringBuffer();
+        Thread drainOut = drain(process.getInputStream(), stdout);
+        Thread drainErr = drain(process.getErrorStream(), stderr);
 
-        String stdout;
         try {
-            stdout = readFully(process.getInputStream());
             if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 throw new GitException(describe(arguments) + " timed out after " + TIMEOUT_SECONDS + "s");
             }
-            drain.join(TimeUnit.SECONDS.toMillis(5));
+            drainOut.join();
+            drainErr.join();
         } catch (InterruptedException e) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
@@ -58,7 +58,7 @@ final class GitCommand {
                             + process.exitValue()
                             + (detail.isEmpty() ? "" : ": " + detail));
         }
-        return stdout;
+        return stdout.toString();
     }
 
     /** Runs a command whose non-zero exit is a meaningful answer rather than an error. */
@@ -71,12 +71,20 @@ final class GitCommand {
         }
     }
 
-    private static String readFully(InputStream stream) {
-        try (stream) {
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new GitException("failed to read git output: " + e.getMessage());
-        }
+    private static Thread drain(InputStream stream, StringBuffer into) {
+        Thread thread =
+                new Thread(
+                        () -> {
+                            try (stream) {
+                                into.append(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+                            } catch (IOException e) {
+                                // the process died mid-read; its exit code is what decides the outcome
+                            }
+                        },
+                        "forge-git-drain");
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
     }
 
     private static String describe(String[] arguments) {

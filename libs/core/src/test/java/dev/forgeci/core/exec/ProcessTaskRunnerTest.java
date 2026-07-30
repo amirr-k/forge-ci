@@ -65,6 +65,31 @@ class ProcessTaskRunnerTest {
     }
 
     @Test
+    void handsTheTaskAnEmptyStandardInput(@TempDir Path directory) {
+        // a task that reads stdin must see EOF, not block until its timeout
+        TaskOutcome outcome = run(directory, task("demo:stdin", List.of("cat")));
+
+        assertEquals(TaskStatus.SUCCEEDED, outcome.status());
+    }
+
+    @Test
+    void boundsOutputThatNeverContainsANewline(@TempDir Path directory) {
+        TaskOutcome outcome =
+                run(
+                        directory,
+                        task(
+                                "demo:noisy",
+                                List.of("sh", "-c", "i=0; while [ $i -lt 40 ]; do printf 'x%.0s' $(seq 1 4096); i=$((i+1)); done")));
+
+        assertEquals(TaskStatus.SUCCEEDED, outcome.status());
+        // 160 KiB with no newline must arrive as bounded chunks, never one unbounded string
+        assertTrue(output.size() > 1, "expected the stream to be split into bounded lines");
+        assertTrue(
+                output.stream().allMatch(line -> line.length() <= 1 << 16),
+                "a forwarded line exceeded the per-line bound");
+    }
+
+    @Test
     void timesOutAndKillsTheWholeProcessTree(@TempDir Path directory) throws Exception {
         Path pidFile = directory.resolve("child.pid");
         TaskDefinition task =

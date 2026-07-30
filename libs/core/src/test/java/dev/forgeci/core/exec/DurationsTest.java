@@ -29,6 +29,17 @@ class DurationsTest {
                 failure.getMessage());
     }
 
+    /** A digit string can be arithmetically valid and still overflow every unit conversion. */
+    @ParameterizedTest
+    @ValueSource(strings = {"99999999999999999999s", "9223372036854775807h", "9000h"})
+    void rejectsADurationTooLongToRepresent(String value) {
+        IllegalArgumentException failure =
+                assertThrows(IllegalArgumentException.class, () -> Durations.parse(value));
+
+        assertEquals(
+                "duration '" + value + "' is too long (the maximum is 8760h)", failure.getMessage());
+    }
+
     @Test
     void formatsForOperators() {
         assertEquals("0.4s", Durations.format(Duration.ofMillis(400)));

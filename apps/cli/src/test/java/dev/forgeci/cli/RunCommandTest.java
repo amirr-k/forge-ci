@@ -141,6 +141,34 @@ class RunCommandTest {
     }
 
     @Test
+    void rejectsAnUnrepresentableTimeoutBeforeRunningAnything(@TempDir Path directory) {
+        GitTestRepository.initialize(directory)
+                .write(
+                        "forgeci.yml",
+                        """
+                        version: 1
+
+                        project:
+                          name: overflowing
+
+                        tasks:
+                          slow:build:
+                            timeout: 99999999999999999999s
+                            command: ["sh", "-c", "true"]
+                        """)
+                .commitAll("init");
+
+        try (CliFixture fixture = new CliFixture(directory)) {
+            CliFixture.Result result = fixture.run("run", "--all");
+
+            assertEquals(ExitCode.USER_ERROR, result.exitCode());
+            assertTrue(result.err().contains("tasks.slow:build.timeout"), result.err());
+            assertTrue(result.err().contains("is too long"), result.err());
+            assertFalse(result.err().contains("\tat dev.forgeci"), result.err());
+        }
+    }
+
+    @Test
     void doesNothingWhenNoTaskIsAffected(@TempDir Path directory) {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
             CliFixture.Result result = fixture.run("run");
@@ -151,12 +179,14 @@ class RunCommandTest {
     }
 
     @Test
-    void rejectsANegativeJobCount(@TempDir Path directory) {
+    void rejectsAnUnusableJobCount(@TempDir Path directory) {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
-            CliFixture.Result result = fixture.run("run", "--all", "--jobs", "-2");
+            for (String jobs : new String[] {"-2", "0"}) {
+                CliFixture.Result result = fixture.run("run", "--all", "--jobs", jobs);
 
-            assertEquals(ExitCode.USER_ERROR, result.exitCode());
-            assertTrue(result.err().contains("--jobs must be a positive number"), result.err());
+                assertEquals(ExitCode.USER_ERROR, result.exitCode(), jobs);
+                assertTrue(result.err().contains("--jobs must be at least 1"), result.err());
+            }
         }
     }
 }

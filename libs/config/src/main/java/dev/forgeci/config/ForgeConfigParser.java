@@ -1,12 +1,12 @@
 package dev.forgeci.config;
 
+import dev.forgeci.core.exec.Durations;
 import dev.forgeci.core.model.Defaults;
 import dev.forgeci.core.model.ForgeConfig;
 import dev.forgeci.core.model.ProjectInfo;
 import dev.forgeci.core.model.TaskDefinition;
 import dev.forgeci.core.validation.ConfigValidationException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -32,7 +31,6 @@ public final class ForgeConfigParser {
     private static final Set<String> DEFAULTS_FIELDS = Set.of("timeout", "cacheable");
     private static final Set<String> TASK_FIELDS =
             Set.of("depends_on", "inputs", "outputs", "command", "environment", "timeout", "cacheable");
-    private static final Pattern TIMEOUT_PATTERN = Pattern.compile("^[0-9]+(ms|s|m|h)$");
 
     private ForgeConfigParser() {}
 
@@ -45,7 +43,8 @@ public final class ForgeConfigParser {
         try {
             content = Files.readString(file);
         } catch (IOException e) {
-            throw new UncheckedIOException("failed to read " + file, e);
+            throw new ConfigValidationException(
+                    "cannot read " + file + ": " + e + ". Check that it is a readable UTF-8 text file.");
         }
         return parse(content, file.toString());
     }
@@ -174,12 +173,12 @@ public final class ForgeConfigParser {
         return command;
     }
 
+    /** Validated here, not at execution time, so a bad duration is reported with its file location. */
     private static void requireValidTimeout(String timeout, String sourceName, String context) {
-        if (!TIMEOUT_PATTERN.matcher(timeout).matches()) {
-            throw fail(
-                    sourceName,
-                    context,
-                    "invalid duration '" + timeout + "' (expected a number followed by ms, s, m, or h)");
+        try {
+            Durations.parse(timeout);
+        } catch (IllegalArgumentException e) {
+            throw fail(sourceName, context, e.getMessage());
         }
     }
 

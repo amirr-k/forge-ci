@@ -10,6 +10,8 @@ import dev.forgeci.core.plan.BuildPlan;
 import java.io.PrintWriter;
 import java.time.Duration;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -25,13 +27,16 @@ import picocli.CommandLine.Spec;
 @Command(name = "run", description = "Run the tasks the current changes affect.")
 final class RunCommand implements Callable<Integer> {
 
+    /** How long a Ctrl-C waits for tasks to be torn down before the JVM stops caring. */
+    private static final Duration CANCELLATION_GRACE = Duration.ofSeconds(10);
+
     @Mixin private SelectionOptions selection;
 
     @Option(
             names = {"-j", "--jobs"},
             paramLabel = "<count>",
             description = "Maximum tasks to run at once (default: one per available processor).")
-    private int jobs;
+    private Integer jobs;
 
     @Spec private CommandSpec spec;
 
@@ -72,10 +77,10 @@ final class RunCommand implements Callable<Integer> {
     }
 
     private int resolveConcurrency(BuildPlan plan) {
-        if (jobs < 0) {
-            throw new CliException("--jobs must be a positive number, got " + jobs);
+        if (jobs != null && jobs < 1) {
+            throw new CliException("--jobs must be at least 1, got " + jobs);
         }
-        int requested = jobs > 0 ? jobs : LocalExecutor.defaultConcurrency();
+        int requested = jobs != null ? jobs : LocalExecutor.defaultConcurrency();
         return Math.max(1, Math.min(requested, plan.selected().size()));
     }
 
@@ -86,16 +91,19 @@ final class RunCommand implements Callable<Integer> {
 
     /**
      * Ctrl-C reaches a JVM as shutdown, not as an exception, so the hook interrupts the run thread —
-     * that is the signal {@code LocalExecutor} turns into killing task process trees.
+     * that is the signal {@code LocalExecutor} turns into killing task process trees. The hook waits
+     * on a latch rather than joining the run thread: during shutdown that thread blocks forever in
+     * {@code System.exit}, so a join could only ever time out.
      */
     private static ExecutionReport cancelableExecute(Supplier<ExecutionReport> body) {
         Thread runThread = Thread.currentThread();
+        CountDownLatch finished = new CountDownLatch(1);
         Thread hook =
                 new Thread(
                         () -> {
                             runThread.interrupt();
                             try {
-                                runThread.join(Duration.ofSeconds(10).toMillis());
+                                finished.await(CANCELLATION_GRACE.toSeconds(), TimeUnit.SECONDS);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }
@@ -105,6 +113,7 @@ final class RunCommand implements Callable<Integer> {
         try {
             return body.get();
         } finally {
+            finished.countDown();
             try {
                 Runtime.getRuntime().removeShutdownHook(hook);
             } catch (IllegalStateException e) {

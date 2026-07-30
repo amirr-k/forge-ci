@@ -17,6 +17,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Runs a selected set of tasks locally with bounded concurrency: a task starts as soon as every
@@ -28,6 +29,9 @@ import java.util.concurrent.Future;
 public final class LocalExecutor {
 
     public static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(10);
+
+    /** How long a canceled run waits for its tasks to finish killing their process trees. */
+    private static final Duration TERMINATION_GRACE = Duration.ofSeconds(5);
 
     private final TaskRunner runner;
     private final int concurrency;
@@ -92,12 +96,14 @@ public final class LocalExecutor {
                 }
             }
         } catch (RunCanceledException e) {
-            pool.shutdownNow();
             for (String task : selectedTasks) {
                 outcomes.putIfAbsent(task, TaskOutcome.canceled(task, Duration.ZERO));
             }
         } finally {
-            pool.shutdown();
+            // shutdownNow on every path, including an unexpected one: interrupting the task threads is
+            // what makes them kill their process trees instead of leaving them orphaned
+            pool.shutdownNow();
+            awaitTaskThreads(pool);
         }
 
         List<TaskOutcome> ordered = new ArrayList<>(selectedTasks.size());
@@ -154,6 +160,24 @@ public final class LocalExecutor {
             throw new RunCanceledException();
         } catch (ExecutionException e) {
             throw new IllegalStateException("task runner threw instead of reporting an outcome", e.getCause());
+        }
+    }
+
+    /**
+     * Gives interrupted tasks a moment to terminate their process trees. Runs with the interrupt flag
+     * temporarily cleared — on the cancellation path the flag is already set, and awaiting would
+     * otherwise return instantly and leave the very processes we are trying to kill running.
+     */
+    private static void awaitTaskThreads(ExecutorService pool) {
+        boolean interrupted = Thread.interrupted();
+        try {
+            pool.awaitTermination(TERMINATION_GRACE.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            interrupted = true;
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
