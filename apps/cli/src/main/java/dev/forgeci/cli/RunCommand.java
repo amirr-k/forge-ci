@@ -61,9 +61,12 @@ final class RunCommand implements Callable<Integer> {
         out.println();
         out.flush();
 
+        CacheCoordinator coordinator = new CacheCoordinator(workspace);
         LocalExecutor executor =
                 new LocalExecutor(
-                        new ProcessTaskRunner(workspace.directory()), concurrency, defaultTimeout(workspace));
+                        new CachingTaskRunner(new ProcessTaskRunner(workspace.directory()), coordinator),
+                        concurrency,
+                        defaultTimeout(workspace));
         ExecutionReport report =
                 cancelableExecute(
                         () ->

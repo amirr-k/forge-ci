@@ -6,6 +6,9 @@ out/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 
+# ForgeCI local cache
+.forge/
+
 # Node / frontend (ui/)
 node_modules/
 dist/

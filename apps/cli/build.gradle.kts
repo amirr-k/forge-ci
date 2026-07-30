@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":libs:core"))
     implementation(project(":libs:config"))
+    implementation(project(":libs:cache"))
     implementation("info.picocli:picocli:4.7.6")
     testImplementation(project(":libs:test-support"))
 }

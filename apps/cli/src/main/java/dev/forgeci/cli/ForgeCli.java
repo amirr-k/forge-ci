@@ -11,7 +11,9 @@ import picocli.CommandLine.Command;
         description = "Build only what changed.",
         mixinStandardHelpOptions = true,
         version = "forge 0.1.0-SNAPSHOT",
-        subcommands = {InitCommand.class, PlanCommand.class, RunCommand.class, DoctorCommand.class})
+        subcommands = {
+            InitCommand.class, PlanCommand.class, RunCommand.class, ExplainCommand.class, DoctorCommand.class
+        })
 public final class ForgeCli implements Runnable {
 
     @Override
