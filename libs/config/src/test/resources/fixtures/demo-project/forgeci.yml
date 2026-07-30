@@ -1,0 +1,55 @@
+version: 1
+
+project:
+  name: forge-ci-demo
+
+defaults:
+  timeout: 10m
+  cacheable: true
+
+tasks:
+  catalog:build:
+    inputs:
+      - "services/catalog/**"
+    outputs:
+      - "services/catalog/build/**"
+    command: ["echo", "build catalog"]
+
+  accounts:test:
+    inputs:
+      - "services/accounts/**"
+    outputs:
+      - "services/accounts/build/test-results/**"
+    command: ["echo", "test accounts"]
+
+  pricing:test:
+    inputs:
+      - "services/pricing/**"
+    outputs:
+      - "services/pricing/build/test-results/**"
+    command: ["echo", "test pricing"]
+
+  pricing:build:
+    depends_on:
+      - "pricing:test"
+    inputs:
+      - "services/pricing/**"
+    outputs:
+      - "services/pricing/build/**"
+    command: ["echo", "build pricing"]
+
+  checkout:integration:
+    depends_on:
+      - "pricing:build"
+    inputs:
+      - "services/checkout/**"
+    outputs:
+      - "services/checkout/build/**"
+    command: ["echo", "integration checkout"]
+
+  storefront:build:
+    inputs:
+      - "services/storefront/**"
+    outputs:
+      - "services/storefront/build/**"
+    command: ["echo", "build storefront"]

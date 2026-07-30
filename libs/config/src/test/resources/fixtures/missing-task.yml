@@ -1,0 +1,12 @@
+version: 1
+
+project:
+  name: missing-task-fixture
+
+tasks:
+  checkout:integration:
+    depends_on:
+      - "pricing:build"
+    inputs:
+      - "services/checkout/**"
+    command: ["echo", "integration checkout"]

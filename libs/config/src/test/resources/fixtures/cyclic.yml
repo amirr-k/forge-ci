@@ -1,0 +1,19 @@
+version: 1
+
+project:
+  name: cyclic-fixture
+
+tasks:
+  frontend:build:
+    depends_on:
+      - "api:generate"
+    inputs:
+      - "frontend/**"
+    command: ["echo", "build frontend"]
+
+  api:generate:
+    depends_on:
+      - "frontend:build"
+    inputs:
+      - "api/**"
+    command: ["echo", "generate api"]
