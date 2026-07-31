@@ -1,0 +1,61 @@
+name: forgeci
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: forgeci
+      MYSQL_USER: forgeci
+      MYSQL_PASSWORD: forgeci
+      MYSQL_ROOT_PASSWORD: forgeci
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uforgeci", "-pforgeci"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # S3-compatible local dev store. Production points FORGE_S3_ENDPOINT at real AWS S3 instead —
+  # see docs/architecture.md for the production configuration.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: forgeci
+      MINIO_ROOT_PASSWORD: forgeci-artifact-store
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  control-plane:
+    build:
+      context: ..
+      dockerfile: apps/control-plane/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      FORGE_DB_URL: jdbc:mysql://mysql:3306/forgeci
+      FORGE_DB_USER: forgeci
+      FORGE_DB_PASSWORD: forgeci
+      FORGE_S3_ENDPOINT: http://minio:9000
+      FORGE_S3_BUCKET: forgeci-artifacts
+      FORGE_S3_REGION: us-east-1
+      FORGE_S3_ACCESS_KEY: forgeci
+      FORGE_S3_SECRET_KEY: forgeci-artifact-store
+      FORGE_S3_PATH_STYLE: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  minio-data:

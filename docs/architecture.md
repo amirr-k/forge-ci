@@ -19,11 +19,12 @@ demo/sample-monorepo  bundled demo project used by the walkthrough in the README
 empty; they are filled in by later phases (workers, Docker execution,
 Kafka). `libs/core` deliberately has no framework dependency so planning
 and execution stay usable from the CLI alone. `libs/cache` depends only on
-`libs/core` — the same cache-key algorithm and artifact protocol will be
-reused by the control plane and workers once remote execution lands.
-`apps/control-plane` does not depend on either — it is a standalone
-service the CLI submits plans and builds to, not a consumer of local-mode
-code.
+`libs/core` — the same cache-key algorithm and content-hashing (`Digests`)
+are reused by the control plane's remote artifact verification, and by
+workers once distributed execution lands. `apps/control-plane` depends on
+`libs/cache` for that one shared piece (digest computation) only — it is
+still a standalone service the CLI submits plans, builds, and artifacts
+to, not a consumer of local-mode planning or execution code.
 
 ## From a change to a plan
 
@@ -144,6 +145,48 @@ logs are emitted as JSON (Logstash encoder). Micrometer counters and timers
 cover build starts/completions/duration, task attempts/retries/duration,
 and ready-queue depth — real values driven by actual transitions, not
 placeholders.
+
+## Remote artifact cache
+
+`apps/control-plane` now backs the content-addressed artifact protocol with
+S3 (or an S3-compatible service for local/Compose dev — MinIO). The upload
+flow matches architecture.md's protocol exactly: the CLI archives a task's
+outputs and computes its digest and size locally (unchanged from the local
+cache in `libs/cache`), `POST /api/artifacts` uploads those bytes plus the
+declared digest/size, the control plane recomputes the digest itself
+(never trusting the caller's claim alone), writes to a temp key, verifies
+what actually landed in S3, copies it to its final content-addressed key
+(`artifacts/<first two digest chars>/<digest>`), records the `Artifact`
+row, and transactionally associates the cache key with it via a
+`CacheEntry` row — then deletes the temp object. Any mismatch along the
+way (wrong size, wrong digest, an S3 error) leaves no `Artifact` and no
+`CacheEntry` behind. `GET /api/artifacts/lookup` resolves a cache key,
+re-fetches the object, and re-verifies its digest and size before
+returning it — a stored object that no longer matches its recorded digest
+is reported as `409 artifact_corrupt`, never as a hit. A scheduled sweep
+(`TempUploadCleanupService`) removes anything left under the temp prefix
+past its TTL, for uploads a client abandoned mid-flight.
+
+`libs/cache`'s `TaskCache` gained an optional `RemoteArtifactClient`: a
+lookup checks the local cache first and only falls back to the remote
+store on a local miss (adopting a remote hit into the local cache too), a
+fresh store always writes locally first and then best-effort mirrors to
+remote. `apps/cli` wires this in only when `FORGE_CONTROL_PLANE_URL` is
+set — unset, `forge plan`/`forge run` are unchanged phase 1/2 behavior
+with zero infrastructure, and a configured-but-unreachable remote degrades
+to local-only rather than failing the command. The same `CacheKey` value
+already used locally is reused as the remote lookup key, so the
+relocatable-key property from phase 2 carries through unchanged.
+
+Production S3 configuration: point `FORGE_S3_ENDPOINT` at nothing (leave
+it unset) to use real AWS S3 with the default credentials provider chain
+(IAM role, environment, or `~/.aws/credentials`) and virtual-hosted
+addressing; set `FORGE_S3_BUCKET`/`FORGE_S3_REGION` to the provisioned
+bucket. Setting `FORGE_S3_ENDPOINT` switches to path-style addressing with
+static credentials (`FORGE_S3_ACCESS_KEY`/`FORGE_S3_SECRET_KEY`) — the dev
+path in `deploy/compose.yaml`. The bucket itself is provisioned out of
+band in production (IAM policy scoped to the artifact prefix); the control
+plane only auto-creates it as a dev/test convenience when missing.
 
 ## The `./forge` launcher
 
