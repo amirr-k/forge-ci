@@ -3,6 +3,8 @@ package dev.forgeci.cli;
 import dev.forgeci.cache.CacheKey;
 import dev.forgeci.cache.CacheKeyCalculator;
 import dev.forgeci.cache.Digests;
+import dev.forgeci.cache.RemoteArtifactClient;
+import dev.forgeci.cache.RemoteCacheUnavailableException;
 import dev.forgeci.cache.TaskCache;
 import dev.forgeci.cache.ToolchainFingerprint;
 import dev.forgeci.core.graph.TaskGraph;
@@ -36,8 +38,32 @@ final class CacheCoordinator {
     CacheCoordinator(ProjectWorkspace workspace) {
         this.projectDirectory = workspace.directory();
         this.graph = workspace.graph();
-        this.cache = new TaskCache(projectDirectory);
+        this.cache = buildCache(workspace);
         this.toolchain = ToolchainFingerprint.current();
+    }
+
+    /**
+     * Registering a project fails only if a remote is configured but unreachable — that degrades
+     * to local-only for this run (with a warning) rather than failing the command outright, since
+     * a local build must keep working even when the control plane is down.
+     */
+    private static TaskCache buildCache(ProjectWorkspace workspace) {
+        RemoteArtifactClient remote = RemoteCacheConfig.fromEnvironment();
+        if (remote == null) {
+            return new TaskCache(workspace.directory());
+        }
+        try {
+            long projectId =
+                    remote.ensureProject(
+                            workspace.config().project().name(),
+                            workspace.directory().toString(),
+                            "main",
+                            workspace.config().version());
+            return new TaskCache(workspace.directory(), remote, projectId);
+        } catch (RemoteCacheUnavailableException e) {
+            System.err.println("forge: remote cache unavailable, falling back to local-only (" + e.getMessage() + ")");
+            return new TaskCache(workspace.directory());
+        }
     }
 
     record Decision(CacheKey key, boolean hit, TaskCache.CacheHit cacheHit, String reason) {}

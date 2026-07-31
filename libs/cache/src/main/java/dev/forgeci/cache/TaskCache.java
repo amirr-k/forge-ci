@@ -19,13 +19,28 @@ public final class TaskCache {
     private final ArtifactStore artifacts;
     private final CacheManifestStore manifests;
     private final CacheKeyRecordStore records;
+    private final RemoteArtifactClient remote;
+    private final long remoteProjectId;
 
     public TaskCache(Path projectDirectory) {
+        this(projectDirectory, null, -1);
+    }
+
+    /**
+     * Local mode's cache, plus a remote fallback: a local miss checks the remote store before
+     * declaring the task un-cached, and a fresh local store also uploads so another workspace
+     * pointed at the same control plane can reuse it. Local lookups and stores always happen
+     * first and always succeed on their own — {@code remote} being unreachable degrades to
+     * exactly phase 1/2 behavior, it never fails the build.
+     */
+    public TaskCache(Path projectDirectory, RemoteArtifactClient remote, long remoteProjectId) {
         this.projectDirectory = projectDirectory;
         CacheLayout layout = new CacheLayout(projectDirectory);
         this.artifacts = new ArtifactStore(layout.objects());
         this.manifests = new CacheManifestStore(layout.manifests());
         this.records = new CacheKeyRecordStore(layout.keys());
+        this.remote = remote;
+        this.remoteProjectId = remoteProjectId;
     }
 
     /** A verified artifact ready to be restored into the workspace. */
@@ -34,8 +49,19 @@ public final class TaskCache {
     /**
      * A cache hit requires both a manifest for the key and a stored object that still matches the
      * digest and size that manifest recorded — a manifest existing on its own is never enough.
+     * Checks the local cache first; only on a local miss, and only when a remote store is
+     * configured, does it ask the remote store — local mode's zero-infrastructure behavior is
+     * unchanged whenever no remote is configured or it cannot be reached.
      */
     public Optional<CacheHit> lookup(CacheKey key) {
+        Optional<CacheHit> local = localLookup(key);
+        if (local.isPresent() || remote == null) {
+            return local;
+        }
+        return remoteLookup(key);
+    }
+
+    private Optional<CacheHit> localLookup(CacheKey key) {
         return manifests.load(key.value())
                 .flatMap(
                         manifest -> {
@@ -48,16 +74,43 @@ public final class TaskCache {
                         });
     }
 
+    /** A remote hit is also written into the local cache, so the next lookup for this key is a local hit. */
+    private Optional<CacheHit> remoteLookup(CacheKey key) {
+        try {
+            return remote.lookup(remoteProjectId, key.value())
+                    .map(
+                            bytes -> {
+                                String digest = artifacts.store(bytes);
+                                manifests.save(key.value(), digest, bytes.length);
+                                return new CacheHit(digest, bytes.length, bytes);
+                            });
+        } catch (RemoteCacheUnavailableException | CorruptArtifactException e) {
+            return Optional.empty();
+        }
+    }
+
     /** Extracts a hit's archive into the project directory, rejecting any path-traversal attempt. */
     public void restore(CacheHit hit) {
         TaskArchive.extract(hit.archive(), projectDirectory);
     }
 
-    /** Archives the task's declared outputs, commits them to the object store, and records the manifest. */
+    /**
+     * Archives the task's declared outputs, commits them to the local object store, records the
+     * manifest, and — when a remote store is configured — best-effort uploads the same bytes so
+     * another workspace can reuse them. A remote upload failure never fails this call: local mode
+     * must keep working with zero infrastructure regardless of remote reachability.
+     */
     public CacheHit store(CacheKey key, List<String> outputGlobs) {
         byte[] archive = TaskArchive.write(projectDirectory, outputGlobs);
         String digest = artifacts.store(archive);
         manifests.save(key.value(), digest, archive.length);
+        if (remote != null) {
+            try {
+                remote.upload(remoteProjectId, key.value(), archive);
+            } catch (RemoteCacheUnavailableException e) {
+                // remote cache is best-effort; the local store above already succeeded
+            }
+        }
         return new CacheHit(digest, archive.length, archive);
     }
 
