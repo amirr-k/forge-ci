@@ -80,10 +80,11 @@ jobs:
       # forge run reports a task as failed but not which test inside it failed — the JUnit XML is
       # the only way to diagnose a failure that reproduces on CI's platform and not on a developer's.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: test-reports
           path: "**/build/test-results/**/*.xml"
+          if-no-files-found: ignore
 
       - name: comment on the pull request
         if: always() && github.event_name == 'pull_request'
