@@ -16,6 +16,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+*.tsbuildinfo
 
 # Docker / local infra
 *.pid

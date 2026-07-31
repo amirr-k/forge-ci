@@ -1,0 +1,365 @@
+:root {
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --border: #e5ddd0;
+  --text: #211f1c;
+  --text-muted: #6b6459;
+  --accent: #1f6f5c;
+  --affected: #b5651d;
+  --reused: #2f7d4f;
+  --running: #2563a8;
+  --failed: #b3261e;
+  --skipped: #948d80;
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171512;
+    --surface: #211f1c;
+    --border: #3a352c;
+    --text: #f2ede3;
+    --text-muted: #ada496;
+    --accent: #57c9a8;
+    --affected: #e0964a;
+    --reused: #5cc98a;
+    --running: #6ea8e0;
+    --failed: #e0635a;
+    --skipped: #6b6459;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #171512;
+  --surface: #211f1c;
+  --border: #3a352c;
+  --text: #f2ede3;
+  --text-muted: #ada496;
+  --accent: #57c9a8;
+  --affected: #e0964a;
+  --reused: #5cc98a;
+  --running: #6ea8e0;
+  --failed: #e0635a;
+  --skipped: #6b6459;
+}
+
+:root[data-theme="light"] {
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --border: #e5ddd0;
+  --text: #211f1c;
+  --text-muted: #6b6459;
+  --accent: #1f6f5c;
+  --affected: #b5651d;
+  --reused: #2f7d4f;
+  --running: #2563a8;
+  --failed: #b3261e;
+  --skipped: #948d80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.wordmark {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.app-footer {
+  display: flex;
+  gap: 1.25rem;
+  justify-content: center;
+  padding: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.app-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+  color: var(--text);
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+}
+
+.subhead {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  max-width: 46ch;
+  margin: 0 0 2rem;
+}
+
+.button {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--bg);
+  transition: opacity 0.15s ease;
+}
+
+.button:hover:not(:disabled),
+.button:focus-visible {
+  opacity: 0.9;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.graph {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.graph-node {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.graph-node.is-changed {
+  border-color: var(--affected);
+  color: var(--affected);
+  font-weight: 600;
+}
+
+.graph-node.is-affected {
+  border-color: var(--affected);
+  color: var(--affected);
+}
+
+.terminals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 720px) {
+  .terminals {
+    grid-template-columns: 1fr;
+  }
+}
+
+.terminal {
+  background: #14120f;
+  color: #e5ddd0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.terminal-title {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid #2a2620;
+  color: #cfc7b8;
+}
+
+.terminal-body {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  min-height: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.terminal-line {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.terminal-line.affected {
+  color: var(--affected);
+}
+
+.terminal-line.reused {
+  color: var(--reused);
+}
+
+.terminal-line.running {
+  color: var(--running);
+}
+
+.terminal-line.failed {
+  color: var(--failed);
+}
+
+.terminal-line.skipped {
+  color: var(--skipped);
+}
+
+.timers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 720px) {
+  .timers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.timer {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.timer-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.timer-value {
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+
+.result-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  margin: 0 0 0.5rem;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 480px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.result-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.result-stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+}
+
+.crash-summary {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+.status-banner {
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.status-banner.error {
+  border-color: var(--failed);
+  color: var(--failed);
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.link-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
