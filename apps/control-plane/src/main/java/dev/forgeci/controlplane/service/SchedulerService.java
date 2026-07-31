@@ -354,9 +354,12 @@ public class SchedulerService {
                 continue;
             }
             TaskDefinitionEntity definition = definitionByName.get(sibling.getTaskName());
+            // a dependency absent from this build's task list was never selected for it — exactly
+            // like ReadinessEvaluator.isImmediatelyReady, that means it was already satisfied
+            // before the build was planned, not that it's now permanently unsatisfiable
             boolean allSatisfied =
                     definition.getDependsOn().stream()
-                            .allMatch(dep -> isSatisfied(stateByName.get(dep)));
+                            .allMatch(dep -> !stateByName.containsKey(dep) || isSatisfied(stateByName.get(dep)));
             if (allSatisfied) {
                 promoteToReadyOrCached(sibling, completed.getBuild().getProject().getId());
             }

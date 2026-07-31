@@ -81,6 +81,29 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
     }
 
     @Test
+    void dependentPromotesAfterItsOnlySubmittedDependencyFinishesEvenWithUnsubmittedDependencies() {
+        long projectId = registerProject();
+        String suffix = UUID.randomUUID().toString();
+        PlanSubmissionResponse plan =
+                rest.postForObject(
+                        "/api/projects/" + projectId + "/plans",
+                        TestFixtures.partialDependencyPlan("rev-partial-" + suffix, "rev-0", suffix),
+                        PlanSubmissionResponse.class);
+        BuildResponse build = createBuild(projectId, plan.id());
+
+        long workerId = registerWorker("worker-partial-" + suffix);
+        ClaimedTaskResponse pricing = claimMine(workerId, Set.of("pricing:build"));
+        reportResult(pricing, true, 0, null, null);
+
+        // checkout:integration must become claimable once pricing:build (its only submitted
+        // dependency) succeeds — payments:build was never part of this plan and must not block it
+        ClaimedTaskResponse checkout = claimMine(workerId, Set.of("checkout:integration"));
+        reportResult(checkout, true, 0, null, null);
+
+        awaitBuildState(build.id(), BuildState.SUCCEEDED);
+    }
+
+    @Test
     void independentTasksClaimedByTwoWorkersRunInParallel() throws Exception {
         long projectId = registerProject();
         String suffix = UUID.randomUUID().toString();

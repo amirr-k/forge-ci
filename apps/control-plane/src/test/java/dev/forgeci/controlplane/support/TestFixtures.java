@@ -114,6 +114,42 @@ public final class TestFixtures {
                 List.of());
     }
 
+    /**
+     * {@code checkout:integration} depends on both {@code pricing:build} (submitted, must
+     * actually run) and {@code payments:build} (never submitted — an "unaffected" dependency the
+     * plan omits on purpose, the way an affected-only plan is meant to work). Regression coverage
+     * for a scheduler bug where a dependency absent from the build was wrongly treated as
+     * unsatisfied forever instead of already-satisfied, permanently starving any dependent that
+     * also had at least one dependency actually in the plan.
+     */
+    public static PlanSubmissionRequest partialDependencyPlan(String revision, String baseRevision, String suffix) {
+        return new PlanSubmissionRequest(
+                revision,
+                baseRevision,
+                false,
+                List.of("services/pricing/src/PriceCalculator.java"),
+                List.of(
+                        new TaskDefinitionRequest(
+                                "pricing:build",
+                                List.of(),
+                                "sha256:pricing-partial-" + suffix,
+                                "source changed",
+                                shellCommand("pricing"),
+                                List.of("build/pricing/**"),
+                                List.of(),
+                                60),
+                        new TaskDefinitionRequest(
+                                "checkout:integration",
+                                List.of("pricing:build", "payments:build"),
+                                "sha256:checkout-partial-" + suffix,
+                                "pricing:build output may change",
+                                shellCommand("checkout"),
+                                List.of("build/checkout/**"),
+                                List.of(),
+                                60)),
+                List.of("payments:build"));
+    }
+
     /** Same shape as {@link #twoTaskPlan}, but with cache keys unique to this call — safe to reuse across tests. */
     public static PlanSubmissionRequest twoTaskPlanWithUniqueKeys(String revision, String baseRevision, String suffix) {
         return new PlanSubmissionRequest(
