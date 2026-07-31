@@ -16,12 +16,13 @@ public class HealthController {
 
     /**
      * The commit this running process was built from — set by the release pipeline, never derived
-     * from the running repo (a deployed jar has no {@code .git} directory). Defaults to
-     * {@code "unknown"} for local/dev runs, where no release pipeline set it.
+     * from the running repo (a deployed jar has no {@code .git} directory). Defaults to {@code
+     * "unknown"} for local/dev runs, where no release pipeline set it.
      */
     private final String gitCommit;
 
-    public HealthController(DataSource dataSource, @Value("${forge.git-commit:unknown}") String gitCommit) {
+    public HealthController(
+            DataSource dataSource, @Value("${forge.git-commit:unknown}") String gitCommit) {
         this.dataSource = dataSource;
         this.gitCommit = gitCommit;
     }

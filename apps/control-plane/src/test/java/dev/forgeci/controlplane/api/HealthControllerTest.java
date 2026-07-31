@@ -40,7 +40,8 @@ class HealthControllerTest {
     void healthAlwaysReportsUpRegardlessOfDependencies() {
         DataSource dataSource = mock(DataSource.class);
 
-        assertThat(new HealthController(dataSource, "unknown").health()).containsEntry("status", "UP");
+        assertThat(new HealthController(dataSource, "unknown").health())
+                .containsEntry("status", "UP");
     }
 
     @Test
@@ -56,6 +57,7 @@ class HealthControllerTest {
     void versionDefaultsToUnknownRatherThanFabricatingACommit() {
         DataSource dataSource = mock(DataSource.class);
 
-        assertThat(new HealthController(dataSource, "unknown").version()).containsEntry("commit", "unknown");
+        assertThat(new HealthController(dataSource, "unknown").version())
+                .containsEntry("commit", "unknown");
     }
 }

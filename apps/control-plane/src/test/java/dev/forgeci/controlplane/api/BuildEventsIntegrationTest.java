@@ -121,11 +121,11 @@ class BuildEventsIntegrationTest extends ControlPlaneIntegrationTest {
         // the request builder's own .timeout() bounds connection/header time, but does not reliably
         // bound how long collecting a streamed (chunked, SSE) body via BodyHandlers.ofString() can
         // take if the server-side emitter is slow to close — sendAsync().get(timeout) enforces a
-        // hard wall-clock bound on the whole exchange regardless, so a stuck emitter fails this test
+        // hard wall-clock bound on the whole exchange regardless, so a stuck emitter fails this
+        // test
         // in 15s instead of hanging indefinitely
         HttpResponse<String> response =
-                client
-                        .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                         .get(15, java.util.concurrent.TimeUnit.SECONDS);
 
         assertThat(response.statusCode()).isEqualTo(200);

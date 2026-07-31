@@ -6,6 +6,7 @@ import dev.forgeci.controlplane.domain.PlanSubmission;
 import dev.forgeci.controlplane.domain.Project;
 import dev.forgeci.controlplane.repository.PlanSubmissionRepository;
 import dev.forgeci.controlplane.repository.ProjectRepository;
+import org.hibernate.Hibernate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,8 +41,8 @@ public class PlanSubmissionService {
                         projectId, request.revision(), request.baseRevision());
         if (existing.isPresent()) {
             PlanSubmission found = existing.get();
-            found.getTasks()
-                    .size(); // force-load while the session is still open for the DTO mapper
+            Hibernate.initialize(
+                    found.getTasks()); // load while the session is still open for the DTO mapper
             return found;
         }
 

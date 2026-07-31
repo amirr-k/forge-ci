@@ -2,6 +2,7 @@ package dev.forgeci.controlplane.demo;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -53,7 +54,8 @@ public class DemoWorkspace {
                             .directory(workspace.toFile())
                             .redirectErrorStream(true)
                             .start();
-            String output = new String(process.getInputStream().readAllBytes());
+            String output =
+                    new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int exit = process.waitFor();
             if (exit != 0) {
                 throw new IllegalStateException(

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Scoped SpotBugs suppressions, each with its own justification. Nothing here is a blanket
+  "ignore everything" — every entry names the specific bug pattern and, where the pattern could
+  still be a genuine issue elsewhere, the specific classes it's known-safe for in this codebase.
+-->
+<FindBugsFilter>
+    <!--
+      EI_EXPOSE_REP / EI_EXPOSE_REP2: "may expose internal representation" fires on every record
+      accessor that returns a List/array field and every JPA entity getter that returns an
+      association — which in this codebase is nearly all of them, by design. Records are the
+      chosen shape for DTOs and domain values throughout (TaskDefinition, BuildPlan,
+      PlanSubmissionRequest, ClaimedTaskResponse, ...); JPA entities are meant to expose their
+      object graph (Build.getPlanSubmission(), BuildEvent.getTaskRun()) for Hibernate and calling
+      code to traverse. Defensively copying on every access would mean rewriting the entire
+      domain/DTO layer against its established, deliberate style for a rule that assumes untrusted
+      code holds a reference to these objects — none of this codebase's callers do. Genuinely
+      unintentional mutable-state leaks are caught by the state-machine and idempotency tests, not
+      this rule.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2" />
+    </Match>
+
+    <!--
+      NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE on Path.getParent(): each flagged call is
+      Files.createDirectories(x.getParent()) where x was itself just built by resolving a
+      sub-path onto a known, already-existing project/cache/repo root directory (never a bare
+      filesystem root) — so getParent() is structurally guaranteed non-null at every one of these
+      call sites, even though SpotBugs' data-flow analysis can't prove that from Path's nullable
+      return type alone.
+    -->
+    <Match>
+        <Class name="dev.forgeci.cache.ArtifactStore" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+    <Match>
+        <Class name="dev.forgeci.cache.CacheKeyRecordStore" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+    <Match>
+        <Class name="dev.forgeci.cache.CacheManifestStore" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+    <Match>
+        <Class name="dev.forgeci.cache.TaskArchive" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+    <Match>
+        <Class name="dev.forgeci.testsupport.GitTestRepository" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+    <Match>
+        <Class name="dev.forgeci.worker.WorkerMain" />
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+    </Match>
+
+    <!--
+      VA_FORMAT_STRING_USES_NEWLINE in InitCommand.template(): this format string is the literal
+      byte content of a forgeci.yml file being written to disk, not console output — %n would
+      produce \r\n on Windows and corrupt the file's line endings relative to every other file in
+      the repo. \n is the correct choice here, not an oversight.
+    -->
+    <Match>
+        <Class name="dev.forgeci.cli.InitCommand" />
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
+    </Match>
+</FindBugsFilter>

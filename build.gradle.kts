@@ -39,6 +39,7 @@ subprojects {
         ignoreFailures.set(false)
         effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
         reportLevel.set(com.github.spotbugs.snom.Confidence.MEDIUM)
+        excludeFilter.set(rootProject.file("spotbugs-exclude.xml"))
     }
     tasks.matching { it.name == "spotbugsTest" }.configureEach { enabled = false }
     tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
