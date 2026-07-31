@@ -463,7 +463,7 @@ public class SchedulerService {
         throw new IllegalStateException("no task definition for task run " + taskRun.getId() + " (" + taskRun.getTaskName() + ")");
     }
 
-    private static Duration backoff(int attemptsSoFar) {
+    static Duration backoff(int attemptsSoFar) {
         long factor = 1L << Math.min(attemptsSoFar, 4);
         return RETRY_BASE.multipliedBy(factor);
     }
