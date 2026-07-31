@@ -17,13 +17,40 @@ command, dependencies, and toolchain all still match a prior run; `forge
 explain <task>` shows the cache key, its contributor breakdown, and why a
 task ran or was reused.
 
-Not built yet: remote execution, distributed workers, and the public demo
-UI.
+A Spring Boot control plane (`apps/control-plane`) now tracks build/task
+state in MySQL: project registration, plan submission, build creation, the
+`Build`/`TaskRun` state machines with transactional transitions and
+ordered `BuildEvent`s, build history with pagination, and health/readiness
+endpoints. It does not execute anything yet — no worker registration, no
+Docker execution, no remote artifact cache.
+
+Not built yet: remote artifact cache, distributed workers, Docker
+execution, and the public demo UI.
 
 ## Requirements
 
-Java 21 or newer, and Git. Nothing else — `./forge` builds the CLI itself
-on first use.
+Java 21 or newer, and Git for local mode — `./forge` builds the CLI itself
+on first use. The control plane additionally needs a MySQL instance (see
+below); nothing else in local mode touches it.
+
+## Control plane
+
+```bash
+docker run -d --name forgeci-mysql -e MYSQL_DATABASE=forgeci \
+  -e MYSQL_USER=forgeci -e MYSQL_PASSWORD=forgeci \
+  -e MYSQL_ROOT_PASSWORD=forgeci -p 3306:3306 mysql:8.0
+
+FORGE_DB_URL=jdbc:mysql://localhost:3306/forgeci \
+FORGE_DB_USER=forgeci FORGE_DB_PASSWORD=forgeci \
+  ./gradlew :apps:control-plane:bootRun
+
+curl -X POST localhost:8080/api/projects -H 'Content-Type: application/json' \
+  -d '{"name":"dispatch-lab","repositoryIdentity":"git@example.com:example/dispatch-lab.git","defaultBranch":"main","configVersion":1}'
+```
+
+`./gradlew :apps:control-plane:test` runs the Testcontainers-backed suite
+(needs a working Docker daemon) — migrations, state-transition validity,
+idempotent submission, restart survival, and event-sequence ordering.
 
 ## Quick start
 

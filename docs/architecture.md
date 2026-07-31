@@ -7,6 +7,7 @@ here describes work that is not in the repository.
 
 ```text
 apps/cli            picocli entry point; complete local mode
+apps/control-plane  Spring Boot service: build/task state, MySQL, HTTP APIs
 libs/core           graph, change analysis, planning, local execution — no Spring
 libs/config         forgeci.yml parsing and strict validation
 libs/cache          cache-key computation, deterministic archives, local content-addressed storage
@@ -14,12 +15,15 @@ libs/test-support   fixtures shared by other modules' tests
 demo/sample-monorepo  bundled demo project used by the walkthrough in the README
 ```
 
-`apps/control-plane`, `apps/worker`, and `libs/protocol` are declared in
-`settings.gradle.kts` but empty; they are filled in by later phases.
-`libs/core` deliberately has no framework dependency so planning and
-execution stay usable from the CLI alone. `libs/cache` depends only on
+`apps/worker` and `libs/protocol` are declared in `settings.gradle.kts` but
+empty; they are filled in by later phases (workers, Docker execution,
+Kafka). `libs/core` deliberately has no framework dependency so planning
+and execution stay usable from the CLI alone. `libs/cache` depends only on
 `libs/core` — the same cache-key algorithm and artifact protocol will be
 reused by the control plane and workers once remote execution lands.
+`apps/control-plane` does not depend on either — it is a standalone
+service the CLI submits plans and builds to, not a consumer of local-mode
+code.
 
 ## From a change to a plan
 
@@ -90,6 +94,56 @@ a short grace period, then kills whatever is still alive. Ctrl-C reaches a
 JVM as shutdown rather than an exception, so `forge run` installs a
 shutdown hook that interrupts the run thread — the signal the executor
 turns into terminating tasks.
+
+## Control plane
+
+`apps/control-plane` is a Spring Boot service with MySQL as the
+authoritative store for accepted build/task state — Redis, Kafka, and S3
+are not introduced until later phases, and nothing here executes a task;
+it only tracks state a CLI or worker reports.
+
+Flyway migrations (`db/migrations/`, on the service's classpath under
+`migrations/`) create the full v1 schema up front: `projects`,
+`plan_submissions` and `task_definitions` (a plan's selected tasks and
+their cache keys), `builds`, `task_runs`, `task_attempts`, `artifacts`,
+`cache_entries`, `workers`, and `build_events`. Only the tables this phase
+actually populates are read or written today; the rest exist so later
+phases migrate the schema instead of rewriting it.
+
+`Build` (`CREATED → PLANNING → RUNNING → {SUCCEEDED, FAILED, CANCELED}`)
+and `TaskRun` (`PENDING → READY → LEASED → RUNNING → {SUCCEEDED, FAILED,
+RETRY_WAIT}`, `READY → CACHED`, `PENDING → SKIPPED`) each have a dedicated
+state machine (`BuildStateMachine`, `TaskRunStateMachine`) that is the only
+path to mutating either entity's state: it validates the transition
+against a fixed allowed-edges table, rejects it outright if the caller's
+expected version no longer matches the persisted row (optimistic locking
+via a JPA `@Version` column), and emits exactly one ordered `BuildEvent`
+per accepted transition. Both machines lock the owning `Build` row
+(`SELECT ... FOR UPDATE`) for the duration of the transition so that a
+build's event sequence numbers — assigned by counting existing events for
+that build — stay gap-free under concurrent transitions on the build
+itself or any of its task runs.
+
+Submitting the same plan revision (`project id`, `revision`,
+`base revision`) twice, or creating a build for the same plan submission
+twice, returns the original row rather than creating a duplicate — the
+"no exactly-once execution, only idempotent acceptance" invariant applies
+to submission as much as to execution. Creating a build materializes a
+`TaskRun` per selected task and immediately promotes the ones with no
+in-build dependency to `READY`; a dependency outside the selected set was
+already satisfied before the plan was built, so it never blocks readiness.
+
+`GET /api/builds/{id}/artifacts` returns whatever `Artifact` rows this
+build's task runs actually reference — always empty today, since nothing
+uploads an artifact until phase 4/5 — rather than fabricating a response.
+`GET /api/health` reports liveness unconditionally; `GET /api/ready` probes
+the datasource and fails closed if MySQL is unreachable. Every request is
+tagged with a correlation id (from the caller, or generated) and, where the
+URL carries them, project/build ids, via `CorrelationIdFilter` and MDC;
+logs are emitted as JSON (Logstash encoder). Micrometer counters and timers
+cover build starts/completions/duration, task attempts/retries/duration,
+and ready-queue depth — real values driven by actual transitions, not
+placeholders.
 
 ## The `./forge` launcher
 
