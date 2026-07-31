@@ -59,6 +59,18 @@ public class TaskRun {
     @Column(name = "failure_reason")
     private String failureReason;
 
+    @Column(name = "lease_token")
+    private String leaseToken;
+
+    @Column(name = "ready_at")
+    private Instant readyAt;
+
+    @Column(name = "retry_at")
+    private Instant retryAt;
+
+    @Column(name = "critical_path_weight", nullable = false)
+    private int criticalPathWeight;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -145,5 +157,53 @@ public class TaskRun {
 
     public long getVersion() {
         return version;
+    }
+
+    public Long getWorkerId() {
+        return workerId;
+    }
+
+    public void setWorkerId(Long workerId) {
+        this.workerId = workerId;
+    }
+
+    public Instant getLeaseExpiration() {
+        return leaseExpiration;
+    }
+
+    public void setLeaseExpiration(Instant leaseExpiration) {
+        this.leaseExpiration = leaseExpiration;
+    }
+
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public void setLeaseToken(String leaseToken) {
+        this.leaseToken = leaseToken;
+    }
+
+    public Instant getReadyAt() {
+        return readyAt;
+    }
+
+    public void setReadyAt(Instant readyAt) {
+        this.readyAt = readyAt;
+    }
+
+    public Instant getRetryAt() {
+        return retryAt;
+    }
+
+    public void setRetryAt(Instant retryAt) {
+        this.retryAt = retryAt;
+    }
+
+    public int getCriticalPathWeight() {
+        return criticalPathWeight;
+    }
+
+    public void setCriticalPathWeight(int criticalPathWeight) {
+        this.criticalPathWeight = criticalPathWeight;
     }
 }

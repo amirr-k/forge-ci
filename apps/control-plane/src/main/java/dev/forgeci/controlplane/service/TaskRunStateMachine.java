@@ -104,7 +104,9 @@ public class TaskRunStateMachine {
 
         taskRun.setState(target);
         Instant now = Instant.now();
-        if (target == TaskRunState.LEASED) {
+        if (target == TaskRunState.READY) {
+            taskRun.setReadyAt(now);
+        } else if (target == TaskRunState.LEASED) {
             int attemptNumber = taskRun.getAttemptCount() + 1;
             taskRun.setAttemptCount(attemptNumber);
             taskAttemptRepository.save(new TaskAttempt(taskRun, attemptNumber, target));

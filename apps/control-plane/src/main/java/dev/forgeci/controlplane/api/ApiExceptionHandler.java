@@ -2,6 +2,7 @@ package dev.forgeci.controlplane.api;
 
 import dev.forgeci.controlplane.service.ArtifactIntegrityException;
 import dev.forgeci.controlplane.service.InvalidTransitionException;
+import dev.forgeci.controlplane.service.LeaseRejectedException;
 import dev.forgeci.controlplane.service.NotFoundException;
 import dev.forgeci.controlplane.service.StaleTransitionException;
 import java.util.Map;
@@ -27,6 +28,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(StaleTransitionException.class)
     public ResponseEntity<Map<String, String>> staleTransition(StaleTransitionException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "stale_transition", "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(LeaseRejectedException.class)
+    public ResponseEntity<Map<String, String>> leaseRejected(LeaseRejectedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "lease_rejected", "message", e.getMessage()));
     }
 
     @ExceptionHandler(ArtifactIntegrityException.class)

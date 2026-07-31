@@ -23,12 +23,29 @@ public final class TestFixtures {
                 false,
                 List.of("services/pricing/src/PriceCalculator.java"),
                 List.of(
-                        new TaskDefinitionRequest("pricing:build", List.of(), "sha256:pricing", "source changed"),
+                        new TaskDefinitionRequest(
+                                "pricing:build",
+                                List.of(),
+                                "sha256:pricing",
+                                "source changed",
+                                shellCommand("pricing"),
+                                List.of("build/pricing/**"),
+                                List.of(),
+                                60),
                         new TaskDefinitionRequest(
                                 "checkout:integration",
                                 List.of("pricing:build"),
                                 "sha256:checkout",
-                                "pricing:build output may change")),
+                                "pricing:build output may change",
+                                shellCommand("checkout"),
+                                List.of("build/checkout/**"),
+                                List.of(),
+                                60)),
                 List.of("catalog:build"));
+    }
+
+    /** A shell command that deterministically produces one output file under {@code build/<name>/}. */
+    public static List<String> shellCommand(String name) {
+        return List.of("/bin/sh", "-c", "mkdir -p build/" + name + " && echo built > build/" + name + "/out.txt");
     }
 }

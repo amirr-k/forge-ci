@@ -48,7 +48,15 @@ public class PlanSubmissionService {
                         request.changedPaths(),
                         request.unaffectedTasks());
         for (TaskDefinitionRequest task : request.tasks()) {
-            submission.addTask(task.name(), task.dependsOn(), task.cacheKey(), task.reason());
+            submission.addTask(
+                    task.name(),
+                    task.dependsOn(),
+                    task.cacheKey(),
+                    task.reason(),
+                    task.command(),
+                    task.outputs(),
+                    task.environment(),
+                    task.timeoutSeconds());
         }
 
         try {

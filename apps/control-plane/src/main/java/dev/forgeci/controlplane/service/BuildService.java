@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -98,10 +99,13 @@ public class BuildService {
     private void materializeAndAdvance(Long buildId, PlanSubmission planSubmission) {
         Build build = buildRepository.findById(buildId).orElseThrow();
         List<TaskDefinitionEntity> tasks = planSubmission.getTasks();
+        Map<String, Integer> criticalPathWeights = CriticalPathCalculator.weights(tasks);
 
         List<TaskRun> created = new ArrayList<>(tasks.size());
         for (TaskDefinitionEntity task : tasks) {
-            created.add(taskRunRepository.save(new TaskRun(build, task.getTaskName(), task.getCacheKey())));
+            TaskRun taskRun = new TaskRun(build, task.getTaskName(), task.getCacheKey());
+            taskRun.setCriticalPathWeight(criticalPathWeights.getOrDefault(task.getTaskName(), 0));
+            created.add(taskRunRepository.save(taskRun));
         }
 
         build = buildStateMachine.transition(buildId, build.getVersion(), BuildState.PLANNING);

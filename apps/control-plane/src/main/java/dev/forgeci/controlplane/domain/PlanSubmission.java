@@ -68,8 +68,18 @@ public class PlanSubmission {
         this.unaffectedTasks = unaffectedTasks;
     }
 
-    public void addTask(String taskName, List<String> dependsOn, String cacheKey, String reason) {
-        tasks.add(new TaskDefinitionEntity(this, taskName, dependsOn, cacheKey, reason));
+    public void addTask(
+            String taskName,
+            List<String> dependsOn,
+            String cacheKey,
+            String reason,
+            List<String> command,
+            List<String> outputs,
+            List<String> environment,
+            int timeoutSeconds) {
+        tasks.add(
+                new TaskDefinitionEntity(
+                        this, taskName, dependsOn, cacheKey, reason, command, outputs, environment, timeoutSeconds));
     }
 
     public Long getId() {

@@ -1,7 +1,9 @@
 package dev.forgeci.controlplane.service;
 
 import dev.forgeci.controlplane.domain.TaskRunState;
+import dev.forgeci.controlplane.domain.WorkerState;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
+import dev.forgeci.controlplane.repository.WorkerRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -20,8 +22,9 @@ public class BuildMetrics {
     private final Timer taskDuration;
     private final Counter taskAttempts;
     private final Counter taskRetries;
+    private final Counter leaseExpirations;
 
-    public BuildMetrics(MeterRegistry registry, TaskRunRepository taskRunRepository) {
+    public BuildMetrics(MeterRegistry registry, TaskRunRepository taskRunRepository, WorkerRepository workerRepository) {
         this.buildsStarted = Counter.builder("forge.builds.started").register(registry);
         this.buildsSucceeded = Counter.builder("forge.builds.completed").tag("result", "succeeded").register(registry);
         this.buildsFailed = Counter.builder("forge.builds.completed").tag("result", "failed").register(registry);
@@ -30,7 +33,9 @@ public class BuildMetrics {
         this.taskDuration = Timer.builder("forge.tasks.duration").register(registry);
         this.taskAttempts = Counter.builder("forge.tasks.attempts").register(registry);
         this.taskRetries = Counter.builder("forge.tasks.retries").register(registry);
+        this.leaseExpirations = Counter.builder("forge.tasks.lease_expirations").register(registry);
         registry.gauge("forge.scheduler.ready_queue_depth", taskRunRepository, repo -> repo.countByState(TaskRunState.READY));
+        registry.gauge("forge.workers.active", workerRepository, repo -> repo.countByState(WorkerState.ACTIVE));
     }
 
     public void buildStarted() {
@@ -58,6 +63,10 @@ public class BuildMetrics {
 
     public void taskRetried() {
         taskRetries.increment();
+    }
+
+    public void leaseExpired() {
+        leaseExpirations.increment();
     }
 
     public void taskCompleted(Duration duration) {
