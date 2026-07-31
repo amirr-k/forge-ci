@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: forge-control-plane
+  datasource:
+    url: ${FORGE_DB_URL:jdbc:mysql://localhost:3306/forgeci}
+    username: ${FORGE_DB_USER:forgeci}
+    password: ${FORGE_DB_PASSWORD:forgeci}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    locations: classpath:migrations
+    baseline-on-migrate: false
+
+server:
+  port: ${FORGE_SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    readinessstate:
+      enabled: true
+
+forge:
+  build-history:
+    default-page-size: 20
+    max-page-size: 100
