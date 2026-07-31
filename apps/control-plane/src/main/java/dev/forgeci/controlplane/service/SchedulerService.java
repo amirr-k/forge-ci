@@ -372,6 +372,14 @@ public class SchedulerService {
      * verified artifact already exists for its cache key, per
      * spec/reference/architecture.md#affected-task-analysis ("convert valid hits to CACHED").
      * Reused directly by {@link BuildService} for a build's initially-ready task runs.
+     *
+     * <p>A {@code CACHED} outcome must cascade to dependents exactly like a worker-reported {@code
+     * SUCCEEDED} does ({@link #isSatisfied} already treats them identically) — nothing else will
+     * ever call {@link #reportResult} for a task that was never claimed by a worker, so without
+     * this a cache hit on any task with dependents would strand the rest of the build in {@code
+     * PENDING} forever. Completion itself is left to the caller (every call site already checks
+     * it right after triggering promotion) — calling {@link #maybeCompleteBuild} again from here
+     * would re-enter it inside the same transaction for no benefit.
      */
     @Transactional
     public void promoteToReadyOrCached(TaskRun taskRun, Long projectId) {
@@ -386,12 +394,16 @@ public class SchedulerService {
         if (hit.isEmpty()) {
             return;
         }
+        TaskRun cached;
         try {
-            taskRunStateMachine.transition(
-                    ready.getId(), ready.getVersion(), TaskRunState.CACHED, new TaskRunOutcome(null, null, hit.get().getDigest()));
+            cached =
+                    taskRunStateMachine.transition(
+                            ready.getId(), ready.getVersion(), TaskRunState.CACHED, new TaskRunOutcome(null, null, hit.get().getDigest()));
         } catch (StaleTransitionException | InvalidTransitionException raced) {
             log.debug("task run {} cache-hit promotion raced with another transition", ready.getId());
+            return;
         }
+        promoteReadyDependents(cached);
     }
 
     private static boolean isSatisfied(TaskRunState state) {

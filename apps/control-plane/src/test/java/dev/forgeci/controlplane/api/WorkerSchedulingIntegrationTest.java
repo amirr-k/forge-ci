@@ -81,6 +81,39 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
     }
 
     @Test
+    void aCacheHitOnATaskWithADependentStillCascadesToThatDependent() {
+        long projectId = registerProject();
+        String suffix = UUID.randomUUID().toString();
+
+        PlanSubmissionResponse plan1 =
+                rest.postForObject(
+                        "/api/projects/" + projectId + "/plans",
+                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-1", "rev-0", suffix),
+                        PlanSubmissionResponse.class);
+        BuildResponse build1 = createBuild(projectId, plan1.id());
+        long workerId = registerWorker("worker-cascade-" + suffix);
+        ClaimedTaskResponse pricing1 = claimMine(workerId, Set.of("pricing:build"));
+        String pricingDigest = uploadArtifact(projectId, "sha256:pricing-" + suffix, "pricing output".getBytes(StandardCharsets.UTF_8));
+        reportResult(pricing1, true, 0, null, pricingDigest);
+        ClaimedTaskResponse checkout1 = claimMine(workerId, Set.of("checkout:integration"));
+        String checkoutDigest = uploadArtifact(projectId, "sha256:checkout-" + suffix, "checkout output".getBytes(StandardCharsets.UTF_8));
+        reportResult(checkout1, true, 0, null, checkoutDigest);
+        awaitBuildState(build1.id(), BuildState.SUCCEEDED);
+
+        // resubmitting the identical plan: pricing:build hits cache immediately at build creation
+        // (zero in-plan dependencies) — checkout:integration must still be promoted and checked
+        // for its own cache hit rather than being stranded PENDING behind a task that never ran
+        PlanSubmissionResponse plan2 =
+                rest.postForObject(
+                        "/api/projects/" + projectId + "/plans",
+                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-2", "rev-0", suffix),
+                        PlanSubmissionResponse.class);
+        BuildResponse build2 = createBuild(projectId, plan2.id());
+
+        awaitBuildState(build2.id(), BuildState.SUCCEEDED);
+    }
+
+    @Test
     void dependentPromotesAfterItsOnlySubmittedDependencyFinishesEvenWithUnsubmittedDependencies() {
         long projectId = registerProject();
         String suffix = UUID.randomUUID().toString();
