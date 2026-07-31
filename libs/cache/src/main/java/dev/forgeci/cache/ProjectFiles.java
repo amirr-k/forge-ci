@@ -27,7 +27,10 @@ final class ProjectFiles {
         }
         TreeSet<String> matches = new TreeSet<>();
         try (Stream<Path> walk = Files.walk(projectDirectory)) {
-            walk.filter(Files::isRegularFile)
+            // NOFOLLOW_LINKS: a symlink is never a task input or output. Following one would let a
+            // declared glob hash and archive bytes from outside the project directory, which both
+            // leaks host files into a shared artifact and makes the cache key non-relocatable.
+            walk.filter(file -> Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS))
                     .forEach(
                             file -> {
                                 String relative =
