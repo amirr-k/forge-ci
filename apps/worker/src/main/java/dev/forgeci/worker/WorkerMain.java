@@ -10,6 +10,7 @@ import dev.forgeci.protocol.WorkerRegistrationRequest;
 import dev.forgeci.protocol.WorkerRegistrationResponse;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -138,26 +139,61 @@ public final class WorkerMain {
         }
     }
 
-    /** A fresh named volume mounted at the workspace root is empty on first boot — seed it once from the image's bundled copy. */
+    /**
+     * A fresh named volume mounted at the workspace root is empty on first boot — seed it once from
+     * the image's bundled copy. Every worker shares that one volume and boots at the same time, so
+     * plain "is it empty?" would let two of them copy concurrently and the loser would die on an
+     * already-created file. Directory creation is atomic on POSIX: whoever creates the lock owns the
+     * seeding, and the others block on the completion marker so nobody runs against a half-copy.
+     */
     private static void seedWorkspaceIfEmpty(WorkerConfig config) {
         if (config.seedWorkspaceFrom() == null) {
             return;
         }
         Path root = config.workspaceRoot();
+        Path seeded = root.resolve(".forge-seeded");
+        Path lock = root.resolve(".forge-seeding");
         try {
             Files.createDirectories(root);
-            boolean empty;
-            try (Stream<Path> entries = Files.list(root)) {
-                empty = entries.findAny().isEmpty();
-            }
-            if (!empty) {
+            if (Files.exists(seeded)) {
                 return;
             }
-            log.log(System.Logger.Level.INFO, "seeding empty workspace {0} from {1}", root, config.seedWorkspaceFrom());
-            copyRecursively(config.seedWorkspaceFrom(), root);
+            try {
+                Files.createDirectory(lock);
+            } catch (FileAlreadyExistsException seedingElsewhere) {
+                awaitSeedCompletion(seeded);
+                return;
+            }
+            if (isEmptyApartFromLock(root, lock)) {
+                log.log(System.Logger.Level.INFO, "seeding empty workspace {0} from {1}", root, config.seedWorkspaceFrom());
+                copyRecursively(config.seedWorkspaceFrom(), root);
+            }
+            Files.createFile(seeded);
         } catch (IOException e) {
             throw new UncheckedIOException("failed to seed workspace from " + config.seedWorkspaceFrom(), e);
         }
+    }
+
+    private static boolean isEmptyApartFromLock(Path root, Path lock) throws IOException {
+        try (Stream<Path> entries = Files.list(root)) {
+            return entries.noneMatch(entry -> !entry.equals(lock));
+        }
+    }
+
+    /** Bounded so a worker whose peer died mid-seed fails with a clear error instead of hanging forever. */
+    private static void awaitSeedCompletion(Path seeded) throws IOException {
+        for (int attempt = 0; attempt < 120; attempt++) {
+            if (Files.exists(seeded)) {
+                return;
+            }
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted waiting for another worker to seed the workspace", e);
+            }
+        }
+        throw new IOException("timed out waiting for another worker to finish seeding the workspace");
     }
 
     private static void copyRecursively(Path source, Path target) throws IOException {
