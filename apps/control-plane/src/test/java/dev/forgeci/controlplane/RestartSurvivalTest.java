@@ -12,7 +12,9 @@ import dev.forgeci.controlplane.service.PlanSubmissionService;
 import dev.forgeci.controlplane.service.ProjectService;
 import dev.forgeci.controlplane.support.MinioTestContainer;
 import dev.forgeci.controlplane.support.MySqlTestContainer;
+import dev.forgeci.controlplane.support.RedisTestContainer;
 import dev.forgeci.controlplane.support.TestFixtures;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -23,6 +25,7 @@ import org.springframework.context.ConfigurableApplicationContext;
  * that context is torn down (as a process exit would be), and a brand-new context — pointed at the
  * same MySQL instance — must see the same accepted state. No in-memory state is relied on.
  */
+@Tag("integration")
 class RestartSurvivalTest {
 
     private ConfigurableApplicationContext startContext() {
@@ -36,7 +39,12 @@ class RestartSurvivalTest {
                         "--forge.artifacts.s3.endpoint-override=" + MinioTestContainer.INSTANCE.getS3URL(),
                         "--forge.artifacts.s3.access-key=" + MinioTestContainer.INSTANCE.getUserName(),
                         "--forge.artifacts.s3.secret-key=" + MinioTestContainer.INSTANCE.getPassword(),
-                        "--forge.artifacts.s3.bucket=forgeci-artifacts-restart-test");
+                        "--forge.artifacts.s3.bucket=forgeci-artifacts-restart-test",
+                        // pinned to the shared container, not the application.yml default: an ambient
+                        // localhost Redis is exactly the kind of hidden dependency that passes on a
+                        // developer's machine and fails on a clean runner
+                        "--spring.data.redis.host=" + RedisTestContainer.host(),
+                        "--spring.data.redis.port=" + RedisTestContainer.port());
     }
 
     @Test
