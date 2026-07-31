@@ -18,7 +18,9 @@ public class DemoGuestGuard {
     private static final String RATE_LIMIT_PREFIX = "forge:demo:rate:";
     private static final Duration BUILD_LOCK_TTL = Duration.ofMinutes(5);
     private static final Duration RATE_LIMIT_WINDOW = Duration.ofSeconds(30);
-    private static final int MAX_WORKER_COUNT = 4;
+    // matches the number of worker containers deploy/compose.yaml actually runs — claiming a
+    // higher count in the UI would promise concurrency the demo fleet can't deliver
+    private static final int MAX_WORKER_COUNT = 2;
 
     private final StringRedisTemplate redis;
 

@@ -12,12 +12,22 @@ import dev.forgeci.controlplane.repository.TaskRunRepository;
 import dev.forgeci.controlplane.service.BuildService;
 import dev.forgeci.controlplane.service.PlanSubmissionService;
 import dev.forgeci.controlplane.service.WorkerService;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
-/** Orchestrates one guest demo build end to end: scenario mutation, real plan, real scheduled build. */
+/**
+ * Orchestrates one guest demo visit end to end: scenario mutation, then two real, concurrently
+ * scheduled builds against the same mutated workspace — a full rebuild ("traditional baseline")
+ * and the affected-only incremental build — so the comparison the UI shows is two genuine
+ * measured runs, never one live run next to a precomputed number (product-and-demo.md#demo-repository).
+ * Both builds compete for the same worker fleet exactly like any two unrelated builds would
+ * (apps/control-plane's scheduler already claims across a single global queue, not per-build), and
+ * both apply the identical, idempotent scenario mutation on every task, so running them at the same
+ * time against the one shared demo workspace is safe.
+ */
 @Service
 public class DemoScenarioService {
 
@@ -55,7 +65,46 @@ public class DemoScenarioService {
     }
 
     public DemoBuildResponse startBuild(DemoScenario scenario, int requestedWorkerCount) {
-        return submit(scenario, requestedWorkerCount, false, "guest-demo");
+        String token = UUID.randomUUID().toString();
+        if (!guard.tryAcquireBuildSlot(token)) {
+            throw new DemoBusyException();
+        }
+        try {
+            Project project = ensureDemoProject();
+            Path mutatedWorkspace = workspace.applyScenario(scenario);
+            int workerCount = guard.boundWorkerCount(requestedWorkerCount <= 0 ? 2 : requestedWorkerCount);
+
+            DemoPlanFactory.DemoPlan baselinePlan = planFactory.buildFull(mutatedWorkspace, scenario);
+            Build baselineBuild =
+                    submitOne(project, baselinePlan, "demo-baseline-" + scenario.scriptId() + "-" + token, true, "guest-demo-baseline", workerCount);
+
+            DemoPlanFactory.DemoPlan incrementalPlan = planFactory.build(mutatedWorkspace, scenario);
+            Build incrementalBuild =
+                    submitOne(
+                            project,
+                            incrementalPlan,
+                            "demo-incremental-" + scenario.scriptId() + "-" + token,
+                            false,
+                            "guest-demo",
+                            workerCount);
+
+            watcher.watch(List.of(baselineBuild.getId(), incrementalBuild.getId()), token);
+
+            List<DemoTaskResponse> incrementalTasks =
+                    incrementalPlan.tasks().stream().map(t -> new DemoTaskResponse(t.name(), t.dependsOn(), t.reason())).toList();
+            List<String> baselineTasks = baselinePlan.tasks().stream().map(t -> t.name()).toList();
+            return new DemoBuildResponse(
+                    baselineBuild.getId(),
+                    incrementalBuild.getId(),
+                    scenario.scriptId(),
+                    workerCount,
+                    baselineTasks,
+                    incrementalTasks,
+                    incrementalPlan.unaffectedTasks());
+        } catch (RuntimeException failedBeforeScheduling) {
+            guard.releaseBuildSlot(token);
+            throw failedBeforeScheduling;
+        }
     }
 
     /**
@@ -63,37 +112,28 @@ public class DemoScenarioService {
      * scenario has genuine prior output to describe as "reused" rather than an empty history.
      */
     public void warmUp() {
-        submit(DemoScenario.NO_CHANGE, 2, true, "warm-up");
-    }
-
-    private DemoBuildResponse submit(DemoScenario scenario, int requestedWorkerCount, boolean full, String triggerType) {
         String token = UUID.randomUUID().toString();
         if (!guard.tryAcquireBuildSlot(token)) {
-            throw new DemoBusyException();
+            return;
         }
         try {
             Project project = ensureDemoProject();
-            var mutatedWorkspace = workspace.applyScenario(scenario);
-            DemoPlanFactory.DemoPlan plan = full ? planFactory.buildFull(mutatedWorkspace, scenario) : planFactory.build(mutatedWorkspace, scenario);
-
-            String revision = "demo-" + scenario.scriptId() + "-" + token;
-            PlanSubmissionRequest planRequest =
-                    new PlanSubmissionRequest(revision, "baseline", full, plan.changedPaths(), plan.tasks(), plan.unaffectedTasks());
-            PlanSubmission submission = planSubmissionService.submit(project.getId(), planRequest);
-
-            int workerCount = guard.boundWorkerCount(requestedWorkerCount <= 0 ? 2 : requestedWorkerCount);
-            Build build = buildService.createBuild(project.getId(), new BuildCreationRequest(submission.getId(), triggerType, workerCount));
-
-            watcher.watch(build.getId(), token);
-            List<DemoTaskResponse> tasks =
-                    plan.tasks().stream()
-                            .map(t -> new DemoTaskResponse(t.name(), t.dependsOn(), t.reason()))
-                            .toList();
-            return new DemoBuildResponse(build.getId(), scenario.scriptId(), workerCount, tasks, plan.unaffectedTasks());
-        } catch (RuntimeException failedBeforeScheduling) {
+            Path mutatedWorkspace = workspace.applyScenario(DemoScenario.NO_CHANGE);
+            DemoPlanFactory.DemoPlan plan = planFactory.buildFull(mutatedWorkspace, DemoScenario.NO_CHANGE);
+            Build build = submitOne(project, plan, "demo-warmup-" + token, true, "warm-up", 2);
+            watcher.watch(List.of(build.getId()), token);
+        } catch (RuntimeException warmupFailure) {
             guard.releaseBuildSlot(token);
-            throw failedBeforeScheduling;
+            throw warmupFailure;
         }
+    }
+
+    private Build submitOne(
+            Project project, DemoPlanFactory.DemoPlan plan, String revision, boolean full, String triggerType, int workerCount) {
+        PlanSubmissionRequest planRequest =
+                new PlanSubmissionRequest(revision, "baseline", full, plan.changedPaths(), plan.tasks(), plan.unaffectedTasks());
+        PlanSubmission submission = planSubmissionService.submit(project.getId(), planRequest);
+        return buildService.createBuild(project.getId(), new BuildCreationRequest(submission.getId(), triggerType, workerCount));
     }
 
     /** Crashes whichever worker currently holds a running task in this build, for the "Crash a Worker" demo. */

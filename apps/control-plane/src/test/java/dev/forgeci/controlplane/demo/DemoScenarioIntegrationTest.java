@@ -48,9 +48,14 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
     void leafModuleChangeSelectsExactlyItsDownstreamClosure() {
         DemoBuildResponse response = demoScenarioService.startBuild(DemoScenario.LEAF_MODULE_CHANGE, 2);
 
-        assertThat(response.buildId()).isNotNull();
+        assertThat(response.baselineBuildId()).isNotNull();
+        assertThat(response.incrementalBuildId()).isNotNull();
+        assertThat(response.baselineBuildId()).isNotEqualTo(response.incrementalBuildId());
         assertThat(response.scenario()).isEqualTo("leaf-module");
         assertThat(response.workerCount()).isEqualTo(2);
+        assertThat(response.baselineTasks()).hasSize(25);
+        assertThat(response.incrementalTasks()).hasSize(5);
+        assertThat(response.unaffectedTasks()).hasSize(20);
     }
 
     @org.junit.jupiter.api.Test
@@ -70,7 +75,7 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
     void crashingAWorkerWithNothingRunningFailsRatherThanNoOp() {
         DemoBuildResponse response = demoScenarioService.startBuild(DemoScenario.SHARED_CORE_CHANGE, 2);
 
-        assertThatThrownBy(() -> demoScenarioService.crashWorker(response.buildId()))
+        assertThatThrownBy(() -> demoScenarioService.crashWorker(response.incrementalBuildId()))
                 .isInstanceOf(IllegalStateException.class);
     }
 
