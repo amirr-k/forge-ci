@@ -7,23 +7,28 @@ here describes work that is not in the repository.
 
 ```text
 apps/cli            picocli entry point; complete local mode
-apps/control-plane  Spring Boot service: build/task state, MySQL, HTTP APIs
+apps/control-plane  Spring Boot service: build/task state, MySQL, HTTP APIs, scheduler, Kafka
+apps/worker         Docker-executing worker: registers, heartbeats, claims, runs, reports
 libs/core           graph, change analysis, planning, local execution — no Spring
 libs/config         forgeci.yml parsing and strict validation
 libs/cache          cache-key computation, deterministic archives, local content-addressed storage
+libs/protocol       worker <-> control-plane JSON request/response records, shared verbatim
 libs/test-support   fixtures shared by other modules' tests
 demo/sample-monorepo  bundled demo project used by the walkthrough in the README
 ```
 
-`apps/worker` and `libs/protocol` are declared in `settings.gradle.kts` but
-empty; they are filled in by later phases (workers, Docker execution,
-Kafka). `libs/core` deliberately has no framework dependency so planning
-and execution stay usable from the CLI alone. `libs/cache` depends only on
+`libs/core` deliberately has no framework dependency so planning and
+execution stay usable from the CLI alone. `libs/cache` depends only on
 `libs/core` — the same cache-key algorithm and content-hashing (`Digests`)
 are reused by the control plane's remote artifact verification, and by
-workers once distributed execution lands. `apps/control-plane` depends on
-`libs/cache` for that one shared piece (digest computation) only — it is
-still a standalone service the CLI submits plans, builds, and artifacts
+`apps/worker` for archiving and uploading a task's outputs after it runs.
+`libs/protocol` is dependency-light (Jackson only, no Spring) so
+`apps/worker` never needs a Spring Boot classpath just to talk to the
+control plane; `apps/control-plane` uses the same records as its
+`@RequestBody`/`@ResponseBody` types, so the two processes cannot drift on
+field names. `apps/control-plane` depends on `libs/cache` for digest
+computation and cache-hit verification only — it is still a standalone
+service the CLI and workers submit plans, builds, artifacts, and results
 to, not a consumer of local-mode planning or execution code.
 
 ## From a change to a plan
@@ -99,17 +104,19 @@ turns into terminating tasks.
 ## Control plane
 
 `apps/control-plane` is a Spring Boot service with MySQL as the
-authoritative store for accepted build/task state — Redis, Kafka, and S3
-are not introduced until later phases, and nothing here executes a task;
-it only tracks state a CLI or worker reports.
+authoritative store for accepted build/task state — Redis isn't
+introduced until phase 6 (full crash-recovery reconciliation), and this
+service itself never executes a task; it only tracks state a CLI or
+worker reports and hands out work through the scheduler described below.
 
 Flyway migrations (`db/migrations/`, on the service's classpath under
-`migrations/`) create the full v1 schema up front: `projects`,
-`plan_submissions` and `task_definitions` (a plan's selected tasks and
-their cache keys), `builds`, `task_runs`, `task_attempts`, `artifacts`,
-`cache_entries`, `workers`, and `build_events`. Only the tables this phase
-actually populates are read or written today; the rest exist so later
-phases migrate the schema instead of rewriting it.
+`migrations/`) create the schema up front: `projects`, `plan_submissions`
+and `task_definitions` (a plan's selected tasks, their cache keys, and —
+since phase 5 — the command/outputs/environment/timeout a worker needs to
+actually run one), `builds`, `task_runs` (worker id, lease token/
+expiration, readiness/retry timestamps, and critical-path weight, all
+added by `V2__workers_and_scheduling.sql`), `task_attempts`, `artifacts`,
+`cache_entries`, `workers`, and `build_events`.
 
 `Build` (`CREATED → PLANNING → RUNNING → {SUCCEEDED, FAILED, CANCELED}`)
 and `TaskRun` (`PENDING → READY → LEASED → RUNNING → {SUCCEEDED, FAILED,
@@ -130,14 +137,17 @@ Submitting the same plan revision (`project id`, `revision`,
 twice, returns the original row rather than creating a duplicate — the
 "no exactly-once execution, only idempotent acceptance" invariant applies
 to submission as much as to execution. Creating a build materializes a
-`TaskRun` per selected task and immediately promotes the ones with no
-in-build dependency to `READY`; a dependency outside the selected set was
-already satisfied before the plan was built, so it never blocks readiness.
+`TaskRun` per selected task; a task with no in-build dependency goes
+straight to `READY` (a dependency outside the selected set was already
+satisfied before the plan was built, so it never blocks readiness), and
+from there straight on to `CACHED` if a verified artifact already exists
+for its cache key (`SchedulerService.promoteToReadyOrCached`) — a build
+whose every task is a cache hit completes without ever reaching a worker.
 
 `GET /api/builds/{id}/artifacts` returns whatever `Artifact` rows this
-build's task runs actually reference — always empty today, since nothing
-uploads an artifact until phase 4/5 — rather than fabricating a response.
-`GET /api/health` reports liveness unconditionally; `GET /api/ready` probes
+build's task runs actually reference, from a real verified upload or a
+cache hit — never fabricated. `GET /api/health` reports liveness
+unconditionally; `GET /api/ready` probes
 the datasource and fails closed if MySQL is unreachable. Every request is
 tagged with a correlation id (from the caller, or generated) and, where the
 URL carries them, project/build ids, via `CorrelationIdFilter` and MDC;
