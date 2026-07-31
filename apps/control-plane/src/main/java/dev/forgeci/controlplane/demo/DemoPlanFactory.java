@@ -34,18 +34,30 @@ public class DemoPlanFactory {
     private static final String TOOLCHAIN = "forge-demo-v1";
 
     public DemoPlan build(Path workspace, DemoScenario scenario) {
-        return build(workspace, scenario, false);
+        return build(workspace, scenario, false, "");
     }
 
     /** The one server-driven warm-up build: every task really executes once, so "reused previous output" is honest from the first guest visit onward. */
     public DemoPlan buildFull(Path workspace, DemoScenario baselineScenario) {
-        return build(workspace, baselineScenario, true);
+        return build(workspace, baselineScenario, true, "");
     }
 
-    private DemoPlan build(Path workspace, DemoScenario scenario, boolean full) {
+    /**
+     * The "traditional build" side of a guest comparison: also a full rebuild, but salted
+     * uniquely per guest visit so it can never hit the cache ForgeCI's own side just built up —
+     * a real non-incremental CI never reuses anything, and this build is standing in for one.
+     * Without this, a scenario a prior guest already ran would make the "traditional" side look
+     * fast too, once its own outputs from that prior run are sitting in the same cache.
+     */
+    public DemoPlan buildBaselineForComparison(Path workspace, DemoScenario scenario, String visitSalt) {
+        return build(workspace, scenario, true, visitSalt);
+    }
+
+    private DemoPlan build(Path workspace, DemoScenario scenario, boolean full, String salt) {
         ForgeConfig config = ForgeConfigParser.parse(workspace.resolve("forgeci.yml"));
         TaskGraph graph = TaskGraph.build(config);
         BuildPlan plan = full ? PlanBuilder.fullBuild(graph) : PlanBuilder.forChangedPaths(graph, scenario.changedPaths());
+        Map<String, String> environment = salt.isEmpty() ? Map.of() : Map.of("FORGE_DEMO_BASELINE_SALT", salt);
 
         Map<String, String> reasons = new LinkedHashMap<>();
         for (AffectedTask task : plan.selected()) {
@@ -60,7 +72,7 @@ public class DemoPlanFactory {
             for (String dependency : task.dependsOn()) {
                 dependencyDigests.put(dependency, digestByTask.get(dependency));
             }
-            CacheKey key = CacheKeyCalculator.compute(workspace, task, Map.of(), dependencyDigests, TOOLCHAIN);
+            CacheKey key = CacheKeyCalculator.compute(workspace, task, environment, dependencyDigests, TOOLCHAIN);
             digestByTask.put(name, key.value());
 
             String reason = reasons.get(name);

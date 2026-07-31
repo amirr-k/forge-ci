@@ -74,7 +74,7 @@ public class DemoScenarioService {
             Path mutatedWorkspace = workspace.applyScenario(scenario);
             int workerCount = guard.boundWorkerCount(requestedWorkerCount <= 0 ? 2 : requestedWorkerCount);
 
-            DemoPlanFactory.DemoPlan baselinePlan = planFactory.buildFull(mutatedWorkspace, scenario);
+            DemoPlanFactory.DemoPlan baselinePlan = planFactory.buildBaselineForComparison(mutatedWorkspace, scenario, token);
             Build baselineBuild =
                     submitOne(project, baselinePlan, "demo-baseline-" + scenario.scriptId() + "-" + token, true, "guest-demo-baseline", workerCount);
 
