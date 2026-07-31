@@ -32,7 +32,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-/** Proves GET /api/builds/{id}/events streams the real, ordered event log and closes once the build is done. */
+/**
+ * Proves GET /api/builds/{id}/events streams the real, ordered event log and closes once the build
+ * is done.
+ */
 class BuildEventsIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Autowired private TestRestTemplate rest;
@@ -40,12 +43,14 @@ class BuildEventsIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Test
     void streamsEventsForACompletedBuildThenCloses() throws Exception {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         String cacheKey = "sha256:events-" + UUID.randomUUID();
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + project.id() + "/plans",
-                        TestFixtures.singleTaskPlan("rev-events-1", "rev-0", "events:build", cacheKey),
+                        TestFixtures.singleTaskPlan(
+                                "rev-events-1", "rev-0", "events:build", cacheKey),
                         PlanSubmissionResponse.class);
         BuildResponse build =
                 rest.postForObject(
@@ -61,7 +66,10 @@ class BuildEventsIntegrationTest extends ControlPlaneIntegrationTest {
         ClaimedTaskResponse task = null;
         for (int i = 0; i < 200 && task == null; i++) {
             ResponseEntity<ClaimedTaskResponse> response =
-                    rest.postForEntity("/api/workers/" + worker.workerId() + "/claim", null, ClaimedTaskResponse.class);
+                    rest.postForEntity(
+                            "/api/workers/" + worker.workerId() + "/claim",
+                            null,
+                            ClaimedTaskResponse.class);
             if (response.getStatusCode() == HttpStatus.OK) {
                 task = response.getBody();
             } else {
@@ -75,22 +83,50 @@ class BuildEventsIntegrationTest extends ControlPlaneIntegrationTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         rest.exchange(
-                "/api/artifacts?projectId=" + project.id() + "&cacheKey=" + cacheKey + "&digest=" + digest + "&size=" + archive.length,
+                "/api/artifacts?projectId="
+                        + project.id()
+                        + "&cacheKey="
+                        + cacheKey
+                        + "&digest="
+                        + digest
+                        + "&size="
+                        + archive.length,
                 HttpMethod.POST,
                 new HttpEntity<>(archive, headers),
                 Map.class);
         rest.postForEntity(
                 "/api/task-runs/" + task.taskRunId() + "/result",
-                new TaskResultReportRequest(task.workerId(), task.leaseToken(), task.attemptId(), true, 0, null, digest),
+                new TaskResultReportRequest(
+                        task.workerId(),
+                        task.leaseToken(),
+                        task.attemptId(),
+                        true,
+                        0,
+                        null,
+                        digest),
                 Void.class);
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request =
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/builds/" + build.id() + "/events"))
+                HttpRequest.newBuilder(
+                                URI.create(
+                                        "http://localhost:"
+                                                + port
+                                                + "/api/builds/"
+                                                + build.id()
+                                                + "/events"))
                         .timeout(Duration.ofSeconds(10))
                         .GET()
                         .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        // the request builder's own .timeout() bounds connection/header time, but does not reliably
+        // bound how long collecting a streamed (chunked, SSE) body via BodyHandlers.ofString() can
+        // take if the server-side emitter is slow to close — sendAsync().get(timeout) enforces a
+        // hard wall-clock bound on the whole exchange regardless, so a stuck emitter fails this test
+        // in 15s instead of hanging indefinitely
+        HttpResponse<String> response =
+                client
+                        .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                        .get(15, java.util.concurrent.TimeUnit.SECONDS);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("build-event");

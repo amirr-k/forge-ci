@@ -1,0 +1,141 @@
+name: release
+
+# The default-branch release sequence from spec/reference/quality-and-testing.md#cicd-requirements,
+# steps 1-9. Phase 9 wires the pipeline mechanics against the one deployment target available right
+# now — the same deploy/compose.yaml stack the PR workflow's browser-smoke-test job already
+# exercises, torn down at the end of this same job. Phase 10 swaps that target for a real,
+# persistent production host; nothing about steps 1-9 themselves changes when it does.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # step 1: run all required checks
+      - name: run all required checks
+        run: ./gradlew check --continue
+      - run: npm ci --prefix ui
+      - run: npm run lint --prefix ui && npm run typecheck --prefix ui && npm run test --prefix ui
+
+      # step 2: build versioned cli, control-plane, and worker artifacts — versioned by the commit
+      # they were built from, never a hand-maintained number that can drift from what actually shipped
+      - name: build versioned artifacts
+        run: |
+          ./gradlew :apps:cli:installDist :apps:control-plane:bootJar :apps:worker:installDist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-artifacts-${{ github.sha }}
+          path: |
+            apps/cli/build/install/forge/**
+            apps/control-plane/build/libs/*.jar
+            apps/worker/build/install/worker/**
+
+      # step 3: build immutable container images — tagged by commit, never a mutable tag like
+      # "latest" that a later push could silently move out from under this release
+      - name: build immutable container images
+        run: |
+          docker build -f apps/control-plane/Dockerfile -t forgeci/control-plane:${{ github.sha }} .
+          docker build -f apps/worker/Dockerfile -t forgeci/worker:${{ github.sha }} .
+
+      # step 4: apply migrations through the release process. There is no separate migration-only
+      # step here because this stack's migrations are Spring Boot/Flyway's startup-time
+      # auto-migration against the target MySQL — step 5 (deploying the control plane) is the act
+      # of applying them; a persistent production target (phase 10) would run this same
+      # auto-migration against its own long-lived database instead of the ephemeral one below.
+      - name: start the release target's dependencies (mysql, minio, kafka, redis)
+        run: docker compose -f deploy/compose.yaml up -d mysql minio kafka redis
+
+      # step 5: deploy control plane (applies migrations per the note above on startup)
+      - name: deploy control plane
+        env:
+          FORGE_GIT_COMMIT: ${{ github.sha }}
+        run: docker compose -f deploy/compose.yaml up --build -d control-plane
+
+      - name: wait for the control plane to become ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "control plane never became ready" >&2
+          docker compose -f deploy/compose.yaml logs
+          exit 1
+
+      # step 6: deploy workers
+      - name: deploy workers
+        run: docker compose -f deploy/compose.yaml up --build -d worker-1 worker-2
+
+      # step 7: verify broker, redis, mysql, and s3 connectivity — each dependency's own compose
+      # healthcheck is the source of truth, checked explicitly rather than inferred from step 5/6
+      # merely having started without error
+      - name: verify broker, redis, mysql, and s3 connectivity
+        run: |
+          for service in mysql minio kafka redis; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose -f deploy/compose.yaml ps -q "$service")")
+            echo "$service: $status"
+            if [ "$status" != "healthy" ]; then
+              echo "$service is not healthy" >&2
+              exit 1
+            fi
+          done
+
+      # step 8: run the fixed public demo scenario — the same request the public "Begin" button sends
+      - name: run the fixed public demo scenario
+        id: demo
+        run: |
+          response=$(curl -sf -X POST http://localhost:8080/api/demo/builds \
+            -H "Content-Type: application/json" \
+            -d '{"scenario":"no-change","workerCount":2}')
+          echo "$response"
+          baseline_id=$(echo "$response" | grep -o '"baselineBuildId":[0-9]*' | grep -o '[0-9]*')
+          incremental_id=$(echo "$response" | grep -o '"incrementalBuildId":[0-9]*' | grep -o '[0-9]*')
+          for i in $(seq 1 60); do
+            baseline_state=$(curl -sf "http://localhost:8080/api/builds/$baseline_id" | grep -o '"state":"[A-Z]*"' | cut -d'"' -f4)
+            incremental_state=$(curl -sf "http://localhost:8080/api/builds/$incremental_id" | grep -o '"state":"[A-Z]*"' | cut -d'"' -f4)
+            echo "baseline=$baseline_state incremental=$incremental_state"
+            if [ "$baseline_state" = "SUCCEEDED" ] && [ "$incremental_state" = "SUCCEEDED" ]; then
+              exit 0
+            fi
+            if [ "$baseline_state" = "FAILED" ] || [ "$incremental_state" = "FAILED" ]; then
+              echo "the fixed demo scenario failed" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "the fixed demo scenario never reached a terminal state" >&2
+          exit 1
+
+      # step 9: verify the public result references the deployed commit
+      - name: verify the deployed commit
+        run: |
+          deployed=$(curl -sf http://localhost:8080/api/version | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)
+          echo "deployed commit: $deployed, expected: ${{ github.sha }}"
+          [ "$deployed" = "${{ github.sha }}" ]
+
+      - name: dump compose logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose.yaml logs
+
+      - if: always()
+        run: docker compose -f deploy/compose.yaml down -v
