@@ -15,5 +15,10 @@ public abstract class ControlPlaneIntegrationTest {
         registry.add("spring.datasource.url", MySqlTestContainer.INSTANCE::getJdbcUrl);
         registry.add("spring.datasource.username", MySqlTestContainer.INSTANCE::getUsername);
         registry.add("spring.datasource.password", MySqlTestContainer.INSTANCE::getPassword);
+
+        registry.add("forge.artifacts.s3.endpoint-override", MinioTestContainer.INSTANCE::getS3URL);
+        registry.add("forge.artifacts.s3.access-key", MinioTestContainer.INSTANCE::getUserName);
+        registry.add("forge.artifacts.s3.secret-key", MinioTestContainer.INSTANCE::getPassword);
+        registry.add("forge.artifacts.s3.bucket", () -> "forgeci-artifacts-test");
     }
 }

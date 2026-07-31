@@ -1,5 +1,6 @@
 package dev.forgeci.controlplane.api;
 
+import dev.forgeci.controlplane.service.ArtifactIntegrityException;
 import dev.forgeci.controlplane.service.InvalidTransitionException;
 import dev.forgeci.controlplane.service.NotFoundException;
 import dev.forgeci.controlplane.service.StaleTransitionException;
@@ -26,6 +27,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(StaleTransitionException.class)
     public ResponseEntity<Map<String, String>> staleTransition(StaleTransitionException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "stale_transition", "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(ArtifactIntegrityException.class)
+    public ResponseEntity<Map<String, String>> artifactIntegrity(ArtifactIntegrityException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "artifact_corrupt", "message", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

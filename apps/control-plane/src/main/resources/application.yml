@@ -33,3 +33,15 @@ forge:
   build-history:
     default-page-size: 20
     max-page-size: 100
+  artifacts:
+    cleanup-interval-ms: ${FORGE_ARTIFACT_CLEANUP_INTERVAL_MS:900000}
+    s3:
+      bucket: ${FORGE_S3_BUCKET:forgeci-artifacts}
+      region: ${FORGE_S3_REGION:us-east-1}
+      endpoint-override: ${FORGE_S3_ENDPOINT:}
+      path-style-access: ${FORGE_S3_PATH_STYLE:true}
+      access-key: ${FORGE_S3_ACCESS_KEY:}
+      secret-key: ${FORGE_S3_SECRET_KEY:}
+      temp-prefix: tmp/
+      object-prefix: artifacts/
+      temp-ttl: ${FORGE_S3_TEMP_TTL:PT1H}

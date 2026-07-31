@@ -10,6 +10,7 @@ import dev.forgeci.controlplane.domain.Project;
 import dev.forgeci.controlplane.service.BuildService;
 import dev.forgeci.controlplane.service.PlanSubmissionService;
 import dev.forgeci.controlplane.service.ProjectService;
+import dev.forgeci.controlplane.support.MinioTestContainer;
 import dev.forgeci.controlplane.support.MySqlTestContainer;
 import dev.forgeci.controlplane.support.TestFixtures;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,11 @@ class RestartSurvivalTest {
                 .run(
                         "--spring.datasource.url=" + MySqlTestContainer.INSTANCE.getJdbcUrl(),
                         "--spring.datasource.username=" + MySqlTestContainer.INSTANCE.getUsername(),
-                        "--spring.datasource.password=" + MySqlTestContainer.INSTANCE.getPassword());
+                        "--spring.datasource.password=" + MySqlTestContainer.INSTANCE.getPassword(),
+                        "--forge.artifacts.s3.endpoint-override=" + MinioTestContainer.INSTANCE.getS3URL(),
+                        "--forge.artifacts.s3.access-key=" + MinioTestContainer.INSTANCE.getUserName(),
+                        "--forge.artifacts.s3.secret-key=" + MinioTestContainer.INSTANCE.getPassword(),
+                        "--forge.artifacts.s3.bucket=forgeci-artifacts-restart-test");
     }
 
     @Test
