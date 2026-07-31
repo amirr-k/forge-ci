@@ -263,6 +263,59 @@ Total wall-clock recovery time in that run was dominated by the demo's
 deliberately generous task timeout and lease grace period, not by the
 recovery mechanism itself.
 
+## Public demo
+
+`dev.forgeci.controlplane.demo` wraps the trusted `PlanSubmissionService`/
+`BuildService` API with a guest-safe surface (`POST /api/demo/builds`,
+`POST /api/demo/builds/{id}/crash-worker`, `GET /api/benchmarks/latest`) —
+it never reimplements scheduling, it only ever builds requests for the
+existing services to accept. Every guest visit computes a real plan
+against the bundled `demo/sample-monorepo`: `DemoWorkspace` mutates a
+single shared, mutable copy of the repo by running
+`scripts/apply-scenario` (the one place a scenario's file changes are
+defined — both the control plane, for hashing, and workers, prefixed onto
+every task's command, run the identical script), and `DemoPlanFactory`
+turns the mutated tree into real `TaskDefinitionRequest`s using the same
+`AffectedTaskAnalyzer`/`CacheKeyCalculator` the CLI uses locally.
+
+A guest visit submits *two* real, concurrently scheduled builds against
+that same mutated tree — a full rebuild standing in for a traditional CI
+system, and the affected-only incremental build — so the UI's comparison
+is two genuine measured runs, never a live run next to a precomputed
+number. The traditional-build side's cache keys are salted with a random
+value unique to that visit (`DemoPlanFactory.buildBaselineForComparison`):
+without that, once any guest had run a given scenario once, a later
+guest's "traditional" build would also start hitting the now-warm cache
+and stop looking like an uncached system. `DemoGuestGuard` enforces a
+single guest build in flight at a time and per-client rate limiting via
+plain Redis TTL keys (`SETNX`), matching contracts.md's "Redis is
+acceleration/ephemeral only" rule — both checks fail closed if Redis is
+unreachable. `DemoBuildWatcher` releases the in-flight slot once every
+build from a visit reaches a terminal state, with the lock's own TTL as a
+backstop.
+
+Building this surfaced two latent bugs in the phase 3/5 scheduler, neither
+specific to the demo — any real affected-subset plan could have hit them:
+`SchedulerService.promoteReadyDependents` treated a dependency absent from
+the submitted plan (because it was unaffected and never included) as
+*unsatisfied* rather than *already satisfied*, permanently starving any
+dependent that also had at least one dependency actually in the plan; and
+`promoteToReadyOrCached` never cascaded to a cache-hit task's dependents at
+all, since nothing calls `reportResult` for a task that never reached a
+worker — so a cache hit anywhere with a dependent stranded the rest of the
+build in `PENDING` forever. Both are fixed and covered by dedicated
+`WorkerSchedulingIntegrationTest` cases that fail without the fix.
+
+The `ui/` app (Vite + React + TypeScript) is the one guest-facing
+surface: an instructions screen with a `Begin` action and a scenario
+picker, then a live dependency graph and two terminal-style panels
+(traditional vs. ForgeCI) streaming real per-task lines from
+`GET /api/builds/{id}/events` (Server-Sent Events over a short poll of
+`BuildEventRepository` — the first read-side exposure of the build event
+log), bottom-pinned live timers, a result card populated from measured
+values once both builds finish, and a `Crash a Worker` action wired to
+the existing crash-injection endpoint.
+
 ## The `./forge` launcher
 
 `./forge` is a POSIX shell script at the repository root, not a packaged
