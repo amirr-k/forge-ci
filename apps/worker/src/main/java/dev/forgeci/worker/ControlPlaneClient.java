@@ -2,6 +2,7 @@ package dev.forgeci.worker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.forgeci.protocol.ClaimedTaskResponse;
+import dev.forgeci.protocol.HeartbeatResponse;
 import dev.forgeci.protocol.LogChunkRequest;
 import dev.forgeci.protocol.TaskResultReportRequest;
 import dev.forgeci.protocol.WorkerRegistrationRequest;
@@ -43,12 +44,13 @@ public final class ControlPlaneClient {
         return readValue(response.body(), WorkerRegistrationResponse.class);
     }
 
-    public void heartbeat(long workerId) {
+    public HeartbeatResponse heartbeat(long workerId) {
         HttpRequest request = requestBuilder("/api/workers/" + workerId + "/heartbeat").POST(HttpRequest.BodyPublishers.noBody()).build();
         HttpResponse<String> response = send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 204) {
+        if (response.statusCode() != 200) {
             throw new ControlPlaneUnavailableException("heartbeat failed: HTTP " + response.statusCode());
         }
+        return readValue(response.body(), HeartbeatResponse.class);
     }
 
     /** Empty means no claimable task run right now — not an error, the caller should poll again. */

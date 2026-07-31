@@ -32,4 +32,6 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
     List<TaskRun> findByStateAndRetryAtBefore(TaskRunState state, Instant cutoff);
 
     List<TaskRun> findByStateInAndLeaseExpirationBefore(List<TaskRunState> states, Instant cutoff);
+
+    List<TaskRun> findByStateIn(List<TaskRunState> states);
 }

@@ -56,6 +56,19 @@ services:
       timeout: 5s
       retries: 20
 
+  # Ephemeral only — heartbeat/lease acceleration cache, per
+  # spec/reference/contracts.md#redis-responsibilities. The control plane reconciles this from
+  # MySQL (the state of truth) on a schedule, so a flush or restart here never loses build state.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   control-plane:
     build:
       context: ..
@@ -66,6 +79,8 @@ services:
       minio:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       FORGE_DB_URL: jdbc:mysql://mysql:3306/forgeci
@@ -78,6 +93,8 @@ services:
       FORGE_S3_SECRET_KEY: forgeci-artifact-store
       FORGE_S3_PATH_STYLE: "true"
       FORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      FORGE_REDIS_HOST: redis
+      FORGE_REDIS_PORT: "6379"
     ports:
       - "8080:8080"
     healthcheck:

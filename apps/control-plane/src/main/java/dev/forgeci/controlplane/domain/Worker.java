@@ -44,6 +44,9 @@ public class Worker {
     @Column(name = "version_label", nullable = false)
     private String versionLabel;
 
+    @Column(name = "crash_requested", nullable = false)
+    private boolean crashRequested;
+
     protected Worker() {}
 
     public Worker(String externalId, List<String> capabilities, int maxConcurrency, String versionLabel) {
@@ -96,5 +99,13 @@ public class Worker {
 
     public String getVersionLabel() {
         return versionLabel;
+    }
+
+    public boolean isCrashRequested() {
+        return crashRequested;
+    }
+
+    public void setCrashRequested(boolean crashRequested) {
+        this.crashRequested = crashRequested;
     }
 }

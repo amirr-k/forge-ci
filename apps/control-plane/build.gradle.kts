@@ -24,6 +24,7 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.29.16"))
     implementation("software.amazon.awssdk:s3")
     implementation("org.springframework.kafka:spring-kafka")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.kafka:spring-kafka-test")

@@ -8,6 +8,7 @@ import dev.forgeci.controlplane.domain.TaskRun;
 import dev.forgeci.controlplane.domain.TaskRunState;
 import dev.forgeci.controlplane.domain.Worker;
 import dev.forgeci.controlplane.domain.WorkerState;
+import dev.forgeci.controlplane.redis.RedisKeys;
 import dev.forgeci.controlplane.repository.BuildRepository;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
 import dev.forgeci.controlplane.repository.WorkerRepository;
@@ -20,7 +21,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -43,7 +46,6 @@ public class SchedulerService {
     static final int MAX_ATTEMPTS = 3;
 
     private static final int CLAIM_CANDIDATE_LIMIT = 20;
-    private static final Duration LEASE_GRACE = Duration.ofSeconds(30);
     private static final Duration RETRY_BASE = Duration.ofSeconds(5);
 
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
@@ -55,6 +57,8 @@ public class SchedulerService {
     private final BuildStateMachine buildStateMachine;
     private final RemoteArtifactService remoteArtifactService;
     private final BuildMetrics metrics;
+    private final StringRedisTemplate redis;
+    private final Duration leaseGrace;
     private final TransactionTemplate leaseTransactionTemplate;
 
     public SchedulerService(
@@ -65,6 +69,8 @@ public class SchedulerService {
             BuildStateMachine buildStateMachine,
             RemoteArtifactService remoteArtifactService,
             BuildMetrics metrics,
+            StringRedisTemplate redis,
+            @Value("${forge.scheduler.lease-grace-seconds:30}") long leaseGraceSeconds,
             PlatformTransactionManager transactionManager) {
         this.taskRunRepository = taskRunRepository;
         this.workerRepository = workerRepository;
@@ -73,6 +79,8 @@ public class SchedulerService {
         this.buildStateMachine = buildStateMachine;
         this.remoteArtifactService = remoteArtifactService;
         this.metrics = metrics;
+        this.redis = redis;
+        this.leaseGrace = Duration.ofSeconds(leaseGraceSeconds);
         DefaultTransactionDefinition requiresNew = new DefaultTransactionDefinition();
         requiresNew.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.leaseTransactionTemplate = new TransactionTemplate(transactionManager, requiresNew);
@@ -128,8 +136,10 @@ public class SchedulerService {
         TaskDefinitionEntity definition = definitionOf(leased);
         leased.setLeaseToken(UUID.randomUUID().toString());
         leased.setWorkerId(workerId);
-        leased.setLeaseExpiration(Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(LEASE_GRACE));
+        Instant leaseExpiration = Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(leaseGrace);
+        leased.setLeaseExpiration(leaseExpiration);
         leased = taskRunRepository.saveAndFlush(leased);
+        markLeaseInRedis(leased.getId(), leased.getLeaseToken(), leaseExpiration);
 
         // there is no separate "start" call in the fixed worker endpoint list (contracts.md) —
         // claiming a task run means the worker is about to execute it immediately, so this moves
@@ -168,6 +178,7 @@ public class SchedulerService {
         }
 
         releaseWorkerLease(workerId);
+        clearLeaseInRedis(taskRunId);
 
         if (success) {
             TaskRun result =
@@ -214,8 +225,10 @@ public class SchedulerService {
     /**
      * A lease past its expiration is never trusted again, even if the worker eventually reports —
      * {@link #reportResult} will reject that report once the task run has moved past {@code
-     * LEASED}/{@code RUNNING}. This phase's leases are DB-backed expiration only, not a
-     * Redis-accelerated reservation — full crash-recovery reconciliation is phase 6.
+     * LEASED}/{@code RUNNING}. This is the unconditional safety net: it runs on MySQL's own {@code
+     * lease_expiration} column regardless of Redis's state, so a flushed or unreachable Redis never
+     * stalls recovery — it just falls back to this sweep's own interval instead of the faster
+     * Redis-driven path in {@link #reclaimExpiredLease}.
      */
     @Scheduled(fixedDelayString = "${forge.scheduler.lease-sweep-interval-ms:5000}")
     @Transactional
@@ -223,28 +236,90 @@ public class SchedulerService {
         for (TaskRun taskRun :
                 taskRunRepository.findByStateInAndLeaseExpirationBefore(
                         List.of(TaskRunState.LEASED, TaskRunState.RUNNING), Instant.now())) {
-            releaseWorkerLease(taskRun.getWorkerId());
-            metrics.leaseExpired();
-            try {
-                if (taskRun.getAttemptCount() < MAX_ATTEMPTS) {
-                    TaskRun result =
-                            taskRunStateMachine.transition(
-                                    taskRun.getId(),
-                                    taskRun.getVersion(),
-                                    TaskRunState.RETRY_WAIT,
-                                    new TaskRunOutcome(null, "lease expired", null));
-                    result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
-                    taskRunRepository.save(result);
-                    metrics.taskRetried();
-                } else {
-                    TaskRun result =
-                            taskRunStateMachine.transition(
-                                    taskRun.getId(), taskRun.getVersion(), TaskRunState.FAILED, new TaskRunOutcome(null, "lease expired", null));
-                    failBuild(result.getBuild().getId());
-                }
-            } catch (StaleTransitionException | InvalidTransitionException raced) {
-                log.debug("task run {} already moved on before its lease expiry was reclaimed", taskRun.getId());
+            reclaimIfStillExpired(taskRun);
+        }
+    }
+
+    /**
+     * The Redis-accelerated counterpart to {@link #reclaimExpiredLeases}: triggered by {@code
+     * ExpiredKeyListener} the moment a lease's Redis TTL key expires, instead of waiting for the
+     * next periodic sweep. Re-reads the task run and re-checks its MySQL {@code lease_expiration}
+     * before doing anything — the Redis event is only ever a hint that speeds up detection, never
+     * itself the authority for whether a lease has actually expired.
+     */
+    @Transactional
+    public void reclaimExpiredLease(Long taskRunId) {
+        taskRunRepository.findById(taskRunId).ifPresent(this::reclaimIfStillExpired);
+    }
+
+    private void reclaimIfStillExpired(TaskRun taskRun) {
+        boolean stillLeased = taskRun.getState() == TaskRunState.LEASED || taskRun.getState() == TaskRunState.RUNNING;
+        boolean stillExpired = taskRun.getLeaseExpiration() != null && taskRun.getLeaseExpiration().isBefore(Instant.now());
+        if (!stillLeased || !stillExpired) {
+            return;
+        }
+        releaseWorkerLease(taskRun.getWorkerId());
+        clearLeaseInRedis(taskRun.getId());
+        metrics.leaseExpired();
+        try {
+            if (taskRun.getAttemptCount() < MAX_ATTEMPTS) {
+                TaskRun result =
+                        taskRunStateMachine.transition(
+                                taskRun.getId(),
+                                taskRun.getVersion(),
+                                TaskRunState.RETRY_WAIT,
+                                new TaskRunOutcome(null, "lease expired", null));
+                result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
+                taskRunRepository.save(result);
+                metrics.taskRetried();
+            } else {
+                TaskRun result =
+                        taskRunStateMachine.transition(
+                                taskRun.getId(), taskRun.getVersion(), TaskRunState.FAILED, new TaskRunOutcome(null, "lease expired", null));
+                failBuild(result.getBuild().getId());
             }
+        } catch (StaleTransitionException | InvalidTransitionException raced) {
+            log.debug("task run {} already moved on before its lease expiry was reclaimed", taskRun.getId());
+        }
+    }
+
+    /**
+     * Re-arms Redis lease keys from MySQL's {@code lease_expiration} — the reconciliation path that
+     * lets active builds recover their acceleration after a Redis flush/restart. A lease whose
+     * expiration has already passed by the time this runs is skipped: {@link #reclaimExpiredLeases}
+     * will pick it up on its own next pass rather than this method re-deriving that decision.
+     */
+    @Scheduled(fixedDelayString = "${forge.redis.reconcile-interval-ms:15000}")
+    public void reconcileRedisLeases() {
+        try {
+            Instant now = Instant.now();
+            for (TaskRun taskRun : taskRunRepository.findByStateIn(List.of(TaskRunState.LEASED, TaskRunState.RUNNING))) {
+                if (taskRun.getLeaseExpiration() != null && taskRun.getLeaseExpiration().isAfter(now) && taskRun.getLeaseToken() != null) {
+                    markLeaseInRedis(taskRun.getId(), taskRun.getLeaseToken(), taskRun.getLeaseExpiration());
+                }
+            }
+        } catch (RuntimeException redisUnavailable) {
+            log.debug("skipping Redis lease reconciliation, Redis unavailable: {}", redisUnavailable.getMessage());
+        }
+    }
+
+    private void markLeaseInRedis(Long taskRunId, String leaseToken, Instant leaseExpiration) {
+        Duration ttl = Duration.between(Instant.now(), leaseExpiration);
+        if (ttl.isNegative() || ttl.isZero()) {
+            return;
+        }
+        try {
+            redis.opsForValue().set(RedisKeys.lease(taskRunId), leaseToken, ttl);
+        } catch (RuntimeException redisUnavailable) {
+            log.debug("could not mark lease for task run {} in Redis: {}", taskRunId, redisUnavailable.getMessage());
+        }
+    }
+
+    private void clearLeaseInRedis(Long taskRunId) {
+        try {
+            redis.delete(RedisKeys.lease(taskRunId));
+        } catch (RuntimeException redisUnavailable) {
+            log.debug("could not clear lease for task run {} in Redis: {}", taskRunId, redisUnavailable.getMessage());
         }
     }
 

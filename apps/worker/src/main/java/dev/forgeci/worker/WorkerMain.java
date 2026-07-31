@@ -50,9 +50,10 @@ public final class WorkerMain {
         AtomicBoolean running = new AtomicBoolean(true);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> running.set(false), "forge-worker-shutdown"));
 
+        CrashTrigger crashTrigger = new CrashTrigger(() -> Runtime.getRuntime().halt(1));
         ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "forge-worker-heartbeat"));
         heartbeats.scheduleWithFixedDelay(
-                () -> safely(() -> controlPlane.heartbeat(workerId)),
+                () -> safely(() -> crashTrigger.maybeCrash(controlPlane.heartbeat(workerId).shouldCrash())),
                 registration.heartbeatIntervalMs(),
                 registration.heartbeatIntervalMs(),
                 TimeUnit.MILLISECONDS);

@@ -6,6 +6,7 @@ import dev.forgeci.controlplane.domain.Worker;
 import dev.forgeci.controlplane.service.SchedulerService;
 import dev.forgeci.controlplane.service.WorkerService;
 import dev.forgeci.protocol.ClaimedTaskResponse;
+import dev.forgeci.protocol.HeartbeatResponse;
 import dev.forgeci.protocol.LogChunkRequest;
 import dev.forgeci.protocol.TaskResultReportRequest;
 import dev.forgeci.protocol.WorkerRegistrationRequest;
@@ -39,9 +40,20 @@ public class WorkerController {
     }
 
     @PostMapping("/api/workers/{id}/heartbeat")
-    public ResponseEntity<Void> heartbeat(@PathVariable("id") Long workerId) {
-        workerService.heartbeat(workerId);
-        return ResponseEntity.noContent().build();
+    public HeartbeatResponse heartbeat(@PathVariable("id") Long workerId) {
+        WorkerService.HeartbeatResult result = workerService.heartbeat(workerId);
+        return new HeartbeatResponse(result.shouldCrash());
+    }
+
+    /**
+     * Admin/test crash-injection trigger — the mechanism phase 7's public "Crash a Worker" demo
+     * button drives. The worker consumes and clears the flag on its next heartbeat and halts
+     * immediately, so the effect is only visible once that heartbeat lands.
+     */
+    @PostMapping("/api/workers/{id}/crash")
+    public ResponseEntity<Void> crash(@PathVariable("id") Long workerId) {
+        workerService.requestCrash(workerId);
+        return ResponseEntity.accepted().build();
     }
 
     /** {@code 204} means no claimable task run right now — not an error, the worker should poll again. */

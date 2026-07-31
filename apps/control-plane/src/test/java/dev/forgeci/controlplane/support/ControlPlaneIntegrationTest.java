@@ -22,5 +22,17 @@ public abstract class ControlPlaneIntegrationTest {
         registry.add("forge.artifacts.s3.bucket", () -> "forgeci-artifacts-test");
 
         registry.add("spring.kafka.bootstrap-servers", KafkaTestContainer.INSTANCE::getBootstrapServers);
+
+        registry.add("spring.data.redis.host", RedisTestContainer::host);
+        registry.add("spring.data.redis.port", RedisTestContainer::port);
+
+        // tightened so failure-recovery tests observe lease expiry, retry promotion, and Redis
+        // reconciliation in seconds instead of the production defaults' minutes — other tests only
+        // poll with generously bounded loops, so this doesn't affect them.
+        registry.add("forge.scheduler.lease-grace-seconds", () -> "2");
+        registry.add("forge.scheduler.lease-sweep-interval-ms", () -> "500");
+        registry.add("forge.scheduler.retry-sweep-interval-ms", () -> "500");
+        registry.add("forge.worker.heartbeat-interval-ms", () -> "1000");
+        registry.add("forge.redis.reconcile-interval-ms", () -> "2000");
     }
 }
