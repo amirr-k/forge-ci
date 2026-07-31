@@ -56,6 +56,40 @@ services:
       FORGE_S3_PATH_STYLE: "true"
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Both workers run docker-outside-of-docker (the mounted host socket) and share one named
+  # volume as their workspace — see docs/architecture.md for why a named volume, not a bind
+  # mount, is what makes task containers launched by a worker see the same files the worker does.
+  worker-1: &worker
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    environment: &worker-environment
+      FORGE_CONTROL_PLANE_URL: http://control-plane:8080
+      FORGE_WORKER_ID: worker-1
+      FORGE_WORKER_MAX_CONCURRENCY: "2"
+      FORGE_WORKSPACE_ROOT: /workspace
+      FORGE_SEED_WORKSPACE_FROM: /opt/forge-demo-repo
+      FORGE_WORKER_DOCKER_VOLUME: forgeci_worker-workspace
+      FORGE_WORKER_DOCKER_IMAGE: alpine:3.20
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker-workspace:/workspace
+
+  worker-2:
+    <<: *worker
+    environment:
+      <<: *worker-environment
+      FORGE_WORKER_ID: worker-2
 
 volumes:
   minio-data:
+  worker-workspace:
