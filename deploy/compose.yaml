@@ -35,6 +35,27 @@ services:
       timeout: 5s
       retries: 20
 
+  # Single-node KRaft broker (no ZooKeeper) — durable event delivery for forge.task-ready,
+  # forge.task-results, and forge.build-events. The control plane still works with this stopped;
+  # only the Kafka mirror/consumer paths degrade, never the direct HTTP claim/report path.
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   control-plane:
     build:
       context: ..
@@ -43,6 +64,8 @@ services:
       mysql:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     environment:
       FORGE_DB_URL: jdbc:mysql://mysql:3306/forgeci
@@ -54,6 +77,7 @@ services:
       FORGE_S3_ACCESS_KEY: forgeci
       FORGE_S3_SECRET_KEY: forgeci-artifact-store
       FORGE_S3_PATH_STYLE: "true"
+      FORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8080:8080"
     healthcheck:

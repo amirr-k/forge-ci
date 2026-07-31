@@ -5,6 +5,8 @@ import dev.forgeci.controlplane.domain.BuildEventType;
 import dev.forgeci.controlplane.domain.TaskAttempt;
 import dev.forgeci.controlplane.domain.TaskRun;
 import dev.forgeci.controlplane.domain.TaskRunState;
+import dev.forgeci.controlplane.kafka.KafkaTopics;
+import dev.forgeci.controlplane.kafka.TaskReadyEvent;
 import dev.forgeci.controlplane.repository.BuildRepository;
 import dev.forgeci.controlplane.repository.TaskAttemptRepository;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
@@ -17,6 +19,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,18 +64,21 @@ public class TaskRunStateMachine {
     private final BuildRepository buildRepository;
     private final BuildEventPublisher events;
     private final EntityManager entityManager;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public TaskRunStateMachine(
             TaskRunRepository taskRunRepository,
             TaskAttemptRepository taskAttemptRepository,
             BuildRepository buildRepository,
             BuildEventPublisher events,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            KafkaTemplate<String, Object> kafkaTemplate) {
         this.taskRunRepository = taskRunRepository;
         this.taskAttemptRepository = taskAttemptRepository;
         this.buildRepository = buildRepository;
         this.events = events;
         this.entityManager = entityManager;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     /**
@@ -148,6 +154,10 @@ public class TaskRunStateMachine {
                 saved,
                 Map.of("taskRunId", saved.getId(), "taskName", saved.getTaskName(), "from", current.name(), "to", target.name()));
 
+        if (target == TaskRunState.READY) {
+            publishTaskReady(build, saved);
+        }
+
         MDC.put("taskRunId", String.valueOf(saved.getId()));
         MDC.put("attemptId", String.valueOf(saved.getAttemptCount()));
         try {
@@ -157,6 +167,18 @@ public class TaskRunStateMachine {
             MDC.remove("attemptId");
         }
         return saved;
+    }
+
+    /** Best-effort: a Kafka outage never blocks or fails an already-accepted transition. */
+    private void publishTaskReady(Build build, TaskRun taskRun) {
+        try {
+            kafkaTemplate.send(
+                    KafkaTopics.TASK_READY,
+                    String.valueOf(taskRun.getId()),
+                    new TaskReadyEvent(build.getId(), taskRun.getId(), taskRun.getTaskName(), taskRun.getCacheKey()));
+        } catch (RuntimeException kafkaUnavailable) {
+            log.warn("failed to publish task-ready for task run {} to Kafka: {}", taskRun.getId(), kafkaUnavailable.getMessage());
+        }
     }
 
     private void updateLatestAttempt(TaskRun taskRun, TaskRunState state, Integer exitCode, String failureReason) {

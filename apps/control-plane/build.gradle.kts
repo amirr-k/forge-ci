@@ -23,13 +23,16 @@ dependencies {
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
     implementation(platform("software.amazon.awssdk:bom:2.29.16"))
     implementation("software.amazon.awssdk:s3")
+    implementation("org.springframework.kafka:spring-kafka")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
     testImplementation(project(":libs:test-support"))
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.20.1"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:minio")
+    testImplementation("org.testcontainers:kafka")
 }
 
 tasks.named<Jar>("jar") {
