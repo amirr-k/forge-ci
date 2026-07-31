@@ -427,6 +427,247 @@ integration and their two self-hosting questions (matching-engine-affected
 DispatchLab benchmarks, C++-affected Blackjack native artifacts) are not
 yet answered.
 
+## Testing, CI/CD, and the production-quality audit (phase 9)
+
+This phase was a gap-closing audit, not a rewrite: it built a coverage
+matrix against the taxonomy in `spec/reference/quality-and-testing.md`,
+implemented what was missing, wired the full required CI/CD pipeline, and
+verified every production-quality rule against the code as it stands.
+
+### Coverage matrix (taxonomy item → test)
+
+**Unit**: graph construction (`TaskGraphTest`), cycle detection
+(`CycleDetectorTest`), topological ordering (`TopologicalSorterTest`),
+reverse closure (`AffectedTaskAnalyzerTest`), critical-path calculation
+(`CriticalPathCalculatorTest`, new — nothing had exercised the scheduler's
+tie-break weighting directly before), glob matching (`GlobMatcherTest`),
+cache-key canonicalization (`CacheKeyCalculatorTest`), state transitions
+(`StateMachineTest`), retry policy (`RetryPolicyTest`, new — backoff
+growth and the attempt cap had only ever been observed indirectly through
+integration tests).
+
+**Property** (all new this phase): every emitted execution order respects
+dependencies, and permuting how a graph is declared never changes the
+selected build plan (`GraphPropertyTest`, 300 seeded random DAGs); the same
+canonical inputs always produce the same cache key, and changing any one
+declared contributor — name, command, outputs, timeout, toolchain, an
+environment value, a dependency's digest, a source file's bytes — always
+changes it (`CacheKeyPropertyTest`, 150 seeded scenarios); no accepted task
+result ever transitions twice, under a generated storm of duplicate,
+forged-lease, and contradictory reports against one real build over HTTP
+(`ResultIdempotencePropertyTest`).
+
+**Integration**: MySQL migrations and restart (`RestartSurvivalTest` boots
+the real app twice against the same MySQL container), S3 upload/verify/
+restore (`ArtifactControllerTest`), Kafka redelivery
+(`KafkaTaskResultsIntegrationTest`), Redis TTL and restart
+(`FailureRecoveryIntegrationTest#theSystemRecoversAfterARedisFlushDuringAnActiveBuild`),
+control-plane/worker protocol (`WorkerSchedulingIntegrationTest`),
+duplicate result handling (`FailureRecoveryIntegrationTest`,
+`ResultIdempotencePropertyTest`).
+
+**End-to-end**: local cold/warm build (`CacheCommandTest`), remote
+incremental build (`RemoteIncrementalBuildEndToEndTest`, new — two
+independent workspace directories sharing one real control plane over the
+actual `HttpRemoteArtifactClient` wire protocol, not a fake stub; the only
+place that protocol was previously exercised end to end rather than
+through an in-memory `RemoteArtifactClient`), worker crash recovery
+(`FailureRecoveryIntegrationTest`), guest public demo
+(`DemoScenarioIntegrationTest`, `ui/e2e/primary-demo.spec.ts`),
+self-hosted CI run (the `plan-and-run` job, phase 8).
+
+**Concurrency** (all new this phase, in `ConcurrencyIntegrationTest`
+unless noted): two builds in flight at once complete independently with no
+task run executed twice; multiple workers claiming from the one global
+queue never double-claim (also `WorkerSchedulingIntegrationTest`'s
+existing pair); a result reported right at its own lease's expiry is
+accepted, lease-rejected, or stale-rejected but never double-applied; a
+late result after a *different* worker's lease reassignment is rejected
+(`FailureRecoveryIntegrationTest`); several clients committing identical
+artifact bytes at once produce exactly one artifact row — this test found
+a real race, see below.
+
+**Security** (the category with no earlier dedicated phase; all new this
+phase): path traversal in artifacts (`TaskArchiveTest` plus the new
+`ProjectFilesSecurityTest`, which found a real gap, see below);
+command-array validation (`CommandExecutionSecurityTest`,
+`DockerTaskExecutorTest#aCommandIsHandedToTheContainerAsArgvSoNothingInItIsShellSyntax`,
+`ApiSecurityIntegrationTest#aSubmittedCommandIsStoredAsTheExactArgvArrayItArrivedAs`);
+public endpoint rate limiting and guest command-submission attempts
+(`PublicDemoSecurityIntegrationTest`); output-size enforcement
+(`CommandExecutionSecurityTest`, `DockerTaskExecutorTest`); timeout
+enforcement (`ProcessTaskRunnerTest`, `DockerTaskExecutorTest`); container
+cleanup (`DockerTaskExecutorTest#noContainerSurvivesATaskThatWasKilledForRunningTooLong`
+and its completed-normally counterpart).
+
+**Failure recovery** (phase 6, re-verified here): all seven required
+scenarios remain covered by `FailureRecoveryIntegrationTest`.
+
+### Two real bugs this phase's tests found and fixed
+
+- **Symlinks were followed out of the project directory.**
+  `ProjectFiles.matching` walked with `Files.isRegularFile` (which follows
+  symlinks), so a symlink inside a project pointing anywhere on the host
+  filesystem could be selected by a declared glob, hashed into a cache key,
+  and archived into a shared artifact — a real path-traversal-adjacent
+  leak, not a hypothetical one. `ProjectFilesSecurityTest` (a new
+  same-directory symlink case) caught it; fixed with
+  `Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)` in
+  `libs/cache/src/main/java/dev/forgeci/cache/ProjectFiles.java`.
+- **Concurrent uploads of identical bytes raced past the dedupe check.**
+  `RemoteArtifactService.commit` looks up an existing `Artifact` by digest
+  before inserting a new one; two callers uploading the same bytes at the
+  same time could both pass that check before either had inserted, so the
+  loser's insert hit `uq_artifacts_digest` and surfaced as a raw
+  `500` — worse, Hibernate refuses any further statement on a session
+  after a flush-time constraint violation ("don't flush the Session after
+  an exception occurs"), so a plain try/catch-and-refetch in the same
+  transaction couldn't recover either.
+  `ConcurrencyIntegrationTest#severalClientsCommittingTheSameBytesAtOnceProduceExactlyOneArtifact`
+  (six concurrent uploaders) caught it; fixed by running the insert in its
+  own `REQUIRES_NEW` transaction (the same pattern `SchedulerService`
+  already used for losing lease-claim candidates) so a duplicate-key
+  failure can fall back to a clean `findByDigest` read afterward. While
+  investigating the related lease-expiry race, `SchedulerService`'s
+  reclaim path was also tightened to clear a task run's lease token when
+  reclaiming it — previously a late report against a reclaimed-but-not-
+  yet-reassigned task run could still coincidentally match the stale lease
+  fields and fail only later, and less informatively, on the state
+  machine's `RETRY_WAIT -> SUCCEEDED` invalid-transition check.
+
+### CI/CD pipeline
+
+`.github/workflows/forgeci.yml` now runs, on every pull request against
+`main`, alongside the existing self-hosting `plan-and-run` job (which
+proves ForgeCI works on itself but — by design — only checks what its own
+affected-task selection decides to run, not a substitute for an
+unconditional gate):
+
+- **`required-checks`**: `./gradlew check` — which, via the root
+  `build.gradle.kts`'s `subprojects` block, already wires Spotless
+  (`spotlessCheck`, Google Java Format's AOSP variant — 4-space indent,
+  matching this codebase, rather than Google's 2-space default) and
+  SpotBugs (`spotbugsMain`; disabled for test sources) into `check`
+  alongside every module's `test` task and `apps/control-plane`'s
+  `integrationTest` — covers Java formatting, static analysis, core
+  unit/property tests, CLI tests, control-plane tests, the Testcontainers
+  suite, and migration validation (real Flyway auto-migration against a
+  real MySQL container, exercised by `RestartSurvivalTest` and every other
+  `ControlPlaneIntegrationTest` subclass) in one command. Frontend
+  lint/type checks and unit tests (`npm run lint` / `typecheck` / `test`)
+  run alongside.
+- **`container-images`**: both Dockerfiles actually build from a clean
+  checkout.
+- **`dependency-security-scan`**: `aquasecurity/trivy-action` filesystem
+  scan (Gradle and npm lockfiles) at `HIGH,CRITICAL` severity, failing the
+  job on a hit — chosen over an OWASP-dependency-check/NVD-API-key setup
+  because it needs no secret and no rate-limited external service to be
+  reliable in CI.
+- **`browser-smoke-test`**: brings up the real `deploy/compose.yaml`
+  stack, serves the actual UI against it, and runs
+  `ui/e2e/primary-demo.spec.ts` with a real browser (Playwright/Chromium)
+  — the literal "browser smoke test" the spec requires, not a unit test
+  standing in for one.
+
+`.github/workflows/release.yml` (push to `main`) wires the nine-step
+default-branch release sequence: run all required checks; build versioned
+CLI/control-plane/worker artifacts (versioned by commit SHA — never a
+hand-maintained number that can drift from what actually shipped); build
+immutable (SHA-tagged, never a mutable tag) container images; apply
+migrations (Spring Boot/Flyway's own startup-time auto-migration against
+the target MySQL — there is no separate migration-only step because
+deploying the control plane *is* how migrations apply, both here and
+against phase 10's eventual persistent target); deploy the control plane;
+deploy both workers; explicitly verify MySQL/S3/Kafka/Redis connectivity
+via each service's own Docker healthcheck status (not merely inferred from
+the previous steps not erroring); run the fixed `no-change` public demo
+scenario end to end and poll both builds to `SUCCEEDED`; and verify the
+deployed instance's new `GET /api/version` endpoint echoes back the exact
+commit SHA this release just deployed (`HealthController`, backed by a
+`FORGE_GIT_COMMIT` environment variable the pipeline sets — never derived
+from a `.git` directory, which a deployed jar doesn't have). This phase
+wires that sequence against the same ephemeral Compose stack
+`browser-smoke-test` already exercises, per the phase's explicit scope —
+phase 10 swaps in a real, persistent target without changing steps 1-9
+themselves.
+
+### Production-quality-requirements audit
+
+Every line of
+[quality-and-testing.md's blanket rules](../../spec/reference/quality-and-testing.md#production-quality-requirements-blanket-rules-all-phases),
+checked against the code as it stands today, not assumed:
+
+- **No fabricated metrics.** `BuildMetrics`/`DemoScenarioService` measure
+  real wall-clock time from real database timestamps; no benchmark numbers
+  are published yet (that is phase 11's job), so none exist to fabricate.
+- **No arbitrary public code execution.** `DemoScenario.fromScriptId`
+  only ever accepts the fixed six-entry enum; `DemoBuildRequest` has no
+  command/path/image field for a guest to set, and extra JSON fields bind
+  to nothing (`PublicDemoSecurityIntegrationTest`).
+- **No hidden shell interpolation.** `ProcessTaskRunner` and
+  `DockerTaskExecutor` both invoke via argv arrays (`ProcessBuilder`,
+  `docker run ... <command...>`), never `sh -c` string concatenation of
+  task-declared content (`CommandExecutionSecurityTest`,
+  `DockerTaskExecutorTest`).
+- **No cache key based on timestamps or unstable ordering.**
+  `CacheKeyCalculator` sorts every map/list before hashing;
+  `TaskArchive.write` strips filesystem timestamps entirely, keeping only
+  the executable bit; `CacheKeyPropertyTest` re-verifies permutation
+  invariance over 150 generated cases, re-confirming phase 2's contributor
+  list rather than assuming it still holds.
+- **No partial artifact exposed as a hit.** Every read path
+  (`RemoteArtifactService.fetchAndVerify`, `TaskCache.localLookup`)
+  re-verifies digest and size before returning bytes
+  (`ArtifactControllerTest`, `TaskCacheTest`).
+- **No unbounded worker or guest concurrency.** `Worker.maxConcurrency`
+  bounds `SchedulerService.claim`; `DemoGuestGuard` bounds guest workers to
+  2 and serializes guest builds behind one global slot with per-client
+  rate limiting (`PublicDemoSecurityIntegrationTest`).
+- **No unbounded logs or artifact size.** `ProcessTaskRunner` and
+  `DockerTaskExecutor` both cap captured output at 1 MiB with a per-line
+  cap, verified to actually truncate rather than merely being configured
+  to (`CommandExecutionSecurityTest`, `DockerTaskExecutorTest`).
+- **No secrets in logs.** Both task runners start from an empty
+  environment and only pass through a task's declared allowlist (plus
+  `PATH`/`HOME`/`TMPDIR`/`LANG`) — an undeclared variable never reaches a
+  task's process, so it can never end up in that task's own output either
+  (`CommandExecutionSecurityTest#aTaskSeesOnlyTheEnvironmentItDeclares`).
+- **No Redis-only authoritative state.** `RedisKeys` holds only TTL'd
+  heartbeat/lease keys; MySQL's `lease_expiration` sweep runs
+  unconditionally regardless of Redis's state
+  (`FailureRecoveryIntegrationTest#theSystemRecoversAfterARedisFlushDuringAnActiveBuild`).
+- **No exactly-once claim.** None made anywhere in code or docs;
+  `ResultIdempotencePropertyTest` and `SchedulerService.reportResult`'s own
+  documentation frame the guarantee as idempotent acceptance, explicitly
+  not exactly-once delivery.
+- **No stale worker result overwriting an accepted result.**
+  `SchedulerService.reportResult`'s lease/attempt matching plus terminal-
+  state check (`FailureRecoveryIntegrationTest`,
+  `ConcurrencyIntegrationTest`'s lease-race case).
+- **No unnecessary microservices.** Still exactly `cli`/`control-plane`/
+  `worker`; nothing added this phase.
+- **No fake public animation.** `DemoScenarioService.startBuild` schedules
+  two genuinely concurrent, separately tracked builds; the Playwright spec
+  asserts the result reflects a real running build, not a canned one.
+- **All commands work from a clean clone.** Every `required-checks` and
+  `release` CI job starts from `actions/checkout` with no pre-existing
+  local state, which exercises this in practice; not independently
+  re-verified as its own standalone clean-clone smoke test in this phase —
+  that literal check is phase 13's final acceptance gate.
+- **Local mode remains usable if remote infrastructure is unavailable.**
+  `RemoteCacheConfig.fromEnvironment()` only activates remote mode when
+  `FORGE_CONTROL_PLANE_URL` is set; an unreachable or unconfigured remote
+  degrades to exactly local-only behavior, never a failure
+  (`RemoteTaskCacheTest`).
+- **Every public metric is reproducible.** No public metric has been
+  published yet — phase 11 is where this becomes checkable; nothing to
+  audit today beyond confirming nothing has been claimed prematurely.
+
+Two items above (clean-clone and public-metric reproducibility) are noted
+as not independently closed by this phase's own tests — both are
+explicitly gated on later phases (10 and 11) by the spec, and the audit
+above says so rather than marking them done on inference.
+
 ## The `./forge` launcher
 
 `./forge` is a POSIX shell script at the repository root, not a packaged
