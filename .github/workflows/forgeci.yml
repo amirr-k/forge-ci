@@ -60,18 +60,30 @@ jobs:
           ./forge run --base "${{ steps.base.outputs.revision }}" | tee run-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
+      # exits non-zero when a task failed; the job's own failure is decided by the final step, so
+      # this must not short-circuit the uploads and the PR comment that report *why* it failed.
       - name: build machine-readable summary
+        continue-on-error: true
         run: |
           python3 .github/scripts/forgeci-summary.py \
             plan-output.txt run-output.txt "${{ steps.base.outputs.revision }}" forgeci-summary.json
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: forgeci-summary
           path: |
             forgeci-summary.json
             plan-output.txt
             run-output.txt
+
+      # forge run reports a task as failed but not which test inside it failed — the JUnit XML is
+      # the only way to diagnose a failure that reproduces on CI's platform and not on a developer's.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: "**/build/test-results/**/*.xml"
 
       - name: comment on the pull request
         if: always() && github.event_name == 'pull_request'
