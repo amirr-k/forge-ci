@@ -94,6 +94,26 @@ public final class TestFixtures {
                 List.of());
     }
 
+    /** A single task with a short (1s) declared timeout — for lease-expiry/crash-recovery tests that need a fast lease. */
+    public static PlanSubmissionRequest singleTaskPlanWithShortTimeout(String revision, String baseRevision, String taskName, String cacheKey) {
+        return new PlanSubmissionRequest(
+                revision,
+                baseRevision,
+                false,
+                List.of("services/solo/src/Solo.java"),
+                List.of(
+                        new TaskDefinitionRequest(
+                                taskName,
+                                List.of(),
+                                cacheKey,
+                                "source changed",
+                                shellCommand(taskName.replace(':', '-')),
+                                List.of("build/solo/**"),
+                                List.of(),
+                                1)),
+                List.of());
+    }
+
     /** Same shape as {@link #twoTaskPlan}, but with cache keys unique to this call — safe to reuse across tests. */
     public static PlanSubmissionRequest twoTaskPlanWithUniqueKeys(String revision, String baseRevision, String suffix) {
         return new PlanSubmissionRequest(

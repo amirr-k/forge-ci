@@ -104,8 +104,9 @@ turns into terminating tasks.
 ## Control plane
 
 `apps/control-plane` is a Spring Boot service with MySQL as the
-authoritative store for accepted build/task state — Redis isn't
-introduced until phase 6 (full crash-recovery reconciliation), and this
+authoritative store for accepted build/task state — Redis (added in phase
+6, see "Failure recovery" below) only ever accelerates detecting a dead
+worker or expired lease, never the record of whether one happened. This
 service itself never executes a task; it only tracks state a CLI or
 worker reports and hands out work through the scheduler described below.
 
@@ -197,6 +198,70 @@ static credentials (`FORGE_S3_ACCESS_KEY`/`FORGE_S3_SECRET_KEY`) — the dev
 path in `deploy/compose.yaml`. The bucket itself is provisioned out of
 band in production (IAM policy scoped to the artifact prefix); the control
 plane only auto-creates it as a dev/test convenience when missing.
+
+## Failure recovery
+
+Every lease and worker heartbeat is still decided by MySQL —
+`SchedulerService.reclaimExpiredLeases` (a lease past `lease_expiration`)
+and `WorkerService.markStaleWorkersUnhealthy` (a worker silent past three
+heartbeat intervals) sweep it unconditionally on a fixed schedule and are
+the sole source of truth. Redis only accelerates *detecting* the same
+condition: on lease grant, `SchedulerService` also sets a Redis key
+(`forge:lease:<taskRunId>`) with a TTL matching `lease_expiration`; on
+heartbeat, `WorkerService` sets `forge:worker:heartbeat:<workerId>` with a
+TTL of three heartbeat intervals. `RedisConfig` enables Redis's `expired`
+keyspace notifications and `ExpiredKeyListener` subscribes to them —
+the moment either key's TTL lapses, it calls the same reclaim/unhealthy
+logic the periodic sweep would eventually reach on its own, just sooner.
+Every accelerated call re-validates against MySQL's own timestamp before
+mutating anything, so a stale or spurious Redis event can never itself
+cause an incorrect transition. `WorkerService.reconcileRedisFromDatabase`
+and `SchedulerService.reconcileRedisLeases` run periodically to re-arm
+Redis's keys from MySQL's current state, which is what makes recovery
+after a Redis flush or restart correct rather than merely "doesn't
+crash": the sweeps never depended on Redis being populated in the first
+place, and reconciliation restores the acceleration once Redis is back.
+
+Idempotency was mostly already in place from phase 5's lease design —
+this phase's job was making it hold under real concurrent failure rather
+than just documenting it. `SchedulerService.reportResult` rejects (`403
+lease_rejected`) any report whose worker id, lease token, or attempt
+count no longer matches the task run's current lease, and returns the
+existing result unchanged (rather than raising) for a report that matches
+an already-*accepted* result — so neither a late report from an expired
+lease nor a redelivered duplicate (HTTP retry or Kafka redelivery,
+`TaskResultKafkaListener` routes through the identical method) can
+overwrite or re-apply an effect. Artifact acceptance is idempotent the
+same way phase 4 already made it: `RemoteArtifactService.commit` looks up
+an existing `Artifact` row by digest before ever writing a new one, so two
+attempts producing byte-identical output — the common case after a
+crash-and-retry — never create a second artifact or cache entry.
+
+Crash injection is a two-step, backend-only mechanism (the public "Crash a
+Worker" button is phase 7's job): `POST /api/workers/{id}/crash` sets a
+`crash_requested` flag on the `workers` row; the worker consumes and
+clears it on its very next heartbeat response
+(`HeartbeatResponse.shouldCrash`) and calls `Runtime.halt` — an abrupt,
+no-shutdown-hook JVM stop, so any in-flight task's lease is left to simply
+expire exactly as a real crash would leave it, rather than releasing
+cleanly.
+
+`FailureRecoveryIntegrationTest` covers all seven required failure
+scenarios (crash before/during execution, duplicate result, late result
+after lease expiration, delayed artifact commit, Redis flush mid-build,
+Kafka redelivery — the last already proven by
+`KafkaTaskResultsIntegrationTest` from phase 5) against the real
+Testcontainers-backed stack, and records recovery time with
+`libs/test-support`'s `RecoveryTimer`. A manual demo against the full
+Compose stack (two workers, `docker kill` on the one holding an in-progress
+task's lease) confirmed the same behavior end to end: the crash was
+detected via the Redis-accelerated path within seconds of the missed
+heartbeat, the lease was reclaimed once it passed `lease_expiration`, the
+task was reassigned to and completed by the surviving worker, and exactly
+one artifact was committed — no duplicate `cache_entries`/`artifacts` row.
+Total wall-clock recovery time in that run was dominated by the demo's
+deliberately generous task timeout and lease grace period, not by the
+recovery mechanism itself.
 
 ## The `./forge` launcher
 
