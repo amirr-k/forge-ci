@@ -8,6 +8,8 @@ import dev.forgeci.controlplane.domain.TaskRunState;
 import dev.forgeci.controlplane.repository.BuildRepository;
 import dev.forgeci.controlplane.repository.TaskAttemptRepository;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -58,16 +60,19 @@ public class TaskRunStateMachine {
     private final TaskAttemptRepository taskAttemptRepository;
     private final BuildRepository buildRepository;
     private final BuildEventPublisher events;
+    private final EntityManager entityManager;
 
     public TaskRunStateMachine(
             TaskRunRepository taskRunRepository,
             TaskAttemptRepository taskAttemptRepository,
             BuildRepository buildRepository,
-            BuildEventPublisher events) {
+            BuildEventPublisher events,
+            EntityManager entityManager) {
         this.taskRunRepository = taskRunRepository;
         this.taskAttemptRepository = taskAttemptRepository;
         this.buildRepository = buildRepository;
         this.events = events;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -81,10 +86,16 @@ public class TaskRunStateMachine {
                 taskRunRepository
                         .findById(taskRunId)
                         .orElseThrow(() -> new NotFoundException("task run " + taskRunId + " not found"));
+        Long buildId = taskRun.getBuild().getId();
         Build build =
-                buildRepository
-                        .findByIdForUpdate(taskRun.getBuild().getId())
-                        .orElseThrow(() -> new NotFoundException("build " + taskRun.getBuild().getId() + " not found"));
+                buildRepository.findByIdForUpdate(buildId).orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
+
+        // force a genuinely fresh read under a lock now that the build row lock guarantees any
+        // concurrent transition on this same task run has fully committed. A second findById (even
+        // a locked one) would still hand back the same already-loaded object from this
+        // transaction's persistence-context identity map without refreshing its field values —
+        // only an explicit refresh reloads them from the database.
+        entityManager.refresh(taskRun, LockModeType.PESSIMISTIC_WRITE);
 
         if (taskRun.getVersion() != expectedVersion) {
             throw new StaleTransitionException(

@@ -24,7 +24,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Owns the parts of the worker protocol that aren't a single state transition: matching a
@@ -52,6 +55,7 @@ public class SchedulerService {
     private final BuildStateMachine buildStateMachine;
     private final RemoteArtifactService remoteArtifactService;
     private final BuildMetrics metrics;
+    private final TransactionTemplate leaseTransactionTemplate;
 
     public SchedulerService(
             TaskRunRepository taskRunRepository,
@@ -60,7 +64,8 @@ public class SchedulerService {
             TaskRunStateMachine taskRunStateMachine,
             BuildStateMachine buildStateMachine,
             RemoteArtifactService remoteArtifactService,
-            BuildMetrics metrics) {
+            BuildMetrics metrics,
+            PlatformTransactionManager transactionManager) {
         this.taskRunRepository = taskRunRepository;
         this.workerRepository = workerRepository;
         this.buildRepository = buildRepository;
@@ -68,6 +73,9 @@ public class SchedulerService {
         this.buildStateMachine = buildStateMachine;
         this.remoteArtifactService = remoteArtifactService;
         this.metrics = metrics;
+        DefaultTransactionDefinition requiresNew = new DefaultTransactionDefinition();
+        requiresNew.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.leaseTransactionTemplate = new TransactionTemplate(transactionManager, requiresNew);
     }
 
     /**
@@ -75,6 +83,12 @@ public class SchedulerService {
      * concurrency and at least one candidate is still available by the time this worker's turn to
      * lease it comes up — a candidate lost to a concurrent claim (optimistic-lock failure) or that
      * stopped being eligible between the query and the lock is skipped in favor of the next one.
+     *
+     * <p>Each candidate attempt runs in its own {@code REQUIRES_NEW} transaction rather than
+     * joining this method's: {@link TaskRunStateMachine#transition} is itself {@code @Transactional}
+     * with the default (joining) propagation, and a losing candidate's exception would otherwise
+     * mark this whole method's transaction rollback-only — turning "skip this candidate, try the
+     * next one" into an {@code UnexpectedRollbackException} on whatever eventually succeeds.
      */
     @Transactional
     public Optional<TaskRun> claim(Long workerId) {
@@ -89,25 +103,39 @@ public class SchedulerService {
 
         List<TaskRun> candidates = taskRunRepository.findClaimCandidates(PageRequest.of(0, CLAIM_CANDIDATE_LIMIT));
         for (TaskRun candidate : candidates) {
-            try {
-                TaskRun leased =
-                        taskRunStateMachine.transition(
-                                candidate.getId(), candidate.getVersion(), TaskRunState.LEASED, TaskRunOutcome.NONE);
-                TaskDefinitionEntity definition = definitionOf(leased);
-                leased.setLeaseToken(UUID.randomUUID().toString());
-                leased.setWorkerId(workerId);
-                leased.setLeaseExpiration(
-                        Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(LEASE_GRACE));
-                taskRunRepository.save(leased);
-
+            Optional<TaskRun> leased = attemptLease(candidate, workerId);
+            if (leased.isPresent()) {
                 worker.setActiveLeaseCount(worker.getActiveLeaseCount() + 1);
                 metrics.taskAttemptStarted();
-                return Optional.of(leased);
-            } catch (StaleTransitionException | InvalidTransitionException | ObjectOptimisticLockingFailureException lostRace) {
-                log.debug("claim candidate {} no longer available, trying next", candidate.getId());
+                return leased;
             }
+            log.debug("claim candidate {} no longer available, trying next", candidate.getId());
         }
         return Optional.empty();
+    }
+
+    private Optional<TaskRun> attemptLease(TaskRun candidate, Long workerId) {
+        try {
+            return Optional.of(leaseTransactionTemplate.execute(status -> leaseAndStart(candidate, workerId)));
+        } catch (StaleTransitionException | InvalidTransitionException | ObjectOptimisticLockingFailureException lostRace) {
+            return Optional.empty();
+        }
+    }
+
+    private TaskRun leaseAndStart(TaskRun candidate, Long workerId) {
+        TaskRun leased =
+                taskRunStateMachine.transition(candidate.getId(), candidate.getVersion(), TaskRunState.LEASED, TaskRunOutcome.NONE);
+        TaskDefinitionEntity definition = definitionOf(leased);
+        leased.setLeaseToken(UUID.randomUUID().toString());
+        leased.setWorkerId(workerId);
+        leased.setLeaseExpiration(Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(LEASE_GRACE));
+        leased = taskRunRepository.saveAndFlush(leased);
+
+        // there is no separate "start" call in the fixed worker endpoint list (contracts.md) —
+        // claiming a task run means the worker is about to execute it immediately, so this moves
+        // it straight on to RUNNING in the same transaction. The re-fetch inside transition()
+        // already picks up the lease fields just flushed above.
+        return taskRunStateMachine.transition(leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
     }
 
     /**
@@ -292,7 +320,9 @@ public class SchedulerService {
         return state == TaskRunState.SUCCEEDED || state == TaskRunState.CACHED;
     }
 
-    private void maybeCompleteBuild(Long buildId) {
+    /** Public so {@link BuildService} can also check completion right after materializing a build whose tasks were all cache hits. */
+    @Transactional
+    public void maybeCompleteBuild(Long buildId) {
         List<TaskRun> runs = taskRunRepository.findByBuildId(buildId);
         boolean allDone =
                 runs.stream().allMatch(r -> r.getState() == TaskRunState.SUCCEEDED || r.getState() == TaskRunState.CACHED);

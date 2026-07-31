@@ -5,6 +5,14 @@ spring:
     url: ${FORGE_DB_URL:jdbc:mysql://localhost:3306/forgeci}
     username: ${FORGE_DB_USER:forgeci}
     password: ${FORGE_DB_PASSWORD:forgeci}
+    # MySQL's default REPEATABLE READ keeps a transaction's plain (non-locking) reads pinned to
+    # the snapshot from its first query, even after that same transaction takes a row lock
+    # elsewhere (e.g. SELECT ... FOR UPDATE) — so a caller that blocked on a lock and then reads
+    # again (build-event sequence allocation, task-attempt numbering) can still see pre-lock data.
+    # READ COMMITTED makes every statement see the latest committed data, which every locking
+    # pattern in the control plane already assumes.
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
   jpa:
     hibernate:
       ddl-auto: validate

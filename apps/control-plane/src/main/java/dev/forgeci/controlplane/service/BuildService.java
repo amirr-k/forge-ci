@@ -118,6 +118,8 @@ public class BuildService {
                 schedulerService.promoteToReadyOrCached(taskRun, projectId);
             }
         }
+        // covers the all-cache-hit case: nothing will ever call claim/reportResult to notice completion
+        schedulerService.maybeCompleteBuild(buildId);
     }
 
     @Transactional
