@@ -12,4 +12,10 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // vitest's default include glob otherwise picks up e2e/*.spec.ts, which are
+    // Playwright specs run separately via `npm run e2e`, not vitest tests.
+    exclude: ["e2e/**", "node_modules/**", "dist/**"],
+    passWithNoTests: true,
+  },
 });

@@ -1,0 +1,233 @@
+version: 1
+
+project:
+  name: forge-ci
+
+defaults:
+  timeout: 5m
+  cacheable: true
+
+tasks:
+  test-support:build:
+    environment:
+      - "JAVA_HOME"
+    inputs:
+      - "libs/test-support/src/main/**"
+      - "libs/test-support/build.gradle.kts"
+    outputs:
+      - "libs/test-support/build/classes/**"
+      - "libs/test-support/build/libs/**"
+    command: ["./gradlew", "-q", ":libs:test-support:jar"]
+
+  core:build:
+    environment:
+      - "JAVA_HOME"
+    inputs:
+      - "libs/core/src/main/**"
+      - "libs/core/build.gradle.kts"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+    outputs:
+      - "libs/core/build/classes/**"
+      - "libs/core/build/libs/**"
+    command: ["./gradlew", "-q", ":libs:core:jar"]
+
+  core:test:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "core:build"
+      - "test-support:build"
+    inputs:
+      - "libs/core/src/**"
+    outputs:
+      - "libs/core/build/test-results/**"
+      - "libs/core/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":libs:core:test"]
+
+  config:build:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "core:build"
+    inputs:
+      - "libs/config/src/main/**"
+      - "libs/config/build.gradle.kts"
+    outputs:
+      - "libs/config/build/classes/**"
+      - "libs/config/build/libs/**"
+    command: ["./gradlew", "-q", ":libs:config:jar"]
+
+  config:test:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "config:build"
+      - "test-support:build"
+    inputs:
+      - "libs/config/src/**"
+    outputs:
+      - "libs/config/build/test-results/**"
+      - "libs/config/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":libs:config:test"]
+
+  cache:build:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "core:build"
+    inputs:
+      - "libs/cache/src/main/**"
+      - "libs/cache/build.gradle.kts"
+    outputs:
+      - "libs/cache/build/classes/**"
+      - "libs/cache/build/libs/**"
+    command: ["./gradlew", "-q", ":libs:cache:jar"]
+
+  cache:test:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "cache:build"
+      - "test-support:build"
+    inputs:
+      - "libs/cache/src/**"
+    outputs:
+      - "libs/cache/build/test-results/**"
+      - "libs/cache/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":libs:cache:test"]
+
+  protocol:build:
+    environment:
+      - "JAVA_HOME"
+    inputs:
+      - "libs/protocol/src/main/**"
+      - "libs/protocol/build.gradle.kts"
+    outputs:
+      - "libs/protocol/build/classes/**"
+      - "libs/protocol/build/libs/**"
+    command: ["./gradlew", "-q", ":libs:protocol:jar"]
+
+  protocol:test:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "protocol:build"
+      - "test-support:build"
+    inputs:
+      - "libs/protocol/src/**"
+    outputs:
+      - "libs/protocol/build/test-results/**"
+      - "libs/protocol/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":libs:protocol:test"]
+
+  cli:build:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "core:build"
+      - "config:build"
+      - "cache:build"
+    inputs:
+      - "apps/cli/src/main/**"
+      - "apps/cli/build.gradle.kts"
+    outputs:
+      - "apps/cli/build/classes/**"
+      - "apps/cli/build/install/**"
+    command: ["./gradlew", "-q", ":apps:cli:installDist"]
+
+  cli:test:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "cli:build"
+      - "test-support:build"
+    inputs:
+      - "apps/cli/src/**"
+    outputs:
+      - "apps/cli/build/test-results/**"
+      - "apps/cli/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":apps:cli:test"]
+
+  control-plane:build:
+    environment:
+      - "JAVA_HOME"
+    timeout: 10m
+    depends_on:
+      - "core:build"
+      - "config:build"
+      - "cache:build"
+      - "protocol:build"
+    inputs:
+      - "apps/control-plane/src/main/**"
+      - "apps/control-plane/build.gradle.kts"
+      - "db/migrations/**"
+    outputs:
+      - "apps/control-plane/build/classes/**"
+      - "apps/control-plane/build/libs/**"
+    command: ["./gradlew", "-q", ":apps:control-plane:classes"]
+
+  control-plane:test:
+    environment:
+      - "JAVA_HOME"
+    timeout: 15m
+    depends_on:
+      - "control-plane:build"
+      - "test-support:build"
+    inputs:
+      - "apps/control-plane/src/**"
+      - "db/migrations/**"
+    outputs:
+      - "apps/control-plane/build/test-results/**"
+      - "apps/control-plane/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":apps:control-plane:test"]
+
+  worker:build:
+    environment:
+      - "JAVA_HOME"
+    depends_on:
+      - "core:build"
+      - "cache:build"
+      - "protocol:build"
+    inputs:
+      - "apps/worker/src/main/**"
+      - "apps/worker/build.gradle.kts"
+    outputs:
+      - "apps/worker/build/classes/**"
+      - "apps/worker/build/libs/**"
+    command: ["./gradlew", "-q", ":apps:worker:classes"]
+
+  worker:test:
+    environment:
+      - "JAVA_HOME"
+    timeout: 10m
+    depends_on:
+      - "worker:build"
+      - "test-support:build"
+    inputs:
+      - "apps/worker/src/**"
+    outputs:
+      - "apps/worker/build/test-results/**"
+      - "apps/worker/build/reports/tests/**"
+    command: ["./gradlew", "-q", ":apps:worker:test"]
+
+  ui:build:
+    inputs:
+      - "ui/src/**"
+      - "ui/index.html"
+      - "ui/package.json"
+      - "ui/package-lock.json"
+      - "ui/vite.config.ts"
+      - "ui/tsconfig.json"
+    outputs:
+      - "ui/dist/**"
+    command: ["npm", "--prefix", "ui", "run", "build"]
+
+  ui:test:
+    depends_on:
+      - "ui:build"
+    inputs:
+      - "ui/src/**"
+    outputs:
+      - "ui/coverage/**"
+    command: ["npm", "--prefix", "ui", "run", "test"]

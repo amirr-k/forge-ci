@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,32 @@ class DockerTaskExecutorTest {
                         "256m",
                         null,
                         1000);
+    }
+
+    /**
+     * Tasks run as root inside the container (production workers are themselves containerized), so
+     * on Linux anything a task wrote into the bind-mounted workspace is root-owned and the test
+     * JVM's user cannot delete it — JUnit's own {@code @TempDir} cleanup then fails the test. Docker
+     * Desktop on macOS remaps ownership to the invoking user and hides this, which is why it only
+     * ever failed on CI. Emptying the directory from a root container first leaves JUnit nothing but
+     * the directory it already owns.
+     */
+    @AfterEach
+    void emptyWorkspaceAsRoot() throws Exception {
+        new ProcessBuilder(
+                        "docker",
+                        "run",
+                        "--rm",
+                        "-v",
+                        workspace.toAbsolutePath() + ":/workspace",
+                        "alpine:3.20",
+                        "sh",
+                        "-c",
+                        "rm -rf /workspace/..?* /workspace/.[!.]* /workspace/*")
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+                .waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     @Test
