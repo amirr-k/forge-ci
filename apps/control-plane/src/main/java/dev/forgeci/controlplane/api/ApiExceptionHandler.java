@@ -1,5 +1,6 @@
 package dev.forgeci.controlplane.api;
 
+import dev.forgeci.controlplane.demo.DemoBusyException;
 import dev.forgeci.controlplane.service.ArtifactIntegrityException;
 import dev.forgeci.controlplane.service.InvalidTransitionException;
 import dev.forgeci.controlplane.service.LeaseRejectedException;
@@ -38,6 +39,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ArtifactIntegrityException.class)
     public ResponseEntity<Map<String, String>> artifactIntegrity(ArtifactIntegrityException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "artifact_corrupt", "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(DemoBusyException.class)
+    public ResponseEntity<Map<String, String>> demoBusy(DemoBusyException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", "demo_busy", "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "bad_request", "message", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -11,6 +11,8 @@ sourceSets {
 }
 
 dependencies {
+    implementation(project(":libs:core"))
+    implementation(project(":libs:config"))
     implementation(project(":libs:cache"))
     implementation(project(":libs:protocol"))
     implementation("org.springframework.boot:spring-boot-starter-web")

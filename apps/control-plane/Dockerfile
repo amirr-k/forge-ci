@@ -6,5 +6,6 @@ RUN ./gradlew :apps:control-plane:bootJar --no-daemon
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /workspace/apps/control-plane/build/libs/*.jar app.jar
+COPY --from=build /workspace/demo/sample-monorepo /opt/forge-demo-repo
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

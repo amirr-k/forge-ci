@@ -95,6 +95,8 @@ services:
       FORGE_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       FORGE_REDIS_HOST: redis
       FORGE_REDIS_PORT: "6379"
+      FORGE_DEMO_REPO_PATH: /opt/forge-demo-repo
+      FORGE_DEMO_WORKSPACE_PATH: /var/lib/forgeci/demo-workspace
     ports:
       - "8080:8080"
     healthcheck:
