@@ -51,6 +51,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "bad_request", "message", e.getMessage()));
     }
 
+    /** e.g. "Crash a Worker" clicked before any task in the build is actually running yet. */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> conflict(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "conflict", "message", e.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> validation(MethodArgumentNotValidException e) {
         String message =

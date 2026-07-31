@@ -14,6 +14,8 @@ node_modules/
 dist/
 .vite/
 coverage/
+playwright-report/
+test-results/
 
 # Docker / local infra
 *.pid
