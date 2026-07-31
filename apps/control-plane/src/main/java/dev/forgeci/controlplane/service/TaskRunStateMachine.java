@@ -123,6 +123,9 @@ public class TaskRunStateMachine {
         } else if (target == TaskRunState.RETRY_WAIT) {
             taskRun.setFailureReason(outcome == null ? null : outcome.failureReason());
             updateLatestAttempt(taskRun, target, null, outcome == null ? null : outcome.failureReason());
+        } else if (target == TaskRunState.CACHED) {
+            taskRun.setCompletedAt(now);
+            taskRun.setArtifactDigest(outcome == null ? null : outcome.artifactDigest());
         }
 
         // flush now so the returned entity's bumped version is visible to a caller chaining transitions

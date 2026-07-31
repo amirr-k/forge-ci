@@ -8,6 +8,7 @@ import dev.forgeci.controlplane.domain.Project;
 import dev.forgeci.controlplane.repository.ArtifactRepository;
 import dev.forgeci.controlplane.repository.CacheEntryRepository;
 import dev.forgeci.controlplane.repository.ProjectRepository;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,6 +120,27 @@ public class RemoteArtifactService {
                         .findByCacheKeyAndProjectId(cacheKey, projectId)
                         .orElseThrow(() -> new NotFoundException("no cache entry for key " + cacheKey));
         return fetchAndVerify(entry.getArtifact());
+    }
+
+    /**
+     * Whether a cache key already has a verified artifact worth reusing, without ever throwing —
+     * a missing entry or a corrupted object is just "no", so the scheduler falls back to running
+     * the task rather than propagating an integrity failure into a plan/claim decision.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Artifact> verifiedHit(String cacheKey, long projectId) {
+        return cacheEntryRepository
+                .findByCacheKeyAndProjectId(cacheKey, projectId)
+                .map(CacheEntry::getArtifact)
+                .flatMap(
+                        artifact -> {
+                            try {
+                                fetchAndVerify(artifact);
+                                return Optional.of(artifact);
+                            } catch (ArtifactIntegrityException corrupt) {
+                                return Optional.empty();
+                            }
+                        });
     }
 
     private DownloadResult fetchAndVerify(Artifact artifact) {

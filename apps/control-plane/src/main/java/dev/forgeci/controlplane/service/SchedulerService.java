@@ -1,5 +1,6 @@
 package dev.forgeci.controlplane.service;
 
+import dev.forgeci.controlplane.domain.Artifact;
 import dev.forgeci.controlplane.domain.Build;
 import dev.forgeci.controlplane.domain.BuildState;
 import dev.forgeci.controlplane.domain.TaskDefinitionEntity;
@@ -49,6 +50,7 @@ public class SchedulerService {
     private final BuildRepository buildRepository;
     private final TaskRunStateMachine taskRunStateMachine;
     private final BuildStateMachine buildStateMachine;
+    private final RemoteArtifactService remoteArtifactService;
     private final BuildMetrics metrics;
 
     public SchedulerService(
@@ -57,12 +59,14 @@ public class SchedulerService {
             BuildRepository buildRepository,
             TaskRunStateMachine taskRunStateMachine,
             BuildStateMachine buildStateMachine,
+            RemoteArtifactService remoteArtifactService,
             BuildMetrics metrics) {
         this.taskRunRepository = taskRunRepository;
         this.workerRepository = workerRepository;
         this.buildRepository = buildRepository;
         this.taskRunStateMachine = taskRunStateMachine;
         this.buildStateMachine = buildStateMachine;
+        this.remoteArtifactService = remoteArtifactService;
         this.metrics = metrics;
     }
 
@@ -251,12 +255,36 @@ public class SchedulerService {
                     definition.getDependsOn().stream()
                             .allMatch(dep -> isSatisfied(stateByName.get(dep)));
             if (allSatisfied) {
-                try {
-                    taskRunStateMachine.transition(sibling.getId(), sibling.getVersion(), TaskRunState.READY, TaskRunOutcome.NONE);
-                } catch (StaleTransitionException | InvalidTransitionException raced) {
-                    log.debug("task run {} readiness promotion raced with another transition", sibling.getId());
-                }
+                promoteToReadyOrCached(sibling, completed.getBuild().getProject().getId());
             }
+        }
+    }
+
+    /**
+     * A dependency-complete task run goes {@code READY} first (always — this is what timestamps
+     * {@code readyAt} for the FIFO tie-break) and then immediately on to {@code CACHED} if a
+     * verified artifact already exists for its cache key, per
+     * spec/reference/architecture.md#affected-task-analysis ("convert valid hits to CACHED").
+     * Reused directly by {@link BuildService} for a build's initially-ready task runs.
+     */
+    @Transactional
+    public void promoteToReadyOrCached(TaskRun taskRun, Long projectId) {
+        TaskRun ready;
+        try {
+            ready = taskRunStateMachine.transition(taskRun.getId(), taskRun.getVersion(), TaskRunState.READY, TaskRunOutcome.NONE);
+        } catch (StaleTransitionException | InvalidTransitionException raced) {
+            log.debug("task run {} readiness promotion raced with another transition", taskRun.getId());
+            return;
+        }
+        Optional<Artifact> hit = remoteArtifactService.verifiedHit(ready.getCacheKey(), projectId);
+        if (hit.isEmpty()) {
+            return;
+        }
+        try {
+            taskRunStateMachine.transition(
+                    ready.getId(), ready.getVersion(), TaskRunState.CACHED, new TaskRunOutcome(null, null, hit.get().getDigest()));
+        } catch (StaleTransitionException | InvalidTransitionException raced) {
+            log.debug("task run {} cache-hit promotion raced with another transition", ready.getId());
         }
     }
 

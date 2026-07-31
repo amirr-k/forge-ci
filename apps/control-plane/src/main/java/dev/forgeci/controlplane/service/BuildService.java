@@ -8,7 +8,6 @@ import dev.forgeci.controlplane.domain.PlanSubmission;
 import dev.forgeci.controlplane.domain.Project;
 import dev.forgeci.controlplane.domain.TaskDefinitionEntity;
 import dev.forgeci.controlplane.domain.TaskRun;
-import dev.forgeci.controlplane.domain.TaskRunState;
 import dev.forgeci.controlplane.repository.ArtifactRepository;
 import dev.forgeci.controlplane.repository.BuildRepository;
 import dev.forgeci.controlplane.repository.PlanSubmissionRepository;
@@ -34,7 +33,7 @@ public class BuildService {
     private final TaskRunRepository taskRunRepository;
     private final ArtifactRepository artifactRepository;
     private final BuildStateMachine buildStateMachine;
-    private final TaskRunStateMachine taskRunStateMachine;
+    private final SchedulerService schedulerService;
     private final BuildMetrics metrics;
 
     public BuildService(
@@ -44,7 +43,7 @@ public class BuildService {
             TaskRunRepository taskRunRepository,
             ArtifactRepository artifactRepository,
             BuildStateMachine buildStateMachine,
-            TaskRunStateMachine taskRunStateMachine,
+            SchedulerService schedulerService,
             BuildMetrics metrics) {
         this.projectRepository = projectRepository;
         this.planSubmissionRepository = planSubmissionRepository;
@@ -52,7 +51,7 @@ public class BuildService {
         this.taskRunRepository = taskRunRepository;
         this.artifactRepository = artifactRepository;
         this.buildStateMachine = buildStateMachine;
-        this.taskRunStateMachine = taskRunStateMachine;
+        this.schedulerService = schedulerService;
         this.metrics = metrics;
     }
 
@@ -111,11 +110,12 @@ public class BuildService {
         build = buildStateMachine.transition(buildId, build.getVersion(), BuildState.PLANNING);
         build = buildStateMachine.transition(buildId, build.getVersion(), BuildState.RUNNING);
 
+        Long projectId = build.getProject().getId();
         for (int i = 0; i < tasks.size(); i++) {
             TaskDefinitionEntity task = tasks.get(i);
             TaskRun taskRun = created.get(i);
             if (ReadinessEvaluator.isImmediatelyReady(task, tasks)) {
-                taskRunStateMachine.transition(taskRun.getId(), taskRun.getVersion(), TaskRunState.READY, TaskRunOutcome.NONE);
+                schedulerService.promoteToReadyOrCached(taskRun, projectId);
             }
         }
     }
