@@ -2,6 +2,7 @@ package dev.forgeci.controlplane.demo;
 
 import dev.forgeci.controlplane.api.dto.BuildCreationRequest;
 import dev.forgeci.controlplane.api.dto.PlanSubmissionRequest;
+import dev.forgeci.controlplane.demo.DemoBuildResponse.DemoTaskResponse;
 import dev.forgeci.controlplane.domain.Build;
 import dev.forgeci.controlplane.domain.PlanSubmission;
 import dev.forgeci.controlplane.domain.Project;
@@ -84,7 +85,11 @@ public class DemoScenarioService {
             Build build = buildService.createBuild(project.getId(), new BuildCreationRequest(submission.getId(), triggerType, workerCount));
 
             watcher.watch(build.getId(), token);
-            return new DemoBuildResponse(build.getId(), scenario.scriptId(), workerCount);
+            List<DemoTaskResponse> tasks =
+                    plan.tasks().stream()
+                            .map(t -> new DemoTaskResponse(t.name(), t.dependsOn(), t.reason()))
+                            .toList();
+            return new DemoBuildResponse(build.getId(), scenario.scriptId(), workerCount, tasks, plan.unaffectedTasks());
         } catch (RuntimeException failedBeforeScheduling) {
             guard.releaseBuildSlot(token);
             throw failedBeforeScheduling;
