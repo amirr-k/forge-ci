@@ -1,0 +1,8 @@
+package dev.forgeci.controlplane.api.dto;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record BuildCreationRequest(
+        @NotNull Long planSubmissionId, @NotBlank String triggerType, @Min(0) int requestedWorkerCount) {}
