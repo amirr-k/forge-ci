@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,7 @@ class HealthControllerTest {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.isValid(2)).thenReturn(true);
 
-        ResponseEntity<?> response = new HealthController(dataSource).ready();
+        ResponseEntity<?> response = new HealthController(dataSource, "unknown").ready();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -30,7 +31,7 @@ class HealthControllerTest {
         DataSource dataSource = mock(DataSource.class);
         when(dataSource.getConnection()).thenThrow(new SQLException("connection refused"));
 
-        ResponseEntity<?> response = new HealthController(dataSource).ready();
+        ResponseEntity<?> response = new HealthController(dataSource, "unknown").ready();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -39,6 +40,22 @@ class HealthControllerTest {
     void healthAlwaysReportsUpRegardlessOfDependencies() {
         DataSource dataSource = mock(DataSource.class);
 
-        assertThat(new HealthController(dataSource).health()).containsEntry("status", "UP");
+        assertThat(new HealthController(dataSource, "unknown").health()).containsEntry("status", "UP");
+    }
+
+    @Test
+    void versionReportsTheCommitItWasConfiguredWith() {
+        DataSource dataSource = mock(DataSource.class);
+
+        Map<String, String> response = new HealthController(dataSource, "abc1234").version();
+
+        assertThat(response).containsEntry("commit", "abc1234");
+    }
+
+    @Test
+    void versionDefaultsToUnknownRatherThanFabricatingACommit() {
+        DataSource dataSource = mock(DataSource.class);
+
+        assertThat(new HealthController(dataSource, "unknown").version()).containsEntry("commit", "unknown");
     }
 }

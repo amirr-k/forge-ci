@@ -49,6 +49,9 @@ management:
       enabled: true
 
 forge:
+  # set by the release pipeline's image build/deploy step (docs/architecture.md), read back by
+  # /api/version — never derived from a .git directory, which a deployed jar doesn't have
+  git-commit: ${FORGE_GIT_COMMIT:unknown}
   demo:
     # local dev/tests run with the working directory at the repo root, where the bundled repo
     # lives at its normal path; deploy/compose.yaml points these at the paths baked into the

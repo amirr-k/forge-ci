@@ -97,6 +97,9 @@ services:
       FORGE_REDIS_PORT: "6379"
       FORGE_DEMO_REPO_PATH: /opt/forge-demo-repo
       FORGE_DEMO_WORKSPACE_PATH: /var/lib/forgeci/demo-workspace
+      # the release pipeline sets this on the host before `compose up`; /api/version echoes it
+      # back so a deploy can be verified against the commit it was supposed to deploy
+      FORGE_GIT_COMMIT: ${FORGE_GIT_COMMIT:-unknown}
     ports:
       - "8080:8080"
     healthcheck:
