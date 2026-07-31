@@ -30,20 +30,29 @@ public class BuildEventPublisher {
     private final BuildEventRepository buildEventRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public BuildEventPublisher(BuildEventRepository buildEventRepository, KafkaTemplate<String, Object> kafkaTemplate) {
+    public BuildEventPublisher(
+            BuildEventRepository buildEventRepository,
+            KafkaTemplate<String, Object> kafkaTemplate) {
         this.buildEventRepository = buildEventRepository;
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    public BuildEvent publish(Build build, BuildEventType type, TaskRun taskRun, Map<String, Object> payload) {
+    public BuildEvent publish(
+            Build build, BuildEventType type, TaskRun taskRun, Map<String, Object> payload) {
         long nextSequence = buildEventRepository.countByBuildId(build.getId()) + 1;
         BuildEvent event = new BuildEvent(build, nextSequence, type, taskRun, payload);
         BuildEvent saved = buildEventRepository.save(event);
 
         try {
-            kafkaTemplate.send(KafkaTopics.BUILD_EVENTS, String.valueOf(build.getId()), BuildEventMessage.from(saved));
+            kafkaTemplate.send(
+                    KafkaTopics.BUILD_EVENTS,
+                    String.valueOf(build.getId()),
+                    BuildEventMessage.from(saved));
         } catch (RuntimeException kafkaUnavailable) {
-            log.warn("failed to mirror build event {} to Kafka: {}", saved.getId(), kafkaUnavailable.getMessage());
+            log.warn(
+                    "failed to mirror build event {} to Kafka: {}",
+                    saved.getId(),
+                    kafkaUnavailable.getMessage());
         }
         return saved;
     }

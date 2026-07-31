@@ -35,7 +35,10 @@ public final class DockerTaskExecutor {
         this.config = config;
     }
 
-    /** {@code logSink} receives output in small batches as the container produces it, for streaming to the control plane. */
+    /**
+     * {@code logSink} receives output in small batches as the container produces it, for streaming
+     * to the control plane.
+     */
     public ExecutionResult run(ClaimedTaskResponse task, Consumer<List<String>> logSink) {
         String containerName = "forge-task-" + task.taskRunId() + "-" + task.attemptId();
         List<String> args = new ArrayList<>();
@@ -77,11 +80,14 @@ public final class DockerTaskExecutor {
                 killContainer(containerName);
                 terminate(process);
                 joinQuietly(pump);
-                return new ExecutionResult(false, null, "task timed out after " + task.timeoutSeconds() + "s");
+                return new ExecutionResult(
+                        false, null, "task timed out after " + task.timeoutSeconds() + "s");
             }
             joinQuietly(pump);
             int exitCode = process.exitValue();
-            return exitCode == 0 ? new ExecutionResult(true, 0, null) : new ExecutionResult(false, exitCode, "task exited with code " + exitCode);
+            return exitCode == 0
+                    ? new ExecutionResult(true, 0, null)
+                    : new ExecutionResult(false, exitCode, "task exited with code " + exitCode);
         } catch (InterruptedException e) {
             killContainer(containerName);
             terminate(process);
@@ -93,7 +99,11 @@ public final class DockerTaskExecutor {
 
     private static void killContainer(String containerName) {
         try {
-            new ProcessBuilder("docker", "kill", containerName).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start().waitFor(TERMINATION_GRACE.toSeconds(), TimeUnit.SECONDS);
+            new ProcessBuilder("docker", "kill", containerName)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+                    .waitFor(TERMINATION_GRACE.toSeconds(), TimeUnit.SECONDS);
         } catch (IOException | InterruptedException e) {
             // best-effort: --rm plus the process-tree termination below still reclaims it
             if (e instanceof InterruptedException) {
@@ -126,7 +136,9 @@ public final class DockerTaskExecutor {
                             long forwarded = 0;
                             boolean truncated = false;
                             char[] buffer = new char[8192];
-                            try (Reader reader = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+                            try (Reader reader =
+                                    new InputStreamReader(
+                                            process.getInputStream(), StandardCharsets.UTF_8)) {
                                 int read;
                                 while ((read = reader.read(buffer)) != -1) {
                                     for (int i = 0; i < read; i++) {
@@ -137,7 +149,10 @@ public final class DockerTaskExecutor {
                                                 batch.add(stripCarriageReturn(line));
                                             } else if (!truncated) {
                                                 truncated = true;
-                                                batch.add("[output truncated at " + MAX_OUTPUT_CHARS + " characters]");
+                                                batch.add(
+                                                        "[output truncated at "
+                                                                + MAX_OUTPUT_CHARS
+                                                                + " characters]");
                                             }
                                             line.setLength(0);
                                             if (c != '\n') {
@@ -159,7 +174,8 @@ public final class DockerTaskExecutor {
                                     logSink.accept(List.copyOf(batch));
                                 }
                             } catch (IOException e) {
-                                // the stream closing under us means the container is gone; its exit code decides
+                                // the stream closing under us means the container is gone; its exit
+                                // code decides
                             }
                         },
                         "forge-worker-output");

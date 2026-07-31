@@ -15,7 +15,8 @@ final class PlanPrinter {
 
     private PlanPrinter() {}
 
-    static void print(PrintWriter out, BuildPlan plan, Map<String, CacheCoordinator.Decision> decisions) {
+    static void print(
+            PrintWriter out, BuildPlan plan, Map<String, CacheCoordinator.Decision> decisions) {
         out.println("ForgeCI plan");
         out.println();
 

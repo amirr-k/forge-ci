@@ -17,12 +17,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 class TaskArchiveTest {
 
-    /** Mirrors {@code TaskArchive}'s private header — a malicious/corrupt object still has to start here. */
+    /**
+     * Mirrors {@code TaskArchive}'s private header — a malicious/corrupt object still has to start
+     * here.
+     */
     private static final byte[] MAGIC = "FORGE-ARCHIVE-1\n".getBytes(StandardCharsets.UTF_8);
 
     @Test
-    void roundTripsFilesInSortedOrderWithNoTimestamps(@TempDir Path source, @TempDir Path destination)
-            throws IOException {
+    void roundTripsFilesInSortedOrderWithNoTimestamps(
+            @TempDir Path source, @TempDir Path destination) throws IOException {
         Files.createDirectories(source.resolve("build/nested"));
         Files.writeString(source.resolve("build/b.txt"), "b\n");
         Files.writeString(source.resolve("build/nested/a.txt"), "a\n");
@@ -47,24 +50,29 @@ class TaskArchiveTest {
 
     @Test
     void anExtractionPathTraversalAttemptIsRejected(@TempDir Path destination) throws IOException {
-        byte[] malicious = archiveWithSingleEntry("../evil.txt", "pwned".getBytes(StandardCharsets.UTF_8));
+        byte[] malicious =
+                archiveWithSingleEntry("../evil.txt", "pwned".getBytes(StandardCharsets.UTF_8));
 
-        assertThrows(PathTraversalException.class, () -> TaskArchive.extract(malicious, destination));
+        assertThrows(
+                PathTraversalException.class, () -> TaskArchive.extract(malicious, destination));
         assertFalse(Files.exists(destination.resolveSibling("evil.txt")));
     }
 
     @Test
     void anAbsolutePathEntryIsRejected(@TempDir Path destination) throws IOException {
-        byte[] malicious = archiveWithSingleEntry("/etc/evil.txt", "pwned".getBytes(StandardCharsets.UTF_8));
+        byte[] malicious =
+                archiveWithSingleEntry("/etc/evil.txt", "pwned".getBytes(StandardCharsets.UTF_8));
 
-        assertThrows(PathTraversalException.class, () -> TaskArchive.extract(malicious, destination));
+        assertThrows(
+                PathTraversalException.class, () -> TaskArchive.extract(malicious, destination));
     }
 
     @Test
     void aTruncatedArchiveIsRejectedAsCorrupt(@TempDir Path destination) throws IOException {
         byte[] truncated = new byte[] {MAGIC[0], MAGIC[1]};
 
-        assertThrows(CorruptArtifactException.class, () -> TaskArchive.extract(truncated, destination));
+        assertThrows(
+                CorruptArtifactException.class, () -> TaskArchive.extract(truncated, destination));
     }
 
     private static byte[] archiveWithSingleEntry(String path, byte[] content) throws IOException {

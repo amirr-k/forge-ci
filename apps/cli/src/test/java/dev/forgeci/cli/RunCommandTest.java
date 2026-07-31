@@ -19,14 +19,16 @@ class RunCommandTest {
     @Test
     void runsTheAffectedTasksAndStreamsTheirOutput(@TempDir Path directory) throws IOException {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
-            Files.writeString(directory.resolve("services/accounts/AccountService.java"), "edited\n");
+            Files.writeString(
+                    directory.resolve("services/accounts/AccountService.java"), "edited\n");
 
             CliFixture.Result result = fixture.run("run");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
             assertTrue(result.out().contains("[accounts:test] testing accounts"), result.out());
             assertTrue(result.out().contains("accounts:test            SUCCEEDED"), result.out());
-            assertTrue(result.out().contains("Run: 1 succeeded, 0 failed, 0 skipped"), result.out());
+            assertTrue(
+                    result.out().contains("Run: 1 succeeded, 0 failed, 0 skipped"), result.out());
             assertFalse(result.out().contains("pricing:test"), result.out());
         }
     }
@@ -77,7 +79,8 @@ class RunCommandTest {
             // an independent task still runs, so one failure does not abandon the whole build
             assertTrue(result.out().contains("accounts:test            SUCCEEDED"), result.out());
             assertFalse(result.out().contains("building pricing"), result.out());
-            assertTrue(result.out().contains("Run: 1 succeeded, 1 failed, 2 skipped"), result.out());
+            assertTrue(
+                    result.out().contains("Run: 1 succeeded, 1 failed, 2 skipped"), result.out());
         }
     }
 

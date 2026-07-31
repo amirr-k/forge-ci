@@ -30,8 +30,11 @@ class StateMachineTest extends ControlPlaneIntegrationTest {
 
     private Build createRunningBuild(String revision) {
         Project project = projectService.register(TestFixtures.project());
-        var plan = planSubmissionService.submit(project.getId(), TestFixtures.twoTaskPlan(revision, "rev-0"));
-        return buildService.createBuild(project.getId(), new BuildCreationRequest(plan.getId(), "manual", 0));
+        var plan =
+                planSubmissionService.submit(
+                        project.getId(), TestFixtures.twoTaskPlan(revision, "rev-0"));
+        return buildService.createBuild(
+                project.getId(), new BuildCreationRequest(plan.getId(), "manual", 0));
     }
 
     @Test
@@ -39,7 +42,10 @@ class StateMachineTest extends ControlPlaneIntegrationTest {
         Build build = createRunningBuild("state-1");
         long eventsBefore = buildEventRepository.countByBuildId(build.getId());
 
-        assertThatThrownBy(() -> buildStateMachine.transition(build.getId(), build.getVersion(), BuildState.PLANNING))
+        assertThatThrownBy(
+                        () ->
+                                buildStateMachine.transition(
+                                        build.getId(), build.getVersion(), BuildState.PLANNING))
                 .isInstanceOf(InvalidTransitionException.class);
 
         Build reloaded = buildService.get(build.getId());
@@ -55,7 +61,10 @@ class StateMachineTest extends ControlPlaneIntegrationTest {
         // an accepted transition moves the version forward from under a caller holding the old copy
         buildStateMachine.transition(build.getId(), build.getVersion(), BuildState.CANCELED);
 
-        assertThatThrownBy(() -> buildStateMachine.transition(build.getId(), staleVersion, BuildState.CANCELED))
+        assertThatThrownBy(
+                        () ->
+                                buildStateMachine.transition(
+                                        build.getId(), staleVersion, BuildState.CANCELED))
                 .isInstanceOf(StaleTransitionException.class);
 
         Build reloaded = buildService.get(build.getId());
@@ -65,38 +74,57 @@ class StateMachineTest extends ControlPlaneIntegrationTest {
     @Test
     void invalidTaskRunTransitionIsRejected() {
         Build build = createRunningBuild("state-3");
-        TaskRun pricingBuild = taskRunRepository.findByBuildIdAndTaskName(build.getId(), "pricing:build").orElseThrow();
+        TaskRun pricingBuild =
+                taskRunRepository
+                        .findByBuildIdAndTaskName(build.getId(), "pricing:build")
+                        .orElseThrow();
         assertThat(pricingBuild.getState()).isEqualTo(TaskRunState.READY);
 
         assertThatThrownBy(
                         () ->
                                 taskRunStateMachine.transition(
-                                        pricingBuild.getId(), pricingBuild.getVersion(), TaskRunState.SUCCEEDED, TaskRunOutcome.NONE))
+                                        pricingBuild.getId(),
+                                        pricingBuild.getVersion(),
+                                        TaskRunState.SUCCEEDED,
+                                        TaskRunOutcome.NONE))
                 .isInstanceOf(InvalidTransitionException.class);
     }
 
     @Test
     void lateReportFromAStaleAttemptCannotOverwriteAnAlreadyAcceptedResult() {
         Build build = createRunningBuild("state-4");
-        TaskRun pricingBuild = taskRunRepository.findByBuildIdAndTaskName(build.getId(), "pricing:build").orElseThrow();
+        TaskRun pricingBuild =
+                taskRunRepository
+                        .findByBuildIdAndTaskName(build.getId(), "pricing:build")
+                        .orElseThrow();
         long staleVersion = pricingBuild.getVersion();
 
         TaskRun leased =
-                taskRunStateMachine.transition(pricingBuild.getId(), pricingBuild.getVersion(), TaskRunState.LEASED, TaskRunOutcome.NONE);
-        taskRunStateMachine.transition(leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
+                taskRunStateMachine.transition(
+                        pricingBuild.getId(),
+                        pricingBuild.getVersion(),
+                        TaskRunState.LEASED,
+                        TaskRunOutcome.NONE);
+        taskRunStateMachine.transition(
+                leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
 
-        // a late worker report still carrying the pre-lease version must not resurrect this task run
+        // a late worker report still carrying the pre-lease version must not resurrect this task
+        // run
         assertThatThrownBy(
                         () ->
                                 taskRunStateMachine.transition(
-                                        pricingBuild.getId(), staleVersion, TaskRunState.LEASED, TaskRunOutcome.NONE))
+                                        pricingBuild.getId(),
+                                        staleVersion,
+                                        TaskRunState.LEASED,
+                                        TaskRunOutcome.NONE))
                 .isInstanceOf(StaleTransitionException.class);
     }
 
     @Test
     void everyAcceptedTransitionEmitsExactlyOneOrderedBuildEvent() {
         Build build = createRunningBuild("state-5");
-        List<BuildEvent> events = buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(build.getId());
+        List<BuildEvent> events =
+                buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(build.getId());
 
         // BUILD_PLANNING, BUILD_RUNNING, plus one TASK_RUN_READY for the dependency-free task
         assertThat(events).hasSize(3);
@@ -104,10 +132,18 @@ class StateMachineTest extends ControlPlaneIntegrationTest {
             assertThat(events.get(i).getSequenceNumber()).isEqualTo(i + 1);
         }
 
-        TaskRun pricingBuild = taskRunRepository.findByBuildIdAndTaskName(build.getId(), "pricing:build").orElseThrow();
-        taskRunStateMachine.transition(pricingBuild.getId(), pricingBuild.getVersion(), TaskRunState.LEASED, TaskRunOutcome.NONE);
+        TaskRun pricingBuild =
+                taskRunRepository
+                        .findByBuildIdAndTaskName(build.getId(), "pricing:build")
+                        .orElseThrow();
+        taskRunStateMachine.transition(
+                pricingBuild.getId(),
+                pricingBuild.getVersion(),
+                TaskRunState.LEASED,
+                TaskRunOutcome.NONE);
 
-        List<BuildEvent> after = buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(build.getId());
+        List<BuildEvent> after =
+                buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(build.getId());
         assertThat(after).hasSize(4);
         assertThat(after.get(3).getSequenceNumber()).isEqualTo(4);
     }

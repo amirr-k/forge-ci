@@ -31,7 +31,8 @@ final class StreamingRunListener implements ExecutionListener {
     @Override
     public void taskFinished(TaskOutcome outcome) {
         String detail = outcome.detail().isEmpty() ? "" : " (" + outcome.detail() + ")";
-        String elapsed = outcome.duration().isZero() ? "" : " in " + Durations.format(outcome.duration());
+        String elapsed =
+                outcome.duration().isZero() ? "" : " in " + Durations.format(outcome.duration());
         write(outcome.task(), outcome.status() + detail + elapsed);
     }
 

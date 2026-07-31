@@ -15,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -45,15 +44,26 @@ public final class WorkerMain {
         WorkerRegistrationResponse registration =
                 registerWithRetry(controlPlane, config, Duration.ofSeconds(2), 30);
         long workerId = registration.workerId();
-        log.log(System.Logger.Level.INFO, "registered as worker {0} ({1})", workerId, config.externalId());
+        log.log(
+                System.Logger.Level.INFO,
+                "registered as worker {0} ({1})",
+                workerId,
+                config.externalId());
 
         AtomicBoolean running = new AtomicBoolean(true);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> running.set(false), "forge-worker-shutdown"));
+        Runtime.getRuntime()
+                .addShutdownHook(new Thread(() -> running.set(false), "forge-worker-shutdown"));
 
         CrashTrigger crashTrigger = new CrashTrigger(() -> Runtime.getRuntime().halt(1));
-        ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "forge-worker-heartbeat"));
+        ScheduledExecutorService heartbeats =
+                Executors.newSingleThreadScheduledExecutor(
+                        r -> new Thread(r, "forge-worker-heartbeat"));
         heartbeats.scheduleWithFixedDelay(
-                () -> safely(() -> crashTrigger.maybeCrash(controlPlane.heartbeat(workerId).shouldCrash())),
+                () ->
+                        safely(
+                                () ->
+                                        crashTrigger.maybeCrash(
+                                                controlPlane.heartbeat(workerId).shouldCrash())),
                 registration.heartbeatIntervalMs(),
                 registration.heartbeatIntervalMs(),
                 TimeUnit.MILLISECONDS);
@@ -78,7 +88,12 @@ public final class WorkerMain {
             HttpRemoteArtifactClient artifacts,
             DockerTaskExecutor executor,
             WorkerConfig config) {
-        log.log(System.Logger.Level.INFO, "claimed task {0} (run {1}, attempt {2})", task.taskName(), task.taskRunId(), task.attemptId());
+        log.log(
+                System.Logger.Level.INFO,
+                "claimed task {0} (run {1}, attempt {2})",
+                task.taskName(),
+                task.taskRunId(),
+                task.attemptId());
 
         DockerTaskExecutor.ExecutionResult result =
                 executor.run(
@@ -87,7 +102,12 @@ public final class WorkerMain {
                                 safely(
                                         () ->
                                                 controlPlane.appendLogs(
-                                                        task.taskRunId(), new LogChunkRequest(task.workerId(), task.leaseToken(), task.attemptId(), lines))));
+                                                        task.taskRunId(),
+                                                        new LogChunkRequest(
+                                                                task.workerId(),
+                                                                task.leaseToken(),
+                                                                task.attemptId(),
+                                                                lines))));
 
         String artifactDigest = null;
         boolean success = result.success();
@@ -104,26 +124,48 @@ public final class WorkerMain {
         }
 
         TaskResultReportRequest report =
-                new TaskResultReportRequest(task.workerId(), task.leaseToken(), task.attemptId(), success, result.exitCode(), failureReason, artifactDigest);
+                new TaskResultReportRequest(
+                        task.workerId(),
+                        task.leaseToken(),
+                        task.attemptId(),
+                        success,
+                        result.exitCode(),
+                        failureReason,
+                        artifactDigest);
         safely(() -> controlPlane.reportResult(task.taskRunId(), report));
     }
 
     private static WorkerRegistrationResponse registerWithRetry(
-            ControlPlaneClient controlPlane, WorkerConfig config, Duration retryDelay, int maxAttempts) throws InterruptedException {
+            ControlPlaneClient controlPlane,
+            WorkerConfig config,
+            Duration retryDelay,
+            int maxAttempts)
+            throws InterruptedException {
         WorkerRegistrationRequest request =
-                new WorkerRegistrationRequest(config.externalId(), config.capabilities(), config.maxConcurrency(), config.versionLabel());
+                new WorkerRegistrationRequest(
+                        config.externalId(),
+                        config.capabilities(),
+                        config.maxConcurrency(),
+                        config.versionLabel());
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return controlPlane.register(request);
             } catch (ControlPlaneUnavailableException e) {
-                log.log(System.Logger.Level.WARNING, "registration attempt {0}/{1} failed: {2}", attempt, maxAttempts, e.getMessage());
+                log.log(
+                        System.Logger.Level.WARNING,
+                        "registration attempt {0}/{1} failed: {2}",
+                        attempt,
+                        maxAttempts,
+                        e.getMessage());
                 Thread.sleep(retryDelay.toMillis());
             }
         }
-        throw new IllegalStateException("could not register with control plane after " + maxAttempts + " attempts");
+        throw new IllegalStateException(
+                "could not register with control plane after " + maxAttempts + " attempts");
     }
 
-    private static Optional<ClaimedTaskResponse> safelyClaim(ControlPlaneClient controlPlane, long workerId) {
+    private static Optional<ClaimedTaskResponse> safelyClaim(
+            ControlPlaneClient controlPlane, long workerId) {
         try {
             return controlPlane.claim(workerId);
         } catch (ControlPlaneUnavailableException e) {
@@ -144,8 +186,9 @@ public final class WorkerMain {
      * A fresh named volume mounted at the workspace root is empty on first boot — seed it once from
      * the image's bundled copy. Every worker shares that one volume and boots at the same time, so
      * plain "is it empty?" would let two of them copy concurrently and the loser would die on an
-     * already-created file. Directory creation is atomic on POSIX: whoever creates the lock owns the
-     * seeding, and the others block on the completion marker so nobody runs against a half-copy.
+     * already-created file. Directory creation is atomic on POSIX: whoever creates the lock owns
+     * the seeding, and the others block on the completion marker so nobody runs against a
+     * half-copy.
      */
     private static void seedWorkspaceIfEmpty(WorkerConfig config) {
         if (config.seedWorkspaceFrom() == null) {
@@ -166,12 +209,17 @@ public final class WorkerMain {
                 return;
             }
             if (isEmptyApartFromLock(root, lock)) {
-                log.log(System.Logger.Level.INFO, "seeding empty workspace {0} from {1}", root, config.seedWorkspaceFrom());
+                log.log(
+                        System.Logger.Level.INFO,
+                        "seeding empty workspace {0} from {1}",
+                        root,
+                        config.seedWorkspaceFrom());
                 copyRecursively(config.seedWorkspaceFrom(), root);
             }
             Files.createFile(seeded);
         } catch (IOException e) {
-            throw new UncheckedIOException("failed to seed workspace from " + config.seedWorkspaceFrom(), e);
+            throw new UncheckedIOException(
+                    "failed to seed workspace from " + config.seedWorkspaceFrom(), e);
         }
     }
 
@@ -181,7 +229,10 @@ public final class WorkerMain {
         }
     }
 
-    /** Bounded so a worker whose peer died mid-seed fails with a clear error instead of hanging forever. */
+    /**
+     * Bounded so a worker whose peer died mid-seed fails with a clear error instead of hanging
+     * forever.
+     */
     private static void awaitSeedCompletion(Path seeded) throws IOException {
         for (int attempt = 0; attempt < 120; attempt++) {
             if (Files.exists(seeded)) {
@@ -191,10 +242,12 @@ public final class WorkerMain {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("interrupted waiting for another worker to seed the workspace", e);
+                throw new IOException(
+                        "interrupted waiting for another worker to seed the workspace", e);
             }
         }
-        throw new IOException("timed out waiting for another worker to finish seeding the workspace");
+        throw new IOException(
+                "timed out waiting for another worker to finish seeding the workspace");
     }
 
     private static void copyRecursively(Path source, Path target) throws IOException {

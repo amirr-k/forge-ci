@@ -28,7 +28,10 @@ class TopologicalSorterTest {
         List<String> order = TopologicalSorter.sort(graph);
         List<String> roots =
                 order.stream()
-                        .filter(name -> List.of("accounts:test", "catalog:build", "pricing:test").contains(name))
+                        .filter(
+                                name ->
+                                        List.of("accounts:test", "catalog:build", "pricing:test")
+                                                .contains(name))
                         .toList();
 
         assertEquals(List.of("accounts:test", "catalog:build", "pricing:test"), roots);

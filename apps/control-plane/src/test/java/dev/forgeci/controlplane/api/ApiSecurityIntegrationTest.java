@@ -36,7 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {};
 
     @Autowired private TestRestTemplate rest;
     @Autowired private S3Properties s3Properties;
@@ -62,11 +63,13 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
                         "/absolute/key",
                         "tmp/" + UUID.randomUUID(),
                         "artifacts/00/deadbeef")) {
-            ResponseEntity<Map<String, Object>> response = client.upload(projectId, hostileKey, archive, digest, archive.length);
+            ResponseEntity<Map<String, Object>> response =
+                    client.upload(projectId, hostileKey, archive, digest, archive.length);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             String objectStoreKey = (String) response.getBody().get("objectStoreKey");
-            // the key is content-addressed from the digest alone; the caller's string never reaches it
+            // the key is content-addressed from the digest alone; the caller's string never reaches
+            // it
             assertThat(objectStoreKey).isEqualTo(s3Properties.objectKey(digest));
             assertThat(objectStoreKey).startsWith(s3Properties.getObjectPrefix());
             assertThat(objectStoreKey).doesNotContain("..");
@@ -80,26 +83,39 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
         String cacheKey = "sha256:private-" + UUID.randomUUID();
         client.uploadArtifact(owner, cacheKey, "owner's output".getBytes(StandardCharsets.UTF_8));
 
-        assertThat(client.lookup(stranger, cacheKey).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(client.lookup(owner, "../" + cacheKey).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(client.lookup(stranger, cacheKey).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(client.lookup(owner, "../" + cacheKey).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
     @Transactional(readOnly = true)
     void aSubmittedCommandIsStoredAsTheExactArgvArrayItArrivedAs() {
         long projectId = client.registerProject();
-        List<String> argv = List.of("/bin/echo", "$(id) && rm -rf / ; echo 'quoted arg'", "--flag=a b c");
+        List<String> argv =
+                List.of("/bin/echo", "$(id) && rm -rf / ; echo 'quoted arg'", "--flag=a b c");
         PlanSubmissionRequest plan =
                 new PlanSubmissionRequest(
                         "rev-" + UUID.randomUUID(),
                         "rev-0",
                         false,
                         List.of("services/argv/src/A.java"),
-                        List.of(new TaskDefinitionRequest("argv:build", List.of(), "sha256:argv-" + UUID.randomUUID(), "source changed", argv, List.of(), List.of(), 60)),
+                        List.of(
+                                new TaskDefinitionRequest(
+                                        "argv:build",
+                                        List.of(),
+                                        "sha256:argv-" + UUID.randomUUID(),
+                                        "source changed",
+                                        argv,
+                                        List.of(),
+                                        List.of(),
+                                        60)),
                         List.of());
         Long planId = client.submitPlan(projectId, plan).id();
 
-        List<TaskDefinitionEntity> stored = planSubmissionRepository.findById(planId).orElseThrow().getTasks();
+        List<TaskDefinitionEntity> stored =
+                planSubmissionRepository.findById(planId).orElseThrow().getTasks();
 
         assertThat(stored).hasSize(1);
         // no splitting on spaces, no shell quoting round-trip: the array survives verbatim
@@ -115,11 +131,24 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
                         "rev-0",
                         false,
                         List.of("services/empty/src/A.java"),
-                        List.of(new TaskDefinitionRequest("empty:build", List.of(), "sha256:empty", "source changed", List.of(), List.of(), List.of(), 60)),
+                        List.of(
+                                new TaskDefinitionRequest(
+                                        "empty:build",
+                                        List.of(),
+                                        "sha256:empty",
+                                        "source changed",
+                                        List.of(),
+                                        List.of(),
+                                        List.of(),
+                                        60)),
                         List.of());
 
         ResponseEntity<Map<String, Object>> response =
-                rest.exchange("/api/projects/" + projectId + "/plans", HttpMethod.POST, new HttpEntity<>(plan), JSON_OBJECT);
+                rest.exchange(
+                        "/api/projects/" + projectId + "/plans",
+                        HttpMethod.POST,
+                        new HttpEntity<>(plan),
+                        JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("error", "validation_failed");
@@ -130,7 +159,14 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
         long projectId = client.registerProject();
         String cacheKey = "sha256:lease-auth-" + UUID.randomUUID();
         Long planId =
-                client.submitPlan(projectId, TestFixtures.singleTaskPlan("rev-" + UUID.randomUUID(), "rev-0", "leased:build", cacheKey)).id();
+                client.submitPlan(
+                                projectId,
+                                TestFixtures.singleTaskPlan(
+                                        "rev-" + UUID.randomUUID(),
+                                        "rev-0",
+                                        "leased:build",
+                                        cacheKey))
+                        .id();
         client.createBuild(projectId, planId);
 
         long holder = client.registerWorker("worker-holder-" + UUID.randomUUID());
@@ -141,7 +177,12 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
                 rest.exchange(
                         "/api/task-runs/" + task.taskRunId() + "/logs",
                         HttpMethod.POST,
-                        new HttpEntity<>(new LogChunkRequest(intruder, UUID.randomUUID().toString(), task.attemptId(), List.of("injected log line"))),
+                        new HttpEntity<>(
+                                new LogChunkRequest(
+                                        intruder,
+                                        UUID.randomUUID().toString(),
+                                        task.attemptId(),
+                                        List.of("injected log line"))),
                         JSON_OBJECT);
         assertThat(logs.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
@@ -159,6 +200,7 @@ class ApiSecurityIntegrationTest extends ControlPlaneIntegrationTest {
                         task.attemptId(),
                         intruder,
                         UUID.randomUUID().toString());
-        assertThat(client.reportResultStatus(forged, true, 0, null, null)).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(client.reportResultStatus(forged, true, 0, null, null))
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

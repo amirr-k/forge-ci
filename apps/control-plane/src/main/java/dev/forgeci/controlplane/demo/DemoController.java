@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Public guest endpoints (contracts.md#apis). Every request only ever operates on the fixed
- * bundled sample repo and an allowlisted scenario id — never a visitor-supplied path, command, or
- * image (product-and-demo.md#public-demo-safety).
+ * Public guest endpoints (contracts.md#apis). Every request only ever operates on the fixed bundled
+ * sample repo and an allowlisted scenario id — never a visitor-supplied path, command, or image
+ * (product-and-demo.md#public-demo-safety).
  */
 @RestController
 public class DemoController {
@@ -28,9 +28,11 @@ public class DemoController {
 
     @PostMapping("/api/demo/builds")
     @ResponseStatus(HttpStatus.CREATED)
-    public DemoBuildResponse createBuild(@Valid @RequestBody DemoBuildRequest request, HttpServletRequest httpRequest) {
+    public DemoBuildResponse createBuild(
+            @Valid @RequestBody DemoBuildRequest request, HttpServletRequest httpRequest) {
         if (!guard.tryConsumeRateLimit(clientKey(httpRequest))) {
-            throw new DemoBusyException("you're demoing a bit fast — please wait a moment and try again");
+            throw new DemoBusyException(
+                    "you're demoing a bit fast — please wait a moment and try again");
         }
         DemoScenario scenario = DemoScenario.fromScriptId(request.scenario());
         return demoScenarioService.startBuild(scenario, request.workerCount());

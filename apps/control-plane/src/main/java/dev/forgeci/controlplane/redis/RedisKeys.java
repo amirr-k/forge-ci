@@ -1,6 +1,9 @@
 package dev.forgeci.controlplane.redis;
 
-/** Key naming for the ephemeral, TTL-only state Redis is allowed to hold (contracts.md#redis-responsibilities). */
+/**
+ * Key naming for the ephemeral, TTL-only state Redis is allowed to hold
+ * (contracts.md#redis-responsibilities).
+ */
 public final class RedisKeys {
 
     public static final String HEARTBEAT_PREFIX = "forge:worker:heartbeat:";

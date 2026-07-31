@@ -5,7 +5,12 @@ import java.time.Instant;
 import java.util.Map;
 
 public record BuildEventResponse(
-        long sequenceNumber, String eventType, Long taskRunId, String taskName, Instant occurredAt, Map<String, Object> payload) {
+        long sequenceNumber,
+        String eventType,
+        Long taskRunId,
+        String taskName,
+        Instant occurredAt,
+        Map<String, Object> payload) {
 
     public static BuildEventResponse from(BuildEvent event) {
         return new BuildEventResponse(

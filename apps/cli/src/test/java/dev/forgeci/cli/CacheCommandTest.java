@@ -72,14 +72,18 @@ class CacheCommandTest {
     }
 
     @Test
-    void warmBuildRestoresEveryTaskFromCacheWithoutReexecuting(@TempDir Path directory) throws IOException {
+    void warmBuildRestoresEveryTaskFromCacheWithoutReexecuting(@TempDir Path directory)
+            throws IOException {
         try (CliFixture fixture = fixture(directory)) {
             fixture.run("run", "--all");
 
             CliFixture.Result result = fixture.run("run", "--all");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
-            assertEquals(1, markerRuns(directory, "shared"), "a cache hit must not re-invoke the command");
+            assertEquals(
+                    1,
+                    markerRuns(directory, "shared"),
+                    "a cache hit must not re-invoke the command");
             assertEquals(1, markerRuns(directory, "pricing"));
             assertEquals(1, markerRuns(directory, "accounts"));
             assertTrue(result.out().contains("restored from cache"), result.out());
@@ -90,20 +94,23 @@ class CacheCommandTest {
     void incrementalBuildRerunsOnlyTheAffectedSubset(@TempDir Path directory) throws IOException {
         try (CliFixture fixture = fixture(directory)) {
             fixture.run("run", "--all");
-            Files.writeString(directory.resolve("services/pricing/PriceCalculator.java"), "edited\n");
+            Files.writeString(
+                    directory.resolve("services/pricing/PriceCalculator.java"), "edited\n");
 
             CliFixture.Result result = fixture.run("run");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
             assertEquals(2, markerRuns(directory, "pricing"), "the changed task must re-run");
             assertEquals(1, markerRuns(directory, "shared"), "an unaffected task must not re-run");
-            assertEquals(1, markerRuns(directory, "accounts"), "an unaffected task must not re-run");
+            assertEquals(
+                    1, markerRuns(directory, "accounts"), "an unaffected task must not re-run");
             assertFalse(result.out().contains("accounts:test"), result.out());
         }
     }
 
     @Test
-    void aCorruptedArtifactForcesARebuildOfOnlyThatTask(@TempDir Path directory) throws IOException {
+    void aCorruptedArtifactForcesARebuildOfOnlyThatTask(@TempDir Path directory)
+            throws IOException {
         try (CliFixture fixture = fixture(directory)) {
             fixture.run("run", "--all");
             corruptTheStoredObjectFor(directory, "pricing:build");
@@ -111,8 +118,14 @@ class CacheCommandTest {
             CliFixture.Result result = fixture.run("run", "--all");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
-            assertEquals(2, markerRuns(directory, "pricing"), "a corrupted artifact must trigger a rebuild");
-            assertEquals(1, markerRuns(directory, "shared"), "an untouched artifact must still be a hit");
+            assertEquals(
+                    2,
+                    markerRuns(directory, "pricing"),
+                    "a corrupted artifact must trigger a rebuild");
+            assertEquals(
+                    1,
+                    markerRuns(directory, "shared"),
+                    "an untouched artifact must still be a hit");
         }
     }
 
@@ -143,7 +156,9 @@ class CacheCommandTest {
             assertTrue(result.out().contains("dependency artifacts"), result.out());
             assertTrue(result.out().contains("toolchain"), result.out());
             assertTrue(result.out().contains("Result: cache miss"), result.out());
-            assertTrue(result.out().contains("Reason: no cache entry for this task yet"), result.out());
+            assertTrue(
+                    result.out().contains("Reason: no cache entry for this task yet"),
+                    result.out());
         }
     }
 
@@ -169,7 +184,8 @@ class CacheCommandTest {
             CliFixture.Result result = fixture.run("explain", "shared:build");
 
             assertTrue(
-                    result.out().contains("Reason: source input services/shared/Money.java changed"),
+                    result.out()
+                            .contains("Reason: source input services/shared/Money.java changed"),
                     result.out());
         }
     }
@@ -204,17 +220,19 @@ class CacheCommandTest {
 
     /**
      * The task name isn't stored in the object itself, but each task's archive is the only one
-     * containing its own output path — searching the (mostly-ASCII) archive bytes for that path finds
-     * the right object without needing to know the digest up front.
+     * containing its own output path — searching the (mostly-ASCII) archive bytes for that path
+     * finds the right object without needing to know the digest up front.
      */
-    private static void corruptTheStoredObjectFor(Path directory, String taskName) throws IOException {
+    private static void corruptTheStoredObjectFor(Path directory, String taskName)
+            throws IOException {
         String marker = taskName.substring(0, taskName.indexOf(':'));
         Path objects = directory.resolve(".forge/cache/objects");
         try (Stream<Path> files = Files.walk(objects)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 byte[] content = Files.readAllBytes(file);
                 if (new String(content, java.nio.charset.StandardCharsets.UTF_8).contains(marker)) {
-                    Files.write(file, "corrupted".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    Files.write(
+                            file, "corrupted".getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 }
             }
         }

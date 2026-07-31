@@ -43,7 +43,8 @@ final class CachingTaskRunner implements TaskRunner {
         return outcome;
     }
 
-    private TaskCache.CacheHit storeIfCacheable(TaskDefinition task, CacheCoordinator.Decision decision) {
+    private TaskCache.CacheHit storeIfCacheable(
+            TaskDefinition task, CacheCoordinator.Decision decision) {
         if (!task.cacheable() || task.outputs().isEmpty()) {
             return null;
         }

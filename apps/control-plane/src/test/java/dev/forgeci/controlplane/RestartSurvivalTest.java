@@ -29,18 +29,23 @@ import org.springframework.context.ConfigurableApplicationContext;
 class RestartSurvivalTest {
 
     private ConfigurableApplicationContext startContext() {
-        // command-line args, not .properties() (those are low-priority defaults application.yml wins over)
+        // command-line args, not .properties() (those are low-priority defaults application.yml
+        // wins over)
         return new SpringApplicationBuilder(ControlPlaneApplication.class)
                 .web(WebApplicationType.NONE)
                 .run(
                         "--spring.datasource.url=" + MySqlTestContainer.INSTANCE.getJdbcUrl(),
                         "--spring.datasource.username=" + MySqlTestContainer.INSTANCE.getUsername(),
                         "--spring.datasource.password=" + MySqlTestContainer.INSTANCE.getPassword(),
-                        "--forge.artifacts.s3.endpoint-override=" + MinioTestContainer.INSTANCE.getS3URL(),
-                        "--forge.artifacts.s3.access-key=" + MinioTestContainer.INSTANCE.getUserName(),
-                        "--forge.artifacts.s3.secret-key=" + MinioTestContainer.INSTANCE.getPassword(),
+                        "--forge.artifacts.s3.endpoint-override="
+                                + MinioTestContainer.INSTANCE.getS3URL(),
+                        "--forge.artifacts.s3.access-key="
+                                + MinioTestContainer.INSTANCE.getUserName(),
+                        "--forge.artifacts.s3.secret-key="
+                                + MinioTestContainer.INSTANCE.getPassword(),
                         "--forge.artifacts.s3.bucket=forgeci-artifacts-restart-test",
-                        // pinned to the shared container, not the application.yml default: an ambient
+                        // pinned to the shared container, not the application.yml default: an
+                        // ambient
                         // localhost Redis is exactly the kind of hidden dependency that passes on a
                         // developer's machine and fails on a clean runner
                         "--spring.data.redis.host=" + RedisTestContainer.host(),
@@ -52,12 +57,17 @@ class RestartSurvivalTest {
         Long buildId;
         try (ConfigurableApplicationContext firstRun = startContext()) {
             ProjectService projectService = firstRun.getBean(ProjectService.class);
-            PlanSubmissionService planSubmissionService = firstRun.getBean(PlanSubmissionService.class);
+            PlanSubmissionService planSubmissionService =
+                    firstRun.getBean(PlanSubmissionService.class);
             BuildService buildService = firstRun.getBean(BuildService.class);
 
             Project project = projectService.register(TestFixtures.project());
-            PlanSubmission plan = planSubmissionService.submit(project.getId(), TestFixtures.twoTaskPlan("restart-1", "rev-0"));
-            Build build = buildService.createBuild(project.getId(), new BuildCreationRequest(plan.getId(), "manual", 0));
+            PlanSubmission plan =
+                    planSubmissionService.submit(
+                            project.getId(), TestFixtures.twoTaskPlan("restart-1", "rev-0"));
+            Build build =
+                    buildService.createBuild(
+                            project.getId(), new BuildCreationRequest(plan.getId(), "manual", 0));
             buildId = build.getId();
         }
 

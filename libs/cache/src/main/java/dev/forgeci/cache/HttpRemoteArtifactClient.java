@@ -15,8 +15,8 @@ import java.util.regex.Pattern;
 /**
  * Talks to the control plane's {@code /api/projects} and {@code /api/artifacts} endpoints over
  * plain HTTP. Deliberately dependency-free JSON handling (a single-field regex extraction) rather
- * than pulling in a JSON library for one integer field — the request/response shapes here are
- * small and fixed by this same phase.
+ * than pulling in a JSON library for one integer field — the request/response shapes here are small
+ * and fixed by this same phase.
  */
 public final class HttpRemoteArtifactClient implements RemoteArtifactClient {
 
@@ -37,10 +37,15 @@ public final class HttpRemoteArtifactClient implements RemoteArtifactClient {
     }
 
     @Override
-    public long ensureProject(String name, String repositoryIdentity, String defaultBranch, int configVersion) {
+    public long ensureProject(
+            String name, String repositoryIdentity, String defaultBranch, int configVersion) {
         String body =
                 "{\"name\":\"%s\",\"repositoryIdentity\":\"%s\",\"defaultBranch\":\"%s\",\"configVersion\":%d}"
-                        .formatted(jsonEscape(name), jsonEscape(repositoryIdentity), jsonEscape(defaultBranch), configVersion);
+                        .formatted(
+                                jsonEscape(name),
+                                jsonEscape(repositoryIdentity),
+                                jsonEscape(defaultBranch),
+                                configVersion);
         HttpRequest request =
                 requestBuilder("/api/projects")
                         .header("Content-Type", "application/json")
@@ -48,35 +53,46 @@ public final class HttpRemoteArtifactClient implements RemoteArtifactClient {
                         .build();
         HttpResponse<String> response = send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200 && response.statusCode() != 201) {
-            throw new RemoteCacheUnavailableException("project registration failed: HTTP " + response.statusCode());
+            throw new RemoteCacheUnavailableException(
+                    "project registration failed: HTTP " + response.statusCode());
         }
         Matcher matcher = ID_FIELD.matcher(response.body());
         if (!matcher.find()) {
-            throw new RemoteCacheUnavailableException("project registration response had no id: " + response.body());
+            throw new RemoteCacheUnavailableException(
+                    "project registration response had no id: " + response.body());
         }
         return Long.parseLong(matcher.group(1));
     }
 
     @Override
     public Optional<byte[]> lookup(long projectId, String cacheKey) {
-        String path = "/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + encode(cacheKey);
+        String path =
+                "/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + encode(cacheKey);
         HttpRequest request = requestBuilder(path).GET().build();
         HttpResponse<byte[]> response = send(request, HttpResponse.BodyHandlers.ofByteArray());
         if (response.statusCode() == 404) {
             return Optional.empty();
         }
         if (response.statusCode() != 200) {
-            throw new RemoteCacheUnavailableException("artifact lookup failed: HTTP " + response.statusCode());
+            throw new RemoteCacheUnavailableException(
+                    "artifact lookup failed: HTTP " + response.statusCode());
         }
         byte[] content = response.body();
         String declaredDigest = response.headers().firstValue("X-Artifact-Digest").orElse(null);
         if (declaredDigest == null) {
-            throw new CorruptArtifactException("remote artifact response for " + cacheKey + " was missing its digest header");
+            throw new CorruptArtifactException(
+                    "remote artifact response for " + cacheKey + " was missing its digest header");
         }
         String actualDigest = Digests.sha256(content);
         if (!actualDigest.equals(declaredDigest)) {
             throw new CorruptArtifactException(
-                    "remote artifact for " + cacheKey + " does not match its declared digest " + declaredDigest + " (got " + actualDigest + ")");
+                    "remote artifact for "
+                            + cacheKey
+                            + " does not match its declared digest "
+                            + declaredDigest
+                            + " (got "
+                            + actualDigest
+                            + ")");
         }
         return Optional.of(content);
     }
@@ -100,7 +116,11 @@ public final class HttpRemoteArtifactClient implements RemoteArtifactClient {
                         .build();
         HttpResponse<String> response = send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 201) {
-            throw new RemoteCacheUnavailableException("artifact upload failed: HTTP " + response.statusCode() + " " + response.body());
+            throw new RemoteCacheUnavailableException(
+                    "artifact upload failed: HTTP "
+                            + response.statusCode()
+                            + " "
+                            + response.body());
         }
     }
 
@@ -112,10 +132,12 @@ public final class HttpRemoteArtifactClient implements RemoteArtifactClient {
         try {
             return client.send(request, handler);
         } catch (IOException e) {
-            throw new RemoteCacheUnavailableException("could not reach control plane at " + baseUri + ": " + e.getMessage());
+            throw new RemoteCacheUnavailableException(
+                    "could not reach control plane at " + baseUri + ": " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RemoteCacheUnavailableException("interrupted while calling control plane at " + baseUri);
+            throw new RemoteCacheUnavailableException(
+                    "interrupted while calling control plane at " + baseUri);
         }
     }
 

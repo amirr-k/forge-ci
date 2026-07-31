@@ -24,8 +24,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 /**
  * Exercises the same HTTP protocol two independent client sessions would: a plain {@code
- * TestRestTemplate} standing in for "workspace A uploads" and "workspace B looks up," proving
- * reuse happens purely through the shared store, not shared JVM state.
+ * TestRestTemplate} standing in for "workspace A uploads" and "workspace B looks up," proving reuse
+ * happens purely through the shared store, not shared JVM state.
  */
 class ArtifactControllerTest extends ControlPlaneIntegrationTest {
 
@@ -42,11 +42,13 @@ class ArtifactControllerTest extends ControlPlaneIntegrationTest {
         ResponseEntity<Map> uploadResponse = upload(projectId, cacheKey, archive);
         assertThat(uploadResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        // a second, independent lookup — standing in for a second workspace pointed at the same store
+        // a second, independent lookup — standing in for a second workspace pointed at the same
+        // store
         ResponseEntity<byte[]> lookup = lookup(projectId, cacheKey);
         assertThat(lookup.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(lookup.getBody()).isEqualTo(archive);
-        assertThat(lookup.getHeaders().getFirst("X-Artifact-Digest")).isEqualTo(Digests.sha256(archive));
+        assertThat(lookup.getHeaders().getFirst("X-Artifact-Digest"))
+                .isEqualTo(Digests.sha256(archive));
     }
 
     @Test
@@ -69,10 +71,18 @@ class ArtifactControllerTest extends ControlPlaneIntegrationTest {
         String wrongDigest = Digests.sha256("not the real bytes".getBytes(StandardCharsets.UTF_8));
 
         String path =
-                "/api/artifacts?projectId=" + projectId + "&cacheKey=" + cacheKey + "&digest=" + wrongDigest + "&size=" + archive.length;
+                "/api/artifacts?projectId="
+                        + projectId
+                        + "&cacheKey="
+                        + cacheKey
+                        + "&digest="
+                        + wrongDigest
+                        + "&size="
+                        + archive.length;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        ResponseEntity<Map> response = rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
+        ResponseEntity<Map> response =
+                rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(lookup(projectId, cacheKey).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -95,7 +105,8 @@ class ArtifactControllerTest extends ControlPlaneIntegrationTest {
                         + (archive.length + 100);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        ResponseEntity<Map> response = rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
+        ResponseEntity<Map> response =
+                rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(lookup(projectId, cacheKey).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -119,19 +130,30 @@ class ArtifactControllerTest extends ControlPlaneIntegrationTest {
     }
 
     private long registerProject() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         return project.id();
     }
 
     private ResponseEntity<Map> upload(long projectId, String cacheKey, byte[] archive) {
         String digest = Digests.sha256(archive);
-        String path = "/api/artifacts?projectId=" + projectId + "&cacheKey=" + cacheKey + "&digest=" + digest + "&size=" + archive.length;
+        String path =
+                "/api/artifacts?projectId="
+                        + projectId
+                        + "&cacheKey="
+                        + cacheKey
+                        + "&digest="
+                        + digest
+                        + "&size="
+                        + archive.length;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
     }
 
     private ResponseEntity<byte[]> lookup(long projectId, String cacheKey) {
-        return rest.getForEntity("/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + cacheKey, byte[].class);
+        return rest.getForEntity(
+                "/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + cacheKey,
+                byte[].class);
     }
 }

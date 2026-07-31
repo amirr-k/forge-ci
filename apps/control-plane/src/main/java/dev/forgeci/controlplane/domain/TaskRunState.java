@@ -3,8 +3,8 @@ package dev.forgeci.controlplane.domain;
 import java.util.Set;
 
 /**
- * Task-run lifecycle. Terminal states ({@link #SUCCEEDED}, {@link #FAILED}, {@link #CACHED},
- * {@link #SKIPPED}) never transition further.
+ * Task-run lifecycle. Terminal states ({@link #SUCCEEDED}, {@link #FAILED}, {@link #CACHED}, {@link
+ * #SKIPPED}) never transition further.
  */
 public enum TaskRunState {
     PENDING,

@@ -11,8 +11,8 @@ import java.util.Set;
 
 /**
  * The task dependency DAG built from a {@link ForgeConfig}. Construction assumes every {@code
- * depends_on} reference has already been validated against the task set (the config parser's
- * job) — a dangling reference here is a programming-contract violation, not a user error.
+ * depends_on} reference has already been validated against the task set (the config parser's job) —
+ * a dangling reference here is a programming-contract violation, not a user error.
  */
 public final class TaskGraph {
 
@@ -44,7 +44,8 @@ public final class TaskGraph {
                 dependents.get(dependency).add(task.name());
             }
         }
-        return new TaskGraph(Collections.unmodifiableMap(tasks), Collections.unmodifiableMap(dependents));
+        return new TaskGraph(
+                Collections.unmodifiableMap(tasks), Collections.unmodifiableMap(dependents));
     }
 
     public Set<String> taskNames() {

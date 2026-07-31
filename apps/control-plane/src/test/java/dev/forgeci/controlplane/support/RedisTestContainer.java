@@ -9,7 +9,8 @@ public final class RedisTestContainer {
     private static final int REDIS_PORT = 6379;
 
     public static final GenericContainer<?> INSTANCE =
-            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(REDIS_PORT);
+            new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
+                    .withExposedPorts(REDIS_PORT);
 
     static {
         INSTANCE.start();

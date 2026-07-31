@@ -41,7 +41,12 @@ public class Artifact {
     protected Artifact() {}
 
     public Artifact(
-            String digest, String objectStoreKey, long sizeBytes, String checksumAlgorithm, int manifestVersion, String producerCacheKey) {
+            String digest,
+            String objectStoreKey,
+            long sizeBytes,
+            String checksumAlgorithm,
+            int manifestVersion,
+            String producerCacheKey) {
         this.digest = digest;
         this.objectStoreKey = objectStoreKey;
         this.sizeBytes = sizeBytes;

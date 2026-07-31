@@ -43,9 +43,9 @@ final class CacheCoordinator {
     }
 
     /**
-     * Registering a project fails only if a remote is configured but unreachable — that degrades
-     * to local-only for this run (with a warning) rather than failing the command outright, since
-     * a local build must keep working even when the control plane is down.
+     * Registering a project fails only if a remote is configured but unreachable — that degrades to
+     * local-only for this run (with a warning) rather than failing the command outright, since a
+     * local build must keep working even when the control plane is down.
      */
     private static TaskCache buildCache(ProjectWorkspace workspace) {
         RemoteArtifactClient remote = RemoteCacheConfig.fromEnvironment();
@@ -61,7 +61,10 @@ final class CacheCoordinator {
                             workspace.config().version());
             return new TaskCache(workspace.directory(), remote, projectId);
         } catch (RemoteCacheUnavailableException e) {
-            System.err.println("forge: remote cache unavailable, falling back to local-only (" + e.getMessage() + ")");
+            System.err.println(
+                    "forge: remote cache unavailable, falling back to local-only ("
+                            + e.getMessage()
+                            + ")");
             return new TaskCache(workspace.directory());
         }
     }
@@ -76,7 +79,9 @@ final class CacheCoordinator {
             dependencyDigests.put(dependency, digestFor(dependency));
         }
 
-        CacheKey key = CacheKeyCalculator.compute(projectDirectory, task, environment, dependencyDigests, toolchain);
+        CacheKey key =
+                CacheKeyCalculator.compute(
+                        projectDirectory, task, environment, dependencyDigests, toolchain);
         Optional<CacheKey> previous = cache.lastKey(taskName);
         Optional<TaskCache.CacheHit> hit = task.cacheable() ? cache.lookup(key) : Optional.empty();
         String reason = TaskCache.explainReason(previous, key, hit.isPresent());
@@ -93,12 +98,17 @@ final class CacheCoordinator {
         return cache.store(key, outputGlobs);
     }
 
-    /** Records the artifact digest a task actually produced this run, or {@code null} when it produced none. */
+    /**
+     * Records the artifact digest a task actually produced this run, or {@code null} when it
+     * produced none.
+     */
     void recordExecuted(String taskName, TaskCache.CacheHit stored) {
         resolvedDigests.put(taskName, stored != null ? stored.digest() : freshPlaceholder());
     }
 
-    /** Records that a selected task will need to run but hasn't yet (a {@code forge plan} preview). */
+    /**
+     * Records that a selected task will need to run but hasn't yet (a {@code forge plan} preview).
+     */
     void recordPending(String taskName) {
         resolvedDigests.put(taskName, freshPlaceholder());
     }
@@ -112,7 +122,10 @@ final class CacheCoordinator {
         return cache.lastKey(taskName).flatMap(cache::manifestDigest).orElse(Digests.EMPTY);
     }
 
-    /** A digest nothing will ever match, so anything depending on a not-yet-known result also misses. */
+    /**
+     * A digest nothing will ever match, so anything depending on a not-yet-known result also
+     * misses.
+     */
     private static String freshPlaceholder() {
         return Digests.sha256(UUID.randomUUID().toString());
     }

@@ -16,7 +16,9 @@ public class PlanSubmissionService {
     private final ProjectRepository projectRepository;
     private final PlanSubmissionRepository planSubmissionRepository;
 
-    public PlanSubmissionService(ProjectRepository projectRepository, PlanSubmissionRepository planSubmissionRepository) {
+    public PlanSubmissionService(
+            ProjectRepository projectRepository,
+            PlanSubmissionRepository planSubmissionRepository) {
         this.projectRepository = projectRepository;
         this.planSubmissionRepository = planSubmissionRepository;
     }
@@ -28,14 +30,18 @@ public class PlanSubmissionService {
     @Transactional
     public PlanSubmission submit(Long projectId, PlanSubmissionRequest request) {
         Project project =
-                projectRepository.findById(projectId).orElseThrow(() -> new NotFoundException("project " + projectId + " not found"));
+                projectRepository
+                        .findById(projectId)
+                        .orElseThrow(
+                                () -> new NotFoundException("project " + projectId + " not found"));
 
         var existing =
                 planSubmissionRepository.findByProjectIdAndRevisionAndBaseRevision(
                         projectId, request.revision(), request.baseRevision());
         if (existing.isPresent()) {
             PlanSubmission found = existing.get();
-            found.getTasks().size(); // force-load while the session is still open for the DTO mapper
+            found.getTasks()
+                    .size(); // force-load while the session is still open for the DTO mapper
             return found;
         }
 
@@ -63,7 +69,8 @@ public class PlanSubmissionService {
             return planSubmissionRepository.saveAndFlush(submission);
         } catch (DataIntegrityViolationException raceLostToConcurrentSubmit) {
             return planSubmissionRepository
-                    .findByProjectIdAndRevisionAndBaseRevision(projectId, request.revision(), request.baseRevision())
+                    .findByProjectIdAndRevisionAndBaseRevision(
+                            projectId, request.revision(), request.baseRevision())
                     .orElseThrow(() -> raceLostToConcurrentSubmit);
         }
     }

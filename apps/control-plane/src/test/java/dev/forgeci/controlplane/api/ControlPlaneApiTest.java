@@ -11,8 +11,8 @@ import dev.forgeci.controlplane.support.ControlPlaneIntegrationTest;
 import dev.forgeci.controlplane.support.TestFixtures;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -24,14 +24,16 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
     void registeringTheSameProjectTwiceIsIdempotent() {
         var request = TestFixtures.project();
         ProjectResponse first = rest.postForObject("/api/projects", request, ProjectResponse.class);
-        ProjectResponse second = rest.postForObject("/api/projects", request, ProjectResponse.class);
+        ProjectResponse second =
+                rest.postForObject("/api/projects", request, ProjectResponse.class);
 
         assertThat(second.id()).isEqualTo(first.id());
     }
 
     @Test
     void submittingThePlanAndBuildOverHttpReturnsABuildIdAndRunsAffectedTasks() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + project.id() + "/plans",
@@ -54,7 +56,8 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
 
     @Test
     void duplicateBuildSubmissionForTheSamePlanIsIdempotent() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + project.id() + "/plans",
@@ -62,28 +65,40 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
                         PlanSubmissionResponse.class);
         var creation = new BuildCreationRequest(plan.id(), "manual", 0);
 
-        BuildResponse first = rest.postForObject("/api/projects/" + project.id() + "/builds", creation, BuildResponse.class);
-        BuildResponse second = rest.postForObject("/api/projects/" + project.id() + "/builds", creation, BuildResponse.class);
+        BuildResponse first =
+                rest.postForObject(
+                        "/api/projects/" + project.id() + "/builds", creation, BuildResponse.class);
+        BuildResponse second =
+                rest.postForObject(
+                        "/api/projects/" + project.id() + "/builds", creation, BuildResponse.class);
 
         assertThat(second.id()).isEqualTo(first.id());
     }
 
     @Test
     void resubmittingTheSamePlanRevisionIsIdempotent() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         var request = TestFixtures.twoTaskPlan("rev-3", "rev-0");
 
         PlanSubmissionResponse first =
-                rest.postForObject("/api/projects/" + project.id() + "/plans", request, PlanSubmissionResponse.class);
+                rest.postForObject(
+                        "/api/projects/" + project.id() + "/plans",
+                        request,
+                        PlanSubmissionResponse.class);
         PlanSubmissionResponse second =
-                rest.postForObject("/api/projects/" + project.id() + "/plans", request, PlanSubmissionResponse.class);
+                rest.postForObject(
+                        "/api/projects/" + project.id() + "/plans",
+                        request,
+                        PlanSubmissionResponse.class);
 
         assertThat(second.id()).isEqualTo(first.id());
     }
 
     @Test
     void cancelingAnAlreadyTerminalBuildIsRejected() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + project.id() + "/plans",
@@ -95,16 +110,19 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
                         new BuildCreationRequest(plan.id(), "manual", 0),
                         BuildResponse.class);
 
-        ResponseEntity<Map> firstCancel = rest.postForEntity("/api/builds/" + build.id() + "/cancel", null, Map.class);
+        ResponseEntity<Map> firstCancel =
+                rest.postForEntity("/api/builds/" + build.id() + "/cancel", null, Map.class);
         assertThat(firstCancel.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        ResponseEntity<Map> secondCancel = rest.postForEntity("/api/builds/" + build.id() + "/cancel", null, Map.class);
+        ResponseEntity<Map> secondCancel =
+                rest.postForEntity("/api/builds/" + build.id() + "/cancel", null, Map.class);
         assertThat(secondCancel.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
     void artifactsEndpointReturnsARealEmptyListRatherThanFakeData() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + project.id() + "/plans",
@@ -116,13 +134,15 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
                         new BuildCreationRequest(plan.id(), "manual", 0),
                         BuildResponse.class);
 
-        Object[] artifacts = rest.getForObject("/api/builds/" + build.id() + "/artifacts", Object[].class);
+        Object[] artifacts =
+                rest.getForObject("/api/builds/" + build.id() + "/artifacts", Object[].class);
         assertThat(artifacts).isEmpty();
     }
 
     @Test
     void buildHistoryPaginatesByProject() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         for (int i = 0; i < 3; i++) {
             PlanSubmissionResponse plan =
                     rest.postForObject(
@@ -130,13 +150,17 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
                             TestFixtures.twoTaskPlan("rev-page-" + i, "rev-0"),
                             PlanSubmissionResponse.class);
             rest.postForObject(
-                    "/api/projects/" + project.id() + "/builds", new BuildCreationRequest(plan.id(), "manual", 0), BuildResponse.class);
+                    "/api/projects/" + project.id() + "/builds",
+                    new BuildCreationRequest(plan.id(), "manual", 0),
+                    BuildResponse.class);
         }
 
         Map<String, Object> page1 =
-                rest.getForObject("/api/projects/" + project.id() + "/builds?page=0&size=2", Map.class);
+                rest.getForObject(
+                        "/api/projects/" + project.id() + "/builds?page=0&size=2", Map.class);
         Map<String, Object> page2 =
-                rest.getForObject("/api/projects/" + project.id() + "/builds?page=1&size=2", Map.class);
+                rest.getForObject(
+                        "/api/projects/" + project.id() + "/builds?page=1&size=2", Map.class);
 
         assertThat((java.util.List<?>) page1.get("content")).hasSize(2);
         assertThat((java.util.List<?>) page2.get("content")).hasSize(1);
@@ -145,7 +169,9 @@ class ControlPlaneApiTest extends ControlPlaneIntegrationTest {
 
     @Test
     void healthAndReadyRespondUpWithAHealthyDatabase() {
-        assertThat(rest.getForEntity("/api/health", Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(rest.getForEntity("/api/ready", Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(rest.getForEntity("/api/health", Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(rest.getForEntity("/api/ready", Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
     }
 }

@@ -20,7 +20,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** REST implementation of the worker protocol fixed in spec/reference/architecture.md#worker-protocol. */
+/**
+ * REST implementation of the worker protocol fixed in
+ * spec/reference/architecture.md#worker-protocol.
+ */
 @RestController
 public class WorkerController {
 
@@ -35,8 +38,14 @@ public class WorkerController {
     @PostMapping("/api/workers/register")
     @ResponseStatus(HttpStatus.CREATED)
     public WorkerRegistrationResponse register(@RequestBody WorkerRegistrationRequest request) {
-        Worker worker = workerService.register(request.externalId(), request.capabilities(), request.maxConcurrency(), request.versionLabel());
-        return new WorkerRegistrationResponse(worker.getId(), workerService.heartbeatInterval().toMillis());
+        Worker worker =
+                workerService.register(
+                        request.externalId(),
+                        request.capabilities(),
+                        request.maxConcurrency(),
+                        request.versionLabel());
+        return new WorkerRegistrationResponse(
+                worker.getId(), workerService.heartbeatInterval().toMillis());
     }
 
     @PostMapping("/api/workers/{id}/heartbeat")
@@ -56,21 +65,32 @@ public class WorkerController {
         return ResponseEntity.accepted().build();
     }
 
-    /** {@code 204} means no claimable task run right now — not an error, the worker should poll again. */
+    /**
+     * {@code 204} means no claimable task run right now — not an error, the worker should poll
+     * again.
+     */
     @PostMapping("/api/workers/{id}/claim")
     public ResponseEntity<ClaimedTaskResponse> claim(@PathVariable("id") Long workerId) {
         Optional<TaskRun> leased = schedulerService.claim(workerId);
-        return leased.map(taskRun -> ResponseEntity.ok(toResponse(taskRun))).orElseGet(() -> ResponseEntity.noContent().build());
+        return leased.map(taskRun -> ResponseEntity.ok(toResponse(taskRun)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @PostMapping("/api/task-runs/{id}/logs")
-    public ResponseEntity<Void> logs(@PathVariable("id") Long taskRunId, @RequestBody LogChunkRequest request) {
-        schedulerService.appendLogs(taskRunId, request.workerId(), request.leaseToken(), request.attemptId(), request.lines());
+    public ResponseEntity<Void> logs(
+            @PathVariable("id") Long taskRunId, @RequestBody LogChunkRequest request) {
+        schedulerService.appendLogs(
+                taskRunId,
+                request.workerId(),
+                request.leaseToken(),
+                request.attemptId(),
+                request.lines());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/api/task-runs/{id}/result")
-    public ResponseEntity<Void> result(@PathVariable("id") Long taskRunId, @RequestBody TaskResultReportRequest request) {
+    public ResponseEntity<Void> result(
+            @PathVariable("id") Long taskRunId, @RequestBody TaskResultReportRequest request) {
         schedulerService.reportResult(
                 taskRunId,
                 request.workerId(),

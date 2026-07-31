@@ -31,7 +31,9 @@ class ProcessTaskRunnerTest {
     @Test
     void reportsSuccessAndStreamsBothOutputStreams(@TempDir Path directory) {
         TaskOutcome outcome =
-                run(directory, task("demo:ok", List.of("sh", "-c", "echo to-stdout; echo to-stderr >&2")));
+                run(
+                        directory,
+                        task("demo:ok", List.of("sh", "-c", "echo to-stdout; echo to-stderr >&2")));
 
         assertEquals(TaskStatus.SUCCEEDED, outcome.status());
         assertEquals(0, outcome.exitCode());
@@ -61,7 +63,9 @@ class ProcessTaskRunnerTest {
                 run(directory, task("demo:missing", List.of("forge-no-such-command", "--now")));
 
         assertEquals(TaskStatus.FAILED, outcome.status());
-        assertTrue(outcome.detail().startsWith("could not start 'forge-no-such-command'"), outcome.detail());
+        assertTrue(
+                outcome.detail().startsWith("could not start 'forge-no-such-command'"),
+                outcome.detail());
     }
 
     @Test
@@ -79,7 +83,10 @@ class ProcessTaskRunnerTest {
                         directory,
                         task(
                                 "demo:noisy",
-                                List.of("sh", "-c", "i=0; while [ $i -lt 40 ]; do printf 'x%.0s' $(seq 1 4096); i=$((i+1)); done")));
+                                List.of(
+                                        "sh",
+                                        "-c",
+                                        "i=0; while [ $i -lt 40 ]; do printf 'x%.0s' $(seq 1 4096); i=$((i+1)); done")));
 
         assertEquals(TaskStatus.SUCCEEDED, outcome.status());
         // 160 KiB with no newline must arrive as bounded chunks, never one unbounded string
@@ -93,9 +100,7 @@ class ProcessTaskRunnerTest {
     void timesOutAndKillsTheWholeProcessTree(@TempDir Path directory) throws Exception {
         Path pidFile = directory.resolve("child.pid");
         TaskDefinition task =
-                task(
-                        "demo:hang",
-                        List.of("sh", "-c", "sleep 60 & echo $! > child.pid; wait"));
+                task("demo:hang", List.of("sh", "-c", "sleep 60 & echo $! > child.pid; wait"));
 
         TaskOutcome outcome =
                 new ProcessTaskRunner(directory).run(task, Duration.ofMillis(500), listener);
@@ -104,7 +109,8 @@ class ProcessTaskRunnerTest {
         assertTrue(outcome.detail().startsWith("timed out after"), outcome.detail());
 
         long childPid = Long.parseLong(Files.readString(pidFile).trim());
-        assertTrue(waitForExit(childPid), "child process " + childPid + " outlived its parent task");
+        assertTrue(
+                waitForExit(childPid), "child process " + childPid + " outlived its parent task");
     }
 
     private TaskOutcome run(Path directory, TaskDefinition task) {

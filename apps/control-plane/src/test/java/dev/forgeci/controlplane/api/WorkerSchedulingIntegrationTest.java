@@ -43,12 +43,12 @@ import org.springframework.http.ResponseEntity;
  * demo are for). No Kafka is involved anywhere here, matching phase 5's "prove the direct path
  * first" ordering.
  *
- * <p>{@code claim} is deliberately a single global priority queue across every build in the
- * system (see spec/reference/architecture.md#scheduler) — it is not scoped to "this test's"
- * build. Other test classes in this module submit plans/builds of their own (and never claim
- * them, since claiming didn't exist before this phase), which leaves permanently-{@code READY}
- * task runs competing for every worker registered here. Every helper below is written to draw
- * down and harmlessly complete that foreign backlog rather than assume the next claim is "ours".
+ * <p>{@code claim} is deliberately a single global priority queue across every build in the system
+ * (see spec/reference/architecture.md#scheduler) — it is not scoped to "this test's" build. Other
+ * test classes in this module submit plans/builds of their own (and never claim them, since
+ * claiming didn't exist before this phase), which leaves permanently-{@code READY} task runs
+ * competing for every worker registered here. Every helper below is written to draw down and
+ * harmlessly complete that foreign backlog rather than assume the next claim is "ours".
  */
 class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
@@ -76,7 +76,8 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         BuildResponse completed = getBuild(build.id());
         assertThat(completed.state()).isEqualTo(BuildState.SUCCEEDED);
 
-        List<Map> artifacts = rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
+        List<Map> artifacts =
+                rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
         assertThat(artifacts).hasSize(1);
     }
 
@@ -93,10 +94,18 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         BuildResponse build1 = createBuild(projectId, plan1.id());
         long workerId = registerWorker("worker-cascade-" + suffix);
         ClaimedTaskResponse pricing1 = claimMine(workerId, Set.of("pricing:build"));
-        String pricingDigest = uploadArtifact(projectId, "sha256:pricing-" + suffix, "pricing output".getBytes(StandardCharsets.UTF_8));
+        String pricingDigest =
+                uploadArtifact(
+                        projectId,
+                        "sha256:pricing-" + suffix,
+                        "pricing output".getBytes(StandardCharsets.UTF_8));
         reportResult(pricing1, true, 0, null, pricingDigest);
         ClaimedTaskResponse checkout1 = claimMine(workerId, Set.of("checkout:integration"));
-        String checkoutDigest = uploadArtifact(projectId, "sha256:checkout-" + suffix, "checkout output".getBytes(StandardCharsets.UTF_8));
+        String checkoutDigest =
+                uploadArtifact(
+                        projectId,
+                        "sha256:checkout-" + suffix,
+                        "checkout output".getBytes(StandardCharsets.UTF_8));
         reportResult(checkout1, true, 0, null, checkoutDigest);
         awaitBuildState(build1.id(), BuildState.SUCCEEDED);
 
@@ -120,7 +129,8 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + projectId + "/plans",
-                        TestFixtures.partialDependencyPlan("rev-partial-" + suffix, "rev-0", suffix),
+                        TestFixtures.partialDependencyPlan(
+                                "rev-partial-" + suffix, "rev-0", suffix),
                         PlanSubmissionResponse.class);
         BuildResponse build = createBuild(projectId, plan.id());
 
@@ -155,8 +165,10 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Instant started = Instant.now();
-            Future<ClaimedTaskResponse> f1 = pool.submit(() -> claimExecuteAndReport(worker1, mine, simulatedWork));
-            Future<ClaimedTaskResponse> f2 = pool.submit(() -> claimExecuteAndReport(worker2, mine, simulatedWork));
+            Future<ClaimedTaskResponse> f1 =
+                    pool.submit(() -> claimExecuteAndReport(worker1, mine, simulatedWork));
+            Future<ClaimedTaskResponse> f2 =
+                    pool.submit(() -> claimExecuteAndReport(worker2, mine, simulatedWork));
             ClaimedTaskResponse t1 = f1.get(20, TimeUnit.SECONDS);
             ClaimedTaskResponse t2 = f2.get(20, TimeUnit.SECONDS);
             Duration elapsed = Duration.between(started, Instant.now());
@@ -180,7 +192,8 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + projectId + "/plans",
-                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-dep-" + suffix, "rev-0", suffix),
+                        TestFixtures.twoTaskPlanWithUniqueKeys(
+                                "rev-dep-" + suffix, "rev-0", suffix),
                         PlanSubmissionResponse.class);
         createBuild(projectId, plan.id());
 
@@ -227,7 +240,8 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
         awaitBuildState(build2.id(), BuildState.SUCCEEDED);
 
-        List<Map> artifacts = rest.getForObject("/api/builds/" + build2.id() + "/artifacts", List.class);
+        List<Map> artifacts =
+                rest.getForObject("/api/builds/" + build2.id() + "/artifacts", List.class);
         assertThat(artifacts).hasSize(1);
         assertThat(artifacts.get(0).get("digest")).isEqualTo(digest);
     }
@@ -256,14 +270,18 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         assertThat(second.taskName()).isEqualTo("leaf:build");
     }
 
-    private ClaimedTaskResponse claimExecuteAndReport(long workerId, Set<String> mine, Duration simulatedWork) throws InterruptedException {
+    private ClaimedTaskResponse claimExecuteAndReport(
+            long workerId, Set<String> mine, Duration simulatedWork) throws InterruptedException {
         ClaimedTaskResponse task = claimMine(workerId, mine);
         Thread.sleep(simulatedWork.toMillis());
         reportResult(task, true, 0, null, null);
         return task;
     }
 
-    /** Claims until a task whose name is in {@code mine} shows up, harmlessly completing any foreign task run encountered along the way. */
+    /**
+     * Claims until a task whose name is in {@code mine} shows up, harmlessly completing any foreign
+     * task run encountered along the way.
+     */
     private ClaimedTaskResponse claimMine(long workerId, Set<String> mine) {
         for (int i = 0; i < 200; i++) {
             Optional<ClaimedTaskResponse> claimed = claim(workerId);
@@ -280,7 +298,10 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         throw new AssertionError("worker " + workerId + " never got one of " + mine);
     }
 
-    /** Drains and completes foreign backlog while confirming {@code forbiddenTaskName} never shows up. */
+    /**
+     * Drains and completes foreign backlog while confirming {@code forbiddenTaskName} never shows
+     * up.
+     */
     private void assertNeverClaims(long workerId, String forbiddenTaskName) {
         for (int i = 0; i < 20; i++) {
             Optional<ClaimedTaskResponse> claimed = claim(workerId);
@@ -299,7 +320,14 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
             }
             sleepQuietly(25);
         }
-        throw new AssertionError("build " + buildId + " never reached " + expected + " (was " + getBuild(buildId).state() + ")");
+        throw new AssertionError(
+                "build "
+                        + buildId
+                        + " never reached "
+                        + expected
+                        + " (was "
+                        + getBuild(buildId).state()
+                        + ")");
     }
 
     private static void sleepQuietly(long millis) {
@@ -311,13 +339,16 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
     }
 
     private long registerProject() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         return project.id();
     }
 
     private BuildResponse createBuild(long projectId, Long planSubmissionId) {
         return rest.postForObject(
-                "/api/projects/" + projectId + "/builds", new BuildCreationRequest(planSubmissionId, "manual", 0), BuildResponse.class);
+                "/api/projects/" + projectId + "/builds",
+                new BuildCreationRequest(planSubmissionId, "manual", 0),
+                BuildResponse.class);
     }
 
     private BuildResponse getBuild(Long buildId) {
@@ -332,14 +363,16 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         WorkerRegistrationResponse response =
                 rest.postForObject(
                         "/api/workers/register",
-                        new WorkerRegistrationRequest(externalId, List.of(), maxConcurrency, "test"),
+                        new WorkerRegistrationRequest(
+                                externalId, List.of(), maxConcurrency, "test"),
                         WorkerRegistrationResponse.class);
         return response.workerId();
     }
 
     private Optional<ClaimedTaskResponse> claim(long workerId) {
         ResponseEntity<ClaimedTaskResponse> response =
-                rest.postForEntity("/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
+                rest.postForEntity(
+                        "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
         if (response.getStatusCode() == HttpStatus.NO_CONTENT) {
             return Optional.empty();
         }
@@ -347,21 +380,42 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
         return Optional.ofNullable(response.getBody());
     }
 
-    private void reportResult(ClaimedTaskResponse task, boolean success, Integer exitCode, String failureReason, String artifactDigest) {
+    private void reportResult(
+            ClaimedTaskResponse task,
+            boolean success,
+            Integer exitCode,
+            String failureReason,
+            String artifactDigest) {
         ResponseEntity<Void> response =
                 rest.postForEntity(
                         "/api/task-runs/" + task.taskRunId() + "/result",
-                        new TaskResultReportRequest(task.workerId(), task.leaseToken(), task.attemptId(), success, exitCode, failureReason, artifactDigest),
+                        new TaskResultReportRequest(
+                                task.workerId(),
+                                task.leaseToken(),
+                                task.attemptId(),
+                                success,
+                                exitCode,
+                                failureReason,
+                                artifactDigest),
                         Void.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     private String uploadArtifact(long projectId, String cacheKey, byte[] archive) {
         String digest = Digests.sha256(archive);
-        String path = "/api/artifacts?projectId=" + projectId + "&cacheKey=" + cacheKey + "&digest=" + digest + "&size=" + archive.length;
+        String path =
+                "/api/artifacts?projectId="
+                        + projectId
+                        + "&cacheKey="
+                        + cacheKey
+                        + "&digest="
+                        + digest
+                        + "&size="
+                        + archive.length;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        ResponseEntity<Map> response = rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
+        ResponseEntity<Map> response =
+                rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return digest;
     }

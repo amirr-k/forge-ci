@@ -12,15 +12,19 @@ import java.util.Optional;
 public interface RemoteArtifactClient {
 
     /** Idempotent: registering the same project name twice returns the same id. */
-    long ensureProject(String name, String repositoryIdentity, String defaultBranch, int configVersion);
+    long ensureProject(
+            String name, String repositoryIdentity, String defaultBranch, int configVersion);
 
     /**
      * The archive bytes for {@code cacheKey}, already verified against the digest and size the
-     * remote store recorded — or empty if the remote store has no entry for this key. Never
-     * returns bytes that failed verification; a caller sees either a trustworthy hit or a miss.
+     * remote store recorded — or empty if the remote store has no entry for this key. Never returns
+     * bytes that failed verification; a caller sees either a trustworthy hit or a miss.
      */
     Optional<byte[]> lookup(long projectId, String cacheKey);
 
-    /** Uploads {@code archive} as the artifact for {@code cacheKey}. Best-effort: local mode must not depend on this succeeding. */
+    /**
+     * Uploads {@code archive} as the artifact for {@code cacheKey}. Best-effort: local mode must
+     * not depend on this succeeding.
+     */
     void upload(long projectId, String cacheKey, byte[] archive);
 }

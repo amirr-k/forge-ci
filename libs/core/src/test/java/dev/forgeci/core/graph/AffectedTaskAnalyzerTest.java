@@ -43,6 +43,7 @@ class AffectedTaskAnalyzerTest {
         AffectedResult result =
                 AffectedTaskAnalyzer.analyze(graph, Set.of("services/catalog/src/Main.java"));
 
-        assertEquals(List.of(new AffectedTask("catalog:build", "source changed")), result.affected());
+        assertEquals(
+                List.of(new AffectedTask("catalog:build", "source changed")), result.affected());
     }
 }

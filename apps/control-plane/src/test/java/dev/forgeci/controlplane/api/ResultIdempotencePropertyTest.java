@@ -51,17 +51,35 @@ class ResultIdempotencePropertyTest extends ControlPlaneIntegrationTest {
         long projectId = client.registerProject();
         String taskName = "idempotence:build";
         String cacheKey = "sha256:idempotence-" + UUID.randomUUID();
-        Long planId = client.submitPlan(projectId, TestFixtures.singleTaskPlan("rev-" + UUID.randomUUID(), "rev-0", taskName, cacheKey)).id();
+        Long planId =
+                client.submitPlan(
+                                projectId,
+                                TestFixtures.singleTaskPlan(
+                                        "rev-" + UUID.randomUUID(), "rev-0", taskName, cacheKey))
+                        .id();
         Long buildId = client.createBuild(projectId, planId).id();
 
         long workerId = client.registerWorker("worker-idempotence-" + UUID.randomUUID());
         ClaimedTaskResponse task = client.claimNamed(workerId, taskName);
-        String digest = client.uploadArtifact(projectId, cacheKey, ("output for seed " + seed).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String digest =
+                client.uploadArtifact(
+                        projectId,
+                        cacheKey,
+                        ("output for seed " + seed)
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
         List<HttpStatus> accepted = new ArrayList<>();
         for (ClaimedTaskResponse report : reportSequence(task, seed)) {
-            boolean success = report.attemptId() == task.attemptId() && report.leaseToken().equals(task.leaseToken());
-            HttpStatus status = client.reportResultStatus(report, success, success ? 0 : 1, success ? null : "forged failure", digest);
+            boolean success =
+                    report.attemptId() == task.attemptId()
+                            && report.leaseToken().equals(task.leaseToken());
+            HttpStatus status =
+                    client.reportResultStatus(
+                            report,
+                            success,
+                            success ? 0 : 1,
+                            success ? null : "forged failure",
+                            digest);
             if (status == HttpStatus.NO_CONTENT) {
                 accepted.add(status);
             }
@@ -73,25 +91,32 @@ class ResultIdempotencePropertyTest extends ControlPlaneIntegrationTest {
         assertThat(taskRun.getState()).isEqualTo(TaskRunState.SUCCEEDED);
         assertThat(taskRun.getArtifactDigest()).isEqualTo(digest);
         assertThat(taskRun.getAttemptCount()).isEqualTo(1);
-        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(task.taskRunId())).hasSize(1);
+        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(task.taskRunId()))
+                .hasSize(1);
 
         // one terminal transition means one terminal event, however many reports arrived
         List<BuildEvent> terminalEvents =
                 buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(buildId).stream()
-                        .filter(event -> event.getEventType() == BuildEventType.TASK_RUN_SUCCEEDED || event.getEventType() == BuildEventType.TASK_RUN_FAILED)
+                        .filter(
+                                event ->
+                                        event.getEventType() == BuildEventType.TASK_RUN_SUCCEEDED
+                                                || event.getEventType()
+                                                        == BuildEventType.TASK_RUN_FAILED)
                         .toList();
         assertThat(terminalEvents).hasSize(1);
 
         Instant completedAt = taskRun.getCompletedAt();
         client.reportResultStatus(task, true, 0, null, digest);
-        assertThat(taskRunRepository.findById(task.taskRunId()).orElseThrow().getCompletedAt()).isEqualTo(completedAt);
+        assertThat(taskRunRepository.findById(task.taskRunId()).orElseThrow().getCompletedAt())
+                .isEqualTo(completedAt);
     }
 
     /**
      * A generated mix of the genuine report and near-misses of it. The genuine one is always in the
      * sequence but never first, so acceptance has to survive being preceded by rejected impostors.
      */
-    private static List<ClaimedTaskResponse> reportSequence(ClaimedTaskResponse genuine, long seed) {
+    private static List<ClaimedTaskResponse> reportSequence(
+            ClaimedTaskResponse genuine, long seed) {
         Random random = new Random(seed);
         List<ClaimedTaskResponse> reports = new ArrayList<>();
         for (int i = 0; i < 1 + random.nextInt(3); i++) {
@@ -106,13 +131,29 @@ class ResultIdempotencePropertyTest extends ControlPlaneIntegrationTest {
 
     private static ClaimedTaskResponse impostor(ClaimedTaskResponse genuine, Random random) {
         return switch (random.nextInt(3)) {
-            case 0 -> withLease(genuine, genuine.workerId(), UUID.randomUUID().toString(), genuine.attemptId());
-            case 1 -> withLease(genuine, genuine.workerId(), genuine.leaseToken(), genuine.attemptId() + 1 + random.nextInt(3));
-            default -> withLease(genuine, genuine.workerId() + 1 + random.nextInt(100), genuine.leaseToken(), genuine.attemptId());
+            case 0 ->
+                    withLease(
+                            genuine,
+                            genuine.workerId(),
+                            UUID.randomUUID().toString(),
+                            genuine.attemptId());
+            case 1 ->
+                    withLease(
+                            genuine,
+                            genuine.workerId(),
+                            genuine.leaseToken(),
+                            genuine.attemptId() + 1 + random.nextInt(3));
+            default ->
+                    withLease(
+                            genuine,
+                            genuine.workerId() + 1 + random.nextInt(100),
+                            genuine.leaseToken(),
+                            genuine.attemptId());
         };
     }
 
-    private static ClaimedTaskResponse withLease(ClaimedTaskResponse task, long workerId, String leaseToken, int attemptId) {
+    private static ClaimedTaskResponse withLease(
+            ClaimedTaskResponse task, long workerId, String leaseToken, int attemptId) {
         return new ClaimedTaskResponse(
                 task.taskRunId(),
                 task.buildId(),

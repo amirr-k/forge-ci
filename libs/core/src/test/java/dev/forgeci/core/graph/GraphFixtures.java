@@ -19,17 +19,18 @@ public final class GraphFixtures {
     }
 
     /**
-     * catalog:build                (no deps, inputs under services/catalog/**)
-     * accounts:test                (no deps, inputs under services/accounts/**)
-     * pricing:test                 (no deps, inputs under services/pricing/**)
-     * pricing:build                depends on pricing:test, inputs under services/pricing/**
-     * checkout:integration         depends on pricing:build, inputs under services/checkout/**
-     * storefront:build             (no deps, inputs under services/storefront/**)
+     * catalog:build (no deps, inputs under services/catalog/**) accounts:test (no deps, inputs
+     * under services/accounts/**) pricing:test (no deps, inputs under services/pricing/**)
+     * pricing:build depends on pricing:test, inputs under services/pricing/** checkout:integration
+     * depends on pricing:build, inputs under services/checkout/** storefront:build (no deps, inputs
+     * under services/storefront/**)
      */
     public static ForgeConfig demoConfig() {
         Map<String, TaskDefinition> tasks = new LinkedHashMap<>();
-        tasks.put("catalog:build", task("catalog:build", List.of(), List.of("services/catalog/**")));
-        tasks.put("accounts:test", task("accounts:test", List.of(), List.of("services/accounts/**")));
+        tasks.put(
+                "catalog:build", task("catalog:build", List.of(), List.of("services/catalog/**")));
+        tasks.put(
+                "accounts:test", task("accounts:test", List.of(), List.of("services/accounts/**")));
         tasks.put("pricing:test", task("pricing:test", List.of(), List.of("services/pricing/**")));
         tasks.put(
                 "pricing:build",
@@ -41,7 +42,8 @@ public final class GraphFixtures {
                         List.of("pricing:build"),
                         List.of("services/checkout/**")));
         tasks.put(
-                "storefront:build", task("storefront:build", List.of(), List.of("services/storefront/**")));
+                "storefront:build",
+                task("storefront:build", List.of(), List.of("services/storefront/**")));
         return new ForgeConfig(1, new ProjectInfo("demo"), new Defaults("10m", true), tasks);
     }
 

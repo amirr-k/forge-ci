@@ -37,7 +37,8 @@ class TaskGraphTest {
     void rejectsDanglingDependencyReferenceDefensively() {
         Map<String, dev.forgeci.core.model.TaskDefinition> tasks = new LinkedHashMap<>();
         tasks.put("a", GraphFixtures.task("a", List.of("b"), List.of()));
-        ForgeConfig config = new ForgeConfig(1, new ProjectInfo("demo"), new Defaults("10m", true), tasks);
+        ForgeConfig config =
+                new ForgeConfig(1, new ProjectInfo("demo"), new Defaults("10m", true), tasks);
 
         assertThrows(IllegalArgumentException.class, () -> TaskGraph.build(config));
     }

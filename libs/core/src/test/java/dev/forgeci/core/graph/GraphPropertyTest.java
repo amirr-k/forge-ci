@@ -33,11 +33,16 @@ class GraphPropertyTest {
 
         List<String> order = TopologicalSorter.sort(graph);
 
-        assertEquals(graph.taskNames().size(), order.size(), "the order must contain every task exactly once");
+        assertEquals(
+                graph.taskNames().size(),
+                order.size(),
+                "the order must contain every task exactly once");
         Set<String> alreadyRun = new HashSet<>();
         for (String name : order) {
             for (String dependency : graph.dependenciesOf(name)) {
-                assertTrue(alreadyRun.contains(dependency), name + " ran before its dependency " + dependency);
+                assertTrue(
+                        alreadyRun.contains(dependency),
+                        name + " ran before its dependency " + dependency);
             }
             alreadyRun.add(name);
         }
@@ -50,14 +55,22 @@ class GraphPropertyTest {
         Set<String> changedPaths = someChangedPaths(config, seed);
 
         BuildPlan original = PlanBuilder.forChangedPaths(TaskGraph.build(config), changedPaths);
-        BuildPlan permuted = PlanBuilder.forChangedPaths(TaskGraph.build(RandomGraphs.permute(config, seed)), changedPaths);
+        BuildPlan permuted =
+                PlanBuilder.forChangedPaths(
+                        TaskGraph.build(RandomGraphs.permute(config, seed)), changedPaths);
 
-        assertEquals(original.selected(), permuted.selected(), "selected tasks, order, and reasons must all be permutation-independent");
+        assertEquals(
+                original.selected(),
+                permuted.selected(),
+                "selected tasks, order, and reasons must all be permutation-independent");
         assertEquals(original.unaffected(), permuted.unaffected());
         assertEquals(original.changedPaths(), permuted.changedPaths());
     }
 
-    /** A random subset of the paths the generated tasks declare as inputs, so some tasks are hit and some are not. */
+    /**
+     * A random subset of the paths the generated tasks declare as inputs, so some tasks are hit and
+     * some are not.
+     */
     private static Set<String> someChangedPaths(ForgeConfig config, long seed) {
         Random random = new Random(~seed);
         Set<String> changed = new HashSet<>();

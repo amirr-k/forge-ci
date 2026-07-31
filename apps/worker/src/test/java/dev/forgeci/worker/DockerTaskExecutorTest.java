@@ -52,10 +52,10 @@ class DockerTaskExecutorTest {
     /**
      * Tasks run as root inside the container (production workers are themselves containerized), so
      * on Linux anything a task wrote into the bind-mounted workspace is root-owned and the test
-     * JVM's user cannot delete it — JUnit's own {@code @TempDir} cleanup then fails the test. Docker
-     * Desktop on macOS remaps ownership to the invoking user and hides this, which is why it only
-     * ever failed on CI. Emptying the directory from a root container first leaves JUnit nothing but
-     * the directory it already owns.
+     * JVM's user cannot delete it — JUnit's own {@code @TempDir} cleanup then fails the test.
+     * Docker Desktop on macOS remaps ownership to the invoking user and hides this, which is why it
+     * only ever failed on CI. Emptying the directory from a root container first leaves JUnit
+     * nothing but the directory it already owns.
      */
     @AfterEach
     void emptyWorkspaceAsRoot() throws Exception {
@@ -80,7 +80,8 @@ class DockerTaskExecutorTest {
         ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "echo hello-from-container"), 30);
         List<String> lines = new CopyOnWriteArrayList<>();
 
-        DockerTaskExecutor.ExecutionResult result = new DockerTaskExecutor(config).run(task, lines::addAll);
+        DockerTaskExecutor.ExecutionResult result =
+                new DockerTaskExecutor(config).run(task, lines::addAll);
 
         assertTrue(result.success());
         assertEquals(0, result.exitCode());
@@ -91,7 +92,8 @@ class DockerTaskExecutorTest {
     void aFailingCommandReportsTheExitCode() {
         ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "exit 7"), 30);
 
-        DockerTaskExecutor.ExecutionResult result = new DockerTaskExecutor(config).run(task, lines -> {});
+        DockerTaskExecutor.ExecutionResult result =
+                new DockerTaskExecutor(config).run(task, lines -> {});
 
         assertFalse(result.success());
         assertEquals(7, result.exitCode());
@@ -102,20 +104,30 @@ class DockerTaskExecutorTest {
         ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "sleep 30"), 1);
 
         long startedAt = System.nanoTime();
-        DockerTaskExecutor.ExecutionResult result = new DockerTaskExecutor(config).run(task, lines -> {});
+        DockerTaskExecutor.ExecutionResult result =
+                new DockerTaskExecutor(config).run(task, lines -> {});
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAt);
 
         assertFalse(result.success());
         assertTrue(result.failureReason() != null && result.failureReason().contains("timed out"));
         // proves the container was actually killed rather than the JVM just giving up on waiting
-        assertTrue(elapsed.compareTo(Duration.ofSeconds(15)) < 0, "expected a fast kill, took " + elapsed);
+        assertTrue(
+                elapsed.compareTo(Duration.ofSeconds(15)) < 0,
+                "expected a fast kill, took " + elapsed);
     }
 
     @Test
     void anOutputFileWrittenIntoTheWorkspaceIsVisibleOnTheHostAfterward() throws Exception {
-        ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "mkdir -p build/x && echo built > build/x/out.txt"), 30);
+        ClaimedTaskResponse task =
+                task(
+                        List.of(
+                                "/bin/sh",
+                                "-c",
+                                "mkdir -p build/x && echo built > build/x/out.txt"),
+                        30);
 
-        DockerTaskExecutor.ExecutionResult result = new DockerTaskExecutor(config).run(task, lines -> {});
+        DockerTaskExecutor.ExecutionResult result =
+                new DockerTaskExecutor(config).run(task, lines -> {});
 
         assertTrue(result.success());
         Path output = workspace.resolve("build/x/out.txt");
@@ -127,10 +139,13 @@ class DockerTaskExecutorTest {
     void noContainerSurvivesATaskThatWasKilledForRunningTooLong() {
         ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "sleep 300"), 1, 8801);
 
-        DockerTaskExecutor.ExecutionResult result = new DockerTaskExecutor(config).run(task, lines -> {});
+        DockerTaskExecutor.ExecutionResult result =
+                new DockerTaskExecutor(config).run(task, lines -> {});
 
         assertFalse(result.success());
-        assertTrue(awaitContainerGone(containerNameOf(task)), "a killed task left its container behind");
+        assertTrue(
+                awaitContainerGone(containerNameOf(task)),
+                "a killed task left its container behind");
     }
 
     @Test
@@ -138,7 +153,9 @@ class DockerTaskExecutorTest {
         ClaimedTaskResponse task = task(List.of("/bin/sh", "-c", "echo done"), 30, 8802);
 
         assertTrue(new DockerTaskExecutor(config).run(task, lines -> {}).success());
-        assertTrue(awaitContainerGone(containerNameOf(task)), "a completed task left its container behind");
+        assertTrue(
+                awaitContainerGone(containerNameOf(task)),
+                "a completed task left its container behind");
     }
 
     @Test
@@ -156,17 +173,30 @@ class DockerTaskExecutorTest {
     void outputIsTruncatedOnceATaskExceedsTheCaptureBudget() {
         // ~1.5 MB, past the 1 MiB the executor is willing to forward
         ClaimedTaskResponse task =
-                task(List.of("/bin/sh", "-c", "i=0; while [ $i -lt 50000 ]; do echo aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; i=$((i+1)); done"), 120, 8804);
+                task(
+                        List.of(
+                                "/bin/sh",
+                                "-c",
+                                "i=0; while [ $i -lt 50000 ]; do echo aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; i=$((i+1)); done"),
+                        120,
+                        8804);
         List<String> lines = new CopyOnWriteArrayList<>();
 
         assertTrue(new DockerTaskExecutor(config).run(task, lines::addAll).success());
 
-        assertTrue(lines.stream().anyMatch(line -> line.startsWith("[output truncated at")), "expected a truncation notice");
+        assertTrue(
+                lines.stream().anyMatch(line -> line.startsWith("[output truncated at")),
+                "expected a truncation notice");
         long forwarded = lines.stream().mapToLong(line -> line.length() + 1L).sum();
-        assertTrue(forwarded < 2L * (1 << 20), "forwarded " + forwarded + " characters despite the bound");
+        assertTrue(
+                forwarded < 2L * (1 << 20),
+                "forwarded " + forwarded + " characters despite the bound");
     }
 
-    /** {@code docker run --rm} reclaims the container asynchronously, so give it a moment before failing. */
+    /**
+     * {@code docker run --rm} reclaims the container asynchronously, so give it a moment before
+     * failing.
+     */
     private static boolean awaitContainerGone(String containerName) {
         for (int i = 0; i < 40; i++) {
             if (listContainers(containerName).isEmpty()) {
@@ -185,10 +215,21 @@ class DockerTaskExecutorTest {
     private static String listContainers(String containerName) {
         try {
             Process process =
-                    new ProcessBuilder("docker", "ps", "--all", "--filter", "name=^" + containerName + "$", "--format", "{{.Names}}")
+                    new ProcessBuilder(
+                                    "docker",
+                                    "ps",
+                                    "--all",
+                                    "--filter",
+                                    "name=^" + containerName + "$",
+                                    "--format",
+                                    "{{.Names}}")
                             .redirectErrorStream(true)
                             .start();
-            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+            String output =
+                    new String(
+                                    process.getInputStream().readAllBytes(),
+                                    java.nio.charset.StandardCharsets.UTF_8)
+                            .trim();
             process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
             return output;
         } catch (Exception e) {
@@ -204,9 +245,24 @@ class DockerTaskExecutorTest {
         return task(command, timeoutSeconds, 1);
     }
 
-    /** {@code taskRunId} names the container, so cleanup tests need one nobody else in this class uses. */
-    private static ClaimedTaskResponse task(List<String> command, int timeoutSeconds, long taskRunId) {
+    /**
+     * {@code taskRunId} names the container, so cleanup tests need one nobody else in this class
+     * uses.
+     */
+    private static ClaimedTaskResponse task(
+            List<String> command, int timeoutSeconds, long taskRunId) {
         return new ClaimedTaskResponse(
-                taskRunId, 1L, 1L, "test:task", "sha256:test", command, new ArrayList<>(), List.of(), timeoutSeconds, 1, 1L, "lease-token");
+                taskRunId,
+                1L,
+                1L,
+                "test:task",
+                "sha256:test",
+                command,
+                new ArrayList<>(),
+                List.of(),
+                timeoutSeconds,
+                1,
+                1L,
+                "lease-token");
     }
 }

@@ -4,7 +4,12 @@ import dev.forgeci.controlplane.domain.Artifact;
 import java.time.Instant;
 
 public record ArtifactResponse(
-        String digest, String objectStoreKey, long sizeBytes, String checksumAlgorithm, int manifestVersion, Instant createdAt) {
+        String digest,
+        String objectStoreKey,
+        long sizeBytes,
+        String checksumAlgorithm,
+        int manifestVersion,
+        Instant createdAt) {
 
     public static ArtifactResponse from(Artifact artifact) {
         return new ArtifactResponse(

@@ -8,7 +8,10 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
 
-/** Explains why a task would run or be reused: its cache key, each contributor, and the hit/miss reason. */
+/**
+ * Explains why a task would run or be reused: its cache key, each contributor, and the hit/miss
+ * reason.
+ */
 @Command(name = "explain", description = "Explain why a task would run or reuse its cache.")
 final class ExplainCommand implements Callable<Integer> {
 
@@ -24,7 +27,9 @@ final class ExplainCommand implements Callable<Integer> {
         ProjectWorkspace workspace = ProjectWorkspace.load();
         if (!workspace.graph().contains(taskName)) {
             throw new CliException(
-                    "no such task: '" + taskName + "'. Run 'forge plan' to see the tasks this project declares.");
+                    "no such task: '"
+                            + taskName
+                            + "'. Run 'forge plan' to see the tasks this project declares.");
         }
 
         CacheCoordinator coordinator = new CacheCoordinator(workspace);
@@ -37,7 +42,10 @@ final class ExplainCommand implements Callable<Integer> {
         out.println("Contributors");
         out.printf(CONTRIBUTOR_ROW, "task definition", "sha256:" + key.taskDefinitionDigest());
         out.printf(CONTRIBUTOR_ROW, "source inputs", "sha256:" + key.sourceInputsDigest());
-        out.printf(CONTRIBUTOR_ROW, "dependency artifacts", "sha256:" + key.dependencyArtifactsDigest());
+        out.printf(
+                CONTRIBUTOR_ROW,
+                "dependency artifacts",
+                "sha256:" + key.dependencyArtifactsDigest());
         out.printf(CONTRIBUTOR_ROW, "toolchain", key.toolchain());
         out.println();
         if (decision.hit()) {

@@ -19,13 +19,17 @@ class PlanCommandTest {
     @Test
     void selectsOnlyTheTasksALeafChangeAffects(@TempDir Path directory) throws IOException {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
-            Files.writeString(directory.resolve("services/accounts/AccountService.java"), "edited\n");
+            Files.writeString(
+                    directory.resolve("services/accounts/AccountService.java"), "edited\n");
 
             CliFixture.Result result = fixture.run("plan");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
-            assertTrue(result.out().contains("services/accounts/AccountService.java"), result.out());
-            assertTrue(result.out().contains("accounts:test            RUN      source changed"), result.out());
+            assertTrue(
+                    result.out().contains("services/accounts/AccountService.java"), result.out());
+            assertTrue(
+                    result.out().contains("accounts:test            RUN      source changed"),
+                    result.out());
             assertFalse(result.out().contains("pricing:test"), result.out());
             assertTrue(result.out().contains("Plan: 1 run, 0 cached, 3 unaffected"), result.out());
         }
@@ -38,12 +42,18 @@ class PlanCommandTest {
 
             CliFixture.Result result = fixture.run("plan");
 
-            assertTrue(result.out().contains("shared:build             RUN      source changed"), result.out());
             assertTrue(
-                    result.out().contains("pricing:test             RUN      shared:build output may change"),
+                    result.out().contains("shared:build             RUN      source changed"),
                     result.out());
             assertTrue(
-                    result.out().contains("pricing:build            RUN      pricing:test output may change"),
+                    result.out()
+                            .contains(
+                                    "pricing:test             RUN      shared:build output may change"),
+                    result.out());
+            assertTrue(
+                    result.out()
+                            .contains(
+                                    "pricing:build            RUN      pricing:test output may change"),
                     result.out());
             assertTrue(result.out().contains("Plan: 3 run, 0 cached, 1 unaffected"), result.out());
         }
@@ -52,7 +62,8 @@ class PlanCommandTest {
     @Test
     void printsTheSpecifiedSectionsInOrder(@TempDir Path directory) throws IOException {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
-            Files.writeString(directory.resolve("services/pricing/PriceCalculator.java"), "edited\n");
+            Files.writeString(
+                    directory.resolve("services/pricing/PriceCalculator.java"), "edited\n");
 
             String out = fixture.run("plan").out();
 
@@ -89,15 +100,15 @@ class PlanCommandTest {
     @Test
     void comparesAgainstAnEarlierRevisionOnRequest(@TempDir Path directory) {
         try (CliFixture fixture = CliFixture.withCommittedProject(directory)) {
-            fixture
-                    .repository()
+            fixture.repository()
                     .write("services/pricing/PriceCalculator.java", "edited\n")
                     .commitAll("edit pricing");
 
             CliFixture.Result result = fixture.run("plan", "--base", "HEAD~1");
 
             assertEquals(ExitCode.SUCCESS, result.exitCode(), result.err());
-            assertTrue(result.out().contains("services/pricing/PriceCalculator.java"), result.out());
+            assertTrue(
+                    result.out().contains("services/pricing/PriceCalculator.java"), result.out());
             assertTrue(result.out().contains("Plan: 2 run, 0 cached, 2 unaffected"), result.out());
         }
     }
@@ -131,7 +142,9 @@ class PlanCommandTest {
     @Test
     void explainsAnInvalidConfigurationWithItsLocation(@TempDir Path directory) {
         GitTestRepository.initialize(directory)
-                .write("forgeci.yml", "version: 1\nproject:\n  name: broken\ntasks:\n  a:build:\n    command: \"make all\"\n")
+                .write(
+                        "forgeci.yml",
+                        "version: 1\nproject:\n  name: broken\ntasks:\n  a:build:\n    command: \"make all\"\n")
                 .commitAll("init");
         try (CliFixture fixture = new CliFixture(directory)) {
             CliFixture.Result result = fixture.run("plan");

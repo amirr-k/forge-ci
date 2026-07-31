@@ -33,7 +33,8 @@ public class Project {
 
     protected Project() {}
 
-    public Project(String name, String repositoryIdentity, String defaultBranch, int configVersion) {
+    public Project(
+            String name, String repositoryIdentity, String defaultBranch, int configVersion) {
         this.name = name;
         this.repositoryIdentity = repositoryIdentity;
         this.defaultBranch = defaultBranch;

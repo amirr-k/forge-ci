@@ -36,7 +36,9 @@ class DoctorCommandTest {
             assertTrue(result.out().contains("java           OK"), result.out());
             assertTrue(result.out().contains("repository     FAIL"), result.out());
             assertTrue(result.out().contains("configuration  FAIL"), result.out());
-            assertTrue(result.out().contains("Failed checks: repository, configuration"), result.out());
+            assertTrue(
+                    result.out().contains("Failed checks: repository, configuration"),
+                    result.out());
         }
     }
 }

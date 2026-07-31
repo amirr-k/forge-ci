@@ -64,7 +64,8 @@ final class RunCommand implements Callable<Integer> {
         CacheCoordinator coordinator = new CacheCoordinator(workspace);
         LocalExecutor executor =
                 new LocalExecutor(
-                        new CachingTaskRunner(new ProcessTaskRunner(workspace.directory()), coordinator),
+                        new CachingTaskRunner(
+                                new ProcessTaskRunner(workspace.directory()), coordinator),
                         concurrency,
                         defaultTimeout(workspace));
         ExecutionReport report =
@@ -93,10 +94,10 @@ final class RunCommand implements Callable<Integer> {
     }
 
     /**
-     * Ctrl-C reaches a JVM as shutdown, not as an exception, so the hook interrupts the run thread —
-     * that is the signal {@code LocalExecutor} turns into killing task process trees. The hook waits
-     * on a latch rather than joining the run thread: during shutdown that thread blocks forever in
-     * {@code System.exit}, so a join could only ever time out.
+     * Ctrl-C reaches a JVM as shutdown, not as an exception, so the hook interrupts the run thread
+     * — that is the signal {@code LocalExecutor} turns into killing task process trees. The hook
+     * waits on a latch rather than joining the run thread: during shutdown that thread blocks
+     * forever in {@code System.exit}, so a join could only ever time out.
      */
     private static ExecutionReport cancelableExecute(Supplier<ExecutionReport> body) {
         Thread runThread = Thread.currentThread();
@@ -129,7 +130,8 @@ final class RunCommand implements Callable<Integer> {
         out.println();
         out.println("Result");
         for (TaskOutcome outcome : report.outcomes()) {
-            String elapsed = outcome.duration().isZero() ? "" : Durations.format(outcome.duration());
+            String elapsed =
+                    outcome.duration().isZero() ? "" : Durations.format(outcome.duration());
             String row =
                     String.format(
                             "  %-24s %-10s %8s  %s",

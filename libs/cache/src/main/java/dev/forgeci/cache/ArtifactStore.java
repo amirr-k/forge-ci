@@ -19,7 +19,10 @@ final class ArtifactStore {
         this.objectsDirectory = objectsDirectory;
     }
 
-    /** Writes {@code content}, returning its digest. Idempotent: storing identical bytes twice is a no-op. */
+    /**
+     * Writes {@code content}, returning its digest. Idempotent: storing identical bytes twice is a
+     * no-op.
+     */
     String store(byte[] content) {
         String digest = Digests.sha256(content);
         Path destination = objectPath(digest);
@@ -31,7 +34,11 @@ final class ArtifactStore {
             Path temp = Files.createTempFile(destination.getParent(), "tmp-", ".part");
             try {
                 Files.write(temp, content);
-                Files.move(temp, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(
+                        temp,
+                        destination,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
             } finally {
                 Files.deleteIfExists(temp);
             }
@@ -52,7 +59,8 @@ final class ArtifactStore {
         try {
             content = Files.readAllBytes(source);
         } catch (IOException e) {
-            throw new CorruptArtifactException("cached artifact " + digest + " is missing or unreadable: " + e);
+            throw new CorruptArtifactException(
+                    "cached artifact " + digest + " is missing or unreadable: " + e);
         }
         if (content.length != expectedSize) {
             throw new CorruptArtifactException(
@@ -66,7 +74,13 @@ final class ArtifactStore {
         String actualDigest = Digests.sha256(content);
         if (!actualDigest.equals(digest)) {
             throw new CorruptArtifactException(
-                    "cached artifact at " + source + " does not match its digest " + digest + " (got " + actualDigest + ")");
+                    "cached artifact at "
+                            + source
+                            + " does not match its digest "
+                            + digest
+                            + " (got "
+                            + actualDigest
+                            + ")");
         }
         return content;
     }

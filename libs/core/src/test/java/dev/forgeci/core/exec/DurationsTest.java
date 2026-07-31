@@ -37,7 +37,8 @@ class DurationsTest {
                 assertThrows(IllegalArgumentException.class, () -> Durations.parse(value));
 
         assertEquals(
-                "duration '" + value + "' is too long (the maximum is 8760h)", failure.getMessage());
+                "duration '" + value + "' is too long (the maximum is 8760h)",
+                failure.getMessage());
     }
 
     @Test

@@ -16,8 +16,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Runs a task's declared command as a direct child process — no shell, so nothing in
- * {@code forgeci.yml} can be interpreted as shell syntax. Enforces the task timeout, bounds captured
+ * Runs a task's declared command as a direct child process — no shell, so nothing in {@code
+ * forgeci.yml} can be interpreted as shell syntax. Enforces the task timeout, bounds captured
  * output, and terminates the whole process tree on timeout or cancellation.
  */
 public final class ProcessTaskRunner implements TaskRunner {
@@ -25,7 +25,10 @@ public final class ProcessTaskRunner implements TaskRunner {
     private static final Duration TERMINATION_GRACE = Duration.ofSeconds(2);
     private static final long MAX_OUTPUT_CHARS = 1 << 20;
     private static final int MAX_LINE_CHARS = 1 << 16;
-    /** Passed through to every task so commands remain resolvable and tools find a home directory. */
+
+    /**
+     * Passed through to every task so commands remain resolvable and tools find a home directory.
+     */
     private static final List<String> ALWAYS_INHERITED = List.of("PATH", "HOME", "TMPDIR", "LANG");
 
     private final Path workingDirectory;
@@ -63,8 +66,10 @@ public final class ProcessTaskRunner implements TaskRunner {
                 joinQuietly(pump);
                 return TaskOutcome.timedOut(task.name(), timeout);
             }
-            // measured before draining output: a task that leaves a background child holding the pipe
-            // would otherwise be reported as taking the pump's grace period longer than it really did
+            // measured before draining output: a task that leaves a background child holding the
+            // pipe
+            // would otherwise be reported as taking the pump's grace period longer than it really
+            // did
             Duration elapsed = elapsedSince(startedAt);
             joinQuietly(pump);
             int exitCode = process.exitValue();
@@ -101,10 +106,11 @@ public final class ProcessTaskRunner implements TaskRunner {
     }
 
     /**
-     * Forwards output line by line without ever holding more than one bounded line in memory: a task
-     * that writes megabytes with no newline must not be able to exhaust the heap.
+     * Forwards output line by line without ever holding more than one bounded line in memory: a
+     * task that writes megabytes with no newline must not be able to exhaust the heap.
      */
-    private static Thread startOutputPump(String task, Process process, ExecutionListener listener) {
+    private static Thread startOutputPump(
+            String task, Process process, ExecutionListener listener) {
         Thread pump =
                 new Thread(
                         () -> {
@@ -113,7 +119,8 @@ public final class ProcessTaskRunner implements TaskRunner {
                             boolean truncated = false;
                             char[] buffer = new char[8192];
                             try (Reader reader =
-                                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+                                    new InputStreamReader(
+                                            process.getInputStream(), StandardCharsets.UTF_8)) {
                                 int read;
                                 while ((read = reader.read(buffer)) != -1) {
                                     for (int i = 0; i < read; i++) {
@@ -121,12 +128,15 @@ public final class ProcessTaskRunner implements TaskRunner {
                                         if (character == '\n' || line.length() >= MAX_LINE_CHARS) {
                                             forwarded += line.length() + 1;
                                             if (forwarded <= MAX_OUTPUT_CHARS) {
-                                                listener.taskOutput(task, stripCarriageReturn(line));
+                                                listener.taskOutput(
+                                                        task, stripCarriageReturn(line));
                                             } else if (!truncated) {
                                                 truncated = true;
                                                 listener.taskOutput(
                                                         task,
-                                                        "[output truncated at " + MAX_OUTPUT_CHARS + " characters]");
+                                                        "[output truncated at "
+                                                                + MAX_OUTPUT_CHARS
+                                                                + " characters]");
                                             }
                                             line.setLength(0);
                                             if (character != '\n') {
@@ -141,7 +151,8 @@ public final class ProcessTaskRunner implements TaskRunner {
                                     listener.taskOutput(task, stripCarriageReturn(line));
                                 }
                             } catch (IOException e) {
-                                // the stream closing under us means the process is gone; its exit code decides
+                                // the stream closing under us means the process is gone; its exit
+                                // code decides
                             }
                         },
                         "forge-output-" + task);

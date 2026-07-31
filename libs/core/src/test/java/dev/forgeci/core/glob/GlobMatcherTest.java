@@ -11,7 +11,8 @@ class GlobMatcherTest {
     void doubleStarCrossesDirectoryBoundaries() {
         assertTrue(
                 GlobMatcher.matches(
-                        "services/pricing/**", "services/pricing/src/main/java/PriceCalculator.java"));
+                        "services/pricing/**",
+                        "services/pricing/src/main/java/PriceCalculator.java"));
         assertTrue(GlobMatcher.matches("services/pricing/**", "services/pricing/go.mod"));
     }
 

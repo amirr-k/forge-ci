@@ -25,7 +25,8 @@ class PlanBuilderTest {
     @Test
     void selectsOnlyTheAffectedClosureForALeafChange() {
         BuildPlan plan =
-                PlanBuilder.forChangedPaths(graph, Set.of("services/accounts/src/AccountService.java"));
+                PlanBuilder.forChangedPaths(
+                        graph, Set.of("services/accounts/src/AccountService.java"));
 
         assertEquals(List.of("accounts:test"), plan.selectedTaskNames());
         assertEquals("source changed", plan.selected().get(0).reason());
@@ -35,10 +36,12 @@ class PlanBuilderTest {
     @Test
     void ordersSelectedTasksDependenciesFirst() {
         BuildPlan plan =
-                PlanBuilder.forChangedPaths(graph, Set.of("services/pricing/src/PriceCalculator.java"));
+                PlanBuilder.forChangedPaths(
+                        graph, Set.of("services/pricing/src/PriceCalculator.java"));
 
         assertEquals(
-                List.of("pricing:test", "pricing:build", "checkout:integration"), plan.selectedTaskNames());
+                List.of("pricing:test", "pricing:build", "checkout:integration"),
+                plan.selectedTaskNames());
         // pricing declares the changed path directly; checkout only inherits it through the graph
         assertEquals("source changed", plan.selected().get(1).reason());
         assertEquals("pricing:build output may change", plan.selected().get(2).reason());
@@ -63,7 +66,8 @@ class PlanBuilderTest {
         assertEquals(graph.size(), plan.selected().size());
         List<String> names = plan.selectedTaskNames();
         assertTrue(
-                names.indexOf("pricing:test") < names.indexOf("pricing:build"), "unexpected order: " + names);
+                names.indexOf("pricing:test") < names.indexOf("pricing:build"),
+                "unexpected order: " + names);
     }
 
     @Test
@@ -72,6 +76,7 @@ class PlanBuilderTest {
                 PlanBuilder.forChangedPaths(
                         graph, Set.of("services/pricing/b.java", "services/pricing/a.java"));
 
-        assertEquals(List.of("services/pricing/a.java", "services/pricing/b.java"), plan.changedPaths());
+        assertEquals(
+                List.of("services/pricing/a.java", "services/pricing/b.java"), plan.changedPaths());
     }
 }

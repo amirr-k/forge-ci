@@ -33,14 +33,17 @@ public class DemoBuildWatcher {
     public void watch(List<Long> buildIds, String buildToken) {
         AtomicReference<ScheduledFuture<?>> self = new AtomicReference<>();
         ScheduledFuture<?> future =
-                scheduler.scheduleAtFixedRate(() -> poll(buildIds, buildToken, self), 1, 1, TimeUnit.SECONDS);
+                scheduler.scheduleAtFixedRate(
+                        () -> poll(buildIds, buildToken, self), 1, 1, TimeUnit.SECONDS);
         self.set(future);
     }
 
-    private void poll(List<Long> buildIds, String buildToken, AtomicReference<ScheduledFuture<?>> self) {
+    private void poll(
+            List<Long> buildIds, String buildToken, AtomicReference<ScheduledFuture<?>> self) {
         boolean allTerminal;
         try {
-            allTerminal = buildIds.stream().allMatch(id -> buildService.get(id).getState().isTerminal());
+            allTerminal =
+                    buildIds.stream().allMatch(id -> buildService.get(id).getState().isTerminal());
         } catch (RuntimeException transientLookupFailure) {
             return; // keep polling; a lookup hiccup isn't proof the builds are gone
         }

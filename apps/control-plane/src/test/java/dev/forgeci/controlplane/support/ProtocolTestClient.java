@@ -33,7 +33,8 @@ import org.springframework.http.ResponseEntity;
  */
 public final class ProtocolTestClient {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {};
 
     private final TestRestTemplate rest;
 
@@ -42,16 +43,20 @@ public final class ProtocolTestClient {
     }
 
     public long registerProject() {
-        return rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class).id();
+        return rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class)
+                .id();
     }
 
     public PlanSubmissionResponse submitPlan(long projectId, PlanSubmissionRequest plan) {
-        return rest.postForObject("/api/projects/" + projectId + "/plans", plan, PlanSubmissionResponse.class);
+        return rest.postForObject(
+                "/api/projects/" + projectId + "/plans", plan, PlanSubmissionResponse.class);
     }
 
     public BuildResponse createBuild(long projectId, Long planSubmissionId) {
         return rest.postForObject(
-                "/api/projects/" + projectId + "/builds", new BuildCreationRequest(planSubmissionId, "manual", 0), BuildResponse.class);
+                "/api/projects/" + projectId + "/builds",
+                new BuildCreationRequest(planSubmissionId, "manual", 0),
+                BuildResponse.class);
     }
 
     public BuildResponse getBuild(Long buildId) {
@@ -67,12 +72,14 @@ public final class ProtocolTestClient {
     }
 
     public HeartbeatResponse heartbeat(long workerId) {
-        return rest.postForObject("/api/workers/" + workerId + "/heartbeat", null, HeartbeatResponse.class);
+        return rest.postForObject(
+                "/api/workers/" + workerId + "/heartbeat", null, HeartbeatResponse.class);
     }
 
     public Optional<ClaimedTaskResponse> claim(long workerId) {
         ResponseEntity<ClaimedTaskResponse> response =
-                rest.postForEntity("/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
+                rest.postForEntity(
+                        "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
         if (response.getStatusCode() == HttpStatus.NO_CONTENT) {
             return Optional.empty();
         }
@@ -97,31 +104,55 @@ public final class ProtocolTestClient {
         throw new AssertionError("worker " + workerId + " never claimed " + taskName);
     }
 
-    public void reportResult(ClaimedTaskResponse task, boolean success, Integer exitCode, String failureReason, String artifactDigest) {
-        assertThat(reportResultStatus(task, success, exitCode, failureReason, artifactDigest)).isEqualTo(HttpStatus.NO_CONTENT);
+    public void reportResult(
+            ClaimedTaskResponse task,
+            boolean success,
+            Integer exitCode,
+            String failureReason,
+            String artifactDigest) {
+        assertThat(reportResultStatus(task, success, exitCode, failureReason, artifactDigest))
+                .isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     /** The raw status, for callers that expect a report to be rejected rather than accepted. */
     public HttpStatus reportResultStatus(
-            ClaimedTaskResponse task, boolean success, Integer exitCode, String failureReason, String artifactDigest) {
+            ClaimedTaskResponse task,
+            boolean success,
+            Integer exitCode,
+            String failureReason,
+            String artifactDigest) {
         ResponseEntity<String> response =
                 rest.postForEntity(
                         "/api/task-runs/" + task.taskRunId() + "/result",
                         new TaskResultReportRequest(
-                                task.workerId(), task.leaseToken(), task.attemptId(), success, exitCode, failureReason, artifactDigest),
+                                task.workerId(),
+                                task.leaseToken(),
+                                task.attemptId(),
+                                success,
+                                exitCode,
+                                failureReason,
+                                artifactDigest),
                         String.class);
         return HttpStatus.valueOf(response.getStatusCode().value());
     }
 
     public String uploadArtifact(long projectId, String cacheKey, byte[] archive) {
-        ResponseEntity<Map<String, Object>> response = upload(projectId, cacheKey, archive, Digests.sha256(archive), archive.length);
+        ResponseEntity<Map<String, Object>> response =
+                upload(projectId, cacheKey, archive, Digests.sha256(archive), archive.length);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return Digests.sha256(archive);
     }
 
-    /** The upload call with every field left to the caller, so a test can declare a wrong digest or size on purpose. */
+    /**
+     * The upload call with every field left to the caller, so a test can declare a wrong digest or
+     * size on purpose.
+     */
     public ResponseEntity<Map<String, Object>> upload(
-            long projectId, String cacheKey, byte[] archive, String declaredDigest, long declaredSize) {
+            long projectId,
+            String cacheKey,
+            byte[] archive,
+            String declaredDigest,
+            long declaredSize) {
         String path =
                 "/api/artifacts?projectId="
                         + projectId
@@ -133,11 +164,14 @@ public final class ProtocolTestClient {
                         + declaredSize;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), JSON_OBJECT);
+        return rest.exchange(
+                path, HttpMethod.POST, new HttpEntity<>(archive, headers), JSON_OBJECT);
     }
 
     public ResponseEntity<byte[]> lookup(long projectId, String cacheKey) {
-        return rest.getForEntity("/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + encode(cacheKey), byte[].class);
+        return rest.getForEntity(
+                "/api/artifacts/lookup?projectId=" + projectId + "&cacheKey=" + encode(cacheKey),
+                byte[].class);
     }
 
     public void awaitBuildState(Long buildId, BuildState expected) {
@@ -147,7 +181,14 @@ public final class ProtocolTestClient {
             }
             sleepQuietly(100);
         }
-        throw new AssertionError("build " + buildId + " never reached " + expected + " (was " + getBuild(buildId).state() + ")");
+        throw new AssertionError(
+                "build "
+                        + buildId
+                        + " never reached "
+                        + expected
+                        + " (was "
+                        + getBuild(buildId).state()
+                        + ")");
     }
 
     private static String encode(String value) {

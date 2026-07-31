@@ -6,7 +6,10 @@ import org.testcontainers.containers.MySQLContainer;
 public final class MySqlTestContainer {
 
     public static final MySQLContainer<?> INSTANCE =
-            new MySQLContainer<>("mysql:8.0").withDatabaseName("forgeci").withUsername("forgeci").withPassword("forgeci");
+            new MySQLContainer<>("mysql:8.0")
+                    .withDatabaseName("forgeci")
+                    .withUsername("forgeci")
+                    .withPassword("forgeci");
 
     static {
         INSTANCE.start();

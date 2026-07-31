@@ -15,7 +15,8 @@ final class ReadinessEvaluator {
 
     private ReadinessEvaluator() {}
 
-    static boolean isImmediatelyReady(TaskDefinitionEntity task, List<TaskDefinitionEntity> allSelected) {
+    static boolean isImmediatelyReady(
+            TaskDefinitionEntity task, List<TaskDefinitionEntity> allSelected) {
         Set<String> selectedNames = new HashSet<>();
         for (TaskDefinitionEntity t : allSelected) {
             selectedNames.add(t.getTaskName());

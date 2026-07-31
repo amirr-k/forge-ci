@@ -37,9 +37,15 @@ public class TaskRunStateMachine {
                     TaskRunState.PENDING, Set.of(TaskRunState.READY, TaskRunState.SKIPPED),
                     TaskRunState.READY, Set.of(TaskRunState.LEASED, TaskRunState.CACHED),
                     TaskRunState.LEASED,
-                            Set.of(TaskRunState.RUNNING, TaskRunState.RETRY_WAIT, TaskRunState.FAILED),
+                            Set.of(
+                                    TaskRunState.RUNNING,
+                                    TaskRunState.RETRY_WAIT,
+                                    TaskRunState.FAILED),
                     TaskRunState.RUNNING,
-                            Set.of(TaskRunState.SUCCEEDED, TaskRunState.FAILED, TaskRunState.RETRY_WAIT),
+                            Set.of(
+                                    TaskRunState.SUCCEEDED,
+                                    TaskRunState.FAILED,
+                                    TaskRunState.RETRY_WAIT),
                     TaskRunState.RETRY_WAIT, Set.of(TaskRunState.READY),
                     TaskRunState.SUCCEEDED, Set.of(),
                     TaskRunState.FAILED, Set.of(),
@@ -87,14 +93,21 @@ public class TaskRunStateMachine {
      * transition on the same build (build or sibling task run).
      */
     @Transactional
-    public TaskRun transition(Long taskRunId, long expectedVersion, TaskRunState target, TaskRunOutcome outcome) {
+    public TaskRun transition(
+            Long taskRunId, long expectedVersion, TaskRunState target, TaskRunOutcome outcome) {
         TaskRun taskRun =
                 taskRunRepository
                         .findById(taskRunId)
-                        .orElseThrow(() -> new NotFoundException("task run " + taskRunId + " not found"));
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "task run " + taskRunId + " not found"));
         Long buildId = taskRun.getBuild().getId();
         Build build =
-                buildRepository.findByIdForUpdate(buildId).orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
+                buildRepository
+                        .findByIdForUpdate(buildId)
+                        .orElseThrow(
+                                () -> new NotFoundException("build " + buildId + " not found"));
 
         // force a genuinely fresh read under a lock now that the build row lock guarantees any
         // concurrent transition on this same task run has fully committed. A second findById (even
@@ -136,23 +149,36 @@ public class TaskRunStateMachine {
             taskRun.setFailureReason(outcome == null ? null : outcome.failureReason());
             taskRun.setArtifactDigest(outcome == null ? null : outcome.artifactDigest());
             updateLatestAttempt(
-                    taskRun, target, outcome == null ? null : outcome.exitCode(), outcome == null ? null : outcome.failureReason());
+                    taskRun,
+                    target,
+                    outcome == null ? null : outcome.exitCode(),
+                    outcome == null ? null : outcome.failureReason());
         } else if (target == TaskRunState.RETRY_WAIT) {
             taskRun.setFailureReason(outcome == null ? null : outcome.failureReason());
-            updateLatestAttempt(taskRun, target, null, outcome == null ? null : outcome.failureReason());
+            updateLatestAttempt(
+                    taskRun, target, null, outcome == null ? null : outcome.failureReason());
         } else if (target == TaskRunState.CACHED) {
             taskRun.setCompletedAt(now);
             taskRun.setArtifactDigest(outcome == null ? null : outcome.artifactDigest());
         }
 
-        // flush now so the returned entity's bumped version is visible to a caller chaining transitions
+        // flush now so the returned entity's bumped version is visible to a caller chaining
+        // transitions
         TaskRun saved = taskRunRepository.saveAndFlush(taskRun);
 
         events.publish(
                 build,
                 EVENT_FOR_TARGET.get(target),
                 saved,
-                Map.of("taskRunId", saved.getId(), "taskName", saved.getTaskName(), "from", current.name(), "to", target.name()));
+                Map.of(
+                        "taskRunId",
+                        saved.getId(),
+                        "taskName",
+                        saved.getTaskName(),
+                        "from",
+                        current.name(),
+                        "to",
+                        target.name()));
 
         if (target == TaskRunState.READY) {
             publishTaskReady(build, saved);
@@ -175,14 +201,23 @@ public class TaskRunStateMachine {
             kafkaTemplate.send(
                     KafkaTopics.TASK_READY,
                     String.valueOf(taskRun.getId()),
-                    new TaskReadyEvent(build.getId(), taskRun.getId(), taskRun.getTaskName(), taskRun.getCacheKey()));
+                    new TaskReadyEvent(
+                            build.getId(),
+                            taskRun.getId(),
+                            taskRun.getTaskName(),
+                            taskRun.getCacheKey()));
         } catch (RuntimeException kafkaUnavailable) {
-            log.warn("failed to publish task-ready for task run {} to Kafka: {}", taskRun.getId(), kafkaUnavailable.getMessage());
+            log.warn(
+                    "failed to publish task-ready for task run {} to Kafka: {}",
+                    taskRun.getId(),
+                    kafkaUnavailable.getMessage());
         }
     }
 
-    private void updateLatestAttempt(TaskRun taskRun, TaskRunState state, Integer exitCode, String failureReason) {
-        List<TaskAttempt> attempts = taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId());
+    private void updateLatestAttempt(
+            TaskRun taskRun, TaskRunState state, Integer exitCode, String failureReason) {
+        List<TaskAttempt> attempts =
+                taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId());
         if (attempts.isEmpty()) {
             return;
         }

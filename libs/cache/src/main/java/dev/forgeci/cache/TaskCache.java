@@ -29,9 +29,9 @@ public final class TaskCache {
     /**
      * Local mode's cache, plus a remote fallback: a local miss checks the remote store before
      * declaring the task un-cached, and a fresh local store also uploads so another workspace
-     * pointed at the same control plane can reuse it. Local lookups and stores always happen
-     * first and always succeed on their own — {@code remote} being unreachable degrades to
-     * exactly phase 1/2 behavior, it never fails the build.
+     * pointed at the same control plane can reuse it. Local lookups and stores always happen first
+     * and always succeed on their own — {@code remote} being unreachable degrades to exactly phase
+     * 1/2 behavior, it never fails the build.
      */
     public TaskCache(Path projectDirectory, RemoteArtifactClient remote, long remoteProjectId) {
         this.projectDirectory = projectDirectory;
@@ -62,19 +62,24 @@ public final class TaskCache {
     }
 
     private Optional<CacheHit> localLookup(CacheKey key) {
-        return manifests.load(key.value())
+        return manifests
+                .load(key.value())
                 .flatMap(
                         manifest -> {
                             try {
                                 byte[] archive = artifacts.load(manifest.digest(), manifest.size());
-                                return Optional.of(new CacheHit(manifest.digest(), manifest.size(), archive));
+                                return Optional.of(
+                                        new CacheHit(manifest.digest(), manifest.size(), archive));
                             } catch (CorruptArtifactException e) {
                                 return Optional.empty();
                             }
                         });
     }
 
-    /** A remote hit is also written into the local cache, so the next lookup for this key is a local hit. */
+    /**
+     * A remote hit is also written into the local cache, so the next lookup for this key is a local
+     * hit.
+     */
     private Optional<CacheHit> remoteLookup(CacheKey key) {
         try {
             return remote.lookup(remoteProjectId, key.value())
@@ -89,7 +94,9 @@ public final class TaskCache {
         }
     }
 
-    /** Extracts a hit's archive into the project directory, rejecting any path-traversal attempt. */
+    /**
+     * Extracts a hit's archive into the project directory, rejecting any path-traversal attempt.
+     */
     public void restore(CacheHit hit) {
         TaskArchive.extract(hit.archive(), projectDirectory);
     }
@@ -114,7 +121,10 @@ public final class TaskCache {
         return new CacheHit(digest, archive.length, archive);
     }
 
-    /** The digest a verified manifest for {@code key} points at, without loading or verifying the object. */
+    /**
+     * The digest a verified manifest for {@code key} points at, without loading or verifying the
+     * object.
+     */
     public Optional<String> manifestDigest(CacheKey key) {
         return manifests.load(key.value()).map(CacheManifest::digest);
     }
@@ -128,7 +138,10 @@ public final class TaskCache {
         return records.load(taskName);
     }
 
-    /** A human explanation of why a task hit or missed, for {@code forge plan} and {@code forge explain}. */
+    /**
+     * A human explanation of why a task hit or missed, for {@code forge plan} and {@code forge
+     * explain}.
+     */
     public static String explainReason(Optional<CacheKey> previous, CacheKey current, boolean hit) {
         if (hit) {
             return "inputs unchanged since the last cached run";
@@ -147,7 +160,8 @@ public final class TaskCache {
             return "toolchain changed from " + before.toolchain() + " to " + current.toolchain();
         }
         if (!before.dependencyArtifactsDigest().equals(current.dependencyArtifactsDigest())) {
-            String changedDependency = firstDifferingKey(before.dependencyDigests(), current.dependencyDigests());
+            String changedDependency =
+                    firstDifferingKey(before.dependencyDigests(), current.dependencyDigests());
             return changedDependency != null
                     ? changedDependency + " output changed"
                     : "a dependency's output changed";
@@ -158,7 +172,8 @@ public final class TaskCache {
         return "cache key matches a prior run, but no verified artifact was found for it";
     }
 
-    private static String sourceInputReason(Map<String, String> before, Map<String, String> current) {
+    private static String sourceInputReason(
+            Map<String, String> before, Map<String, String> current) {
         for (String path : new TreeMap<>(current).keySet()) {
             if (!before.containsKey(path)) {
                 return "source input " + path + " added";
@@ -175,7 +190,8 @@ public final class TaskCache {
         return "source inputs changed";
     }
 
-    private static String firstDifferingKey(Map<String, String> before, Map<String, String> current) {
+    private static String firstDifferingKey(
+            Map<String, String> before, Map<String, String> current) {
         for (String name : new TreeMap<>(current).keySet()) {
             if (!before.containsKey(name) || !before.get(name).equals(current.get(name))) {
                 return name;

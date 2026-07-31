@@ -62,13 +62,23 @@ public class BuildService {
     @Transactional
     public Build createBuild(Long projectId, BuildCreationRequest request) {
         Project project =
-                projectRepository.findById(projectId).orElseThrow(() -> new NotFoundException("project " + projectId + " not found"));
+                projectRepository
+                        .findById(projectId)
+                        .orElseThrow(
+                                () -> new NotFoundException("project " + projectId + " not found"));
         PlanSubmission planSubmission =
                 planSubmissionRepository
                         .findById(request.planSubmissionId())
-                        .orElseThrow(() -> new NotFoundException("plan submission " + request.planSubmissionId() + " not found"));
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "plan submission "
+                                                        + request.planSubmissionId()
+                                                        + " not found"));
 
-        var existing = buildRepository.findByProjectIdAndPlanSubmissionId(projectId, planSubmission.getId());
+        var existing =
+                buildRepository.findByProjectIdAndPlanSubmissionId(
+                        projectId, planSubmission.getId());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -118,21 +128,29 @@ public class BuildService {
                 schedulerService.promoteToReadyOrCached(taskRun, projectId);
             }
         }
-        // covers the all-cache-hit case: nothing will ever call claim/reportResult to notice completion
+        // covers the all-cache-hit case: nothing will ever call claim/reportResult to notice
+        // completion
         schedulerService.maybeCompleteBuild(buildId);
     }
 
     @Transactional
     public Build cancel(Long buildId) {
-        Build build = buildRepository.findById(buildId).orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
-        Build canceled = buildStateMachine.transition(buildId, build.getVersion(), BuildState.CANCELED);
+        Build build =
+                buildRepository
+                        .findById(buildId)
+                        .orElseThrow(
+                                () -> new NotFoundException("build " + buildId + " not found"));
+        Build canceled =
+                buildStateMachine.transition(buildId, build.getVersion(), BuildState.CANCELED);
         metrics.buildCanceled(Duration.between(canceled.getCreatedAt(), Instant.now()));
         return canceled;
     }
 
     @Transactional(readOnly = true)
     public Build get(Long buildId) {
-        return buildRepository.findById(buildId).orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
+        return buildRepository
+                .findById(buildId)
+                .orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
     }
 
     @Transactional(readOnly = true)
@@ -148,7 +166,10 @@ public class BuildService {
     public List<Artifact> artifacts(Long buildId) {
         get(buildId);
         List<String> digests =
-                taskRunRepository.findByBuildId(buildId).stream().map(TaskRun::getArtifactDigest).filter(d -> d != null).toList();
+                taskRunRepository.findByBuildId(buildId).stream()
+                        .map(TaskRun::getArtifactDigest)
+                        .filter(d -> d != null)
+                        .toList();
         return digests.isEmpty() ? List.of() : artifactRepository.findByDigestIn(digests);
     }
 }

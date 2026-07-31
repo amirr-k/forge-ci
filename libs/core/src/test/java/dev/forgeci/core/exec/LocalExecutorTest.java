@@ -26,7 +26,8 @@ class LocalExecutorTest {
         LocalExecutor executor = new LocalExecutor(runner, 2, Duration.ofMinutes(1));
 
         ExecutionReport report =
-                executor.execute(graph, List.of("catalog:build", "accounts:test"), ExecutionListener.NONE);
+                executor.execute(
+                        graph, List.of("catalog:build", "accounts:test"), ExecutionListener.NONE);
 
         assertTrue(report.succeeded());
         // two 600ms tasks with two slots: overlapping means ~600ms, serial would be ~1200ms
@@ -74,7 +75,11 @@ class LocalExecutorTest {
         ExecutionReport report =
                 executor.execute(
                         graph,
-                        List.of("catalog:build", "pricing:test", "pricing:build", "checkout:integration"),
+                        List.of(
+                                "catalog:build",
+                                "pricing:test",
+                                "pricing:build",
+                                "checkout:integration"),
                         ExecutionListener.NONE);
 
         Map<String, TaskOutcome> outcomes = byTask(report);
@@ -83,10 +88,12 @@ class LocalExecutorTest {
         assertEquals(TaskStatus.SKIPPED, outcomes.get("checkout:integration").status());
         assertEquals("dependency pricing:test failed", outcomes.get("pricing:build").detail());
         assertEquals(
-                "dependency pricing:build was skipped", outcomes.get("checkout:integration").detail());
+                "dependency pricing:build was skipped",
+                outcomes.get("checkout:integration").detail());
         // an independent task is unaffected by the failure
         assertEquals(TaskStatus.SUCCEEDED, outcomes.get("catalog:build").status());
-        assertTrue(!runner.completionOrder().contains("pricing:build"), "skipped task must not run");
+        assertTrue(
+                !runner.completionOrder().contains("pricing:build"), "skipped task must not run");
     }
 
     @Test
@@ -108,7 +115,9 @@ class LocalExecutorTest {
 
         ExecutionReport report =
                 executor.execute(
-                        graph, List.of("pricing:test", "pricing:build", "catalog:build"), ExecutionListener.NONE);
+                        graph,
+                        List.of("pricing:test", "pricing:build", "catalog:build"),
+                        ExecutionListener.NONE);
 
         assertEquals(
                 List.of("pricing:test", "pricing:build", "catalog:build"),
@@ -134,13 +143,17 @@ class LocalExecutorTest {
         return outcomes;
     }
 
-    /** Sleeps for a fixed duration instead of starting a process, and records what it was asked to do. */
+    /**
+     * Sleeps for a fixed duration instead of starting a process, and records what it was asked to
+     * do.
+     */
     private static final class FakeRunner implements TaskRunner {
 
         private final Duration duration;
         private final Map<String, Integer> failures;
         private final List<String> completed = Collections.synchronizedList(new ArrayList<>());
-        private final Map<String, Duration> timeouts = new java.util.concurrent.ConcurrentHashMap<>();
+        private final Map<String, Duration> timeouts =
+                new java.util.concurrent.ConcurrentHashMap<>();
         private final AtomicInteger inFlight = new AtomicInteger();
         private final AtomicInteger peakInFlight = new AtomicInteger();
 

@@ -12,7 +12,10 @@ public final class TestFixtures {
 
     public static ProjectRegistrationRequest project() {
         return new ProjectRegistrationRequest(
-                "dispatch-lab-" + UUID.randomUUID(), "git@example.com:example/dispatch-lab.git", "main", 1);
+                "dispatch-lab-" + UUID.randomUUID(),
+                "git@example.com:example/dispatch-lab.git",
+                "main",
+                1);
     }
 
     /** Two independent tasks (no dependency edge) plus one dependent on the first. */
@@ -45,7 +48,8 @@ public final class TestFixtures {
     }
 
     /** Two independent tasks with no dependency edge between them — for parallel-claim tests. */
-    public static PlanSubmissionRequest twoIndependentTaskPlan(String revision, String baseRevision) {
+    public static PlanSubmissionRequest twoIndependentTaskPlan(
+            String revision, String baseRevision) {
         String suffix = UUID.randomUUID().toString();
         return new PlanSubmissionRequest(
                 revision,
@@ -75,7 +79,8 @@ public final class TestFixtures {
     }
 
     /** A single task using the given cache key — for cache-hit-reuse tests across two builds. */
-    public static PlanSubmissionRequest singleTaskPlan(String revision, String baseRevision, String taskName, String cacheKey) {
+    public static PlanSubmissionRequest singleTaskPlan(
+            String revision, String baseRevision, String taskName, String cacheKey) {
         return new PlanSubmissionRequest(
                 revision,
                 baseRevision,
@@ -94,8 +99,12 @@ public final class TestFixtures {
                 List.of());
     }
 
-    /** A single task with a short (1s) declared timeout — for lease-expiry/crash-recovery tests that need a fast lease. */
-    public static PlanSubmissionRequest singleTaskPlanWithShortTimeout(String revision, String baseRevision, String taskName, String cacheKey) {
+    /**
+     * A single task with a short (1s) declared timeout — for lease-expiry/crash-recovery tests that
+     * need a fast lease.
+     */
+    public static PlanSubmissionRequest singleTaskPlanWithShortTimeout(
+            String revision, String baseRevision, String taskName, String cacheKey) {
         return new PlanSubmissionRequest(
                 revision,
                 baseRevision,
@@ -115,14 +124,15 @@ public final class TestFixtures {
     }
 
     /**
-     * {@code checkout:integration} depends on both {@code pricing:build} (submitted, must
-     * actually run) and {@code payments:build} (never submitted — an "unaffected" dependency the
-     * plan omits on purpose, the way an affected-only plan is meant to work). Regression coverage
-     * for a scheduler bug where a dependency absent from the build was wrongly treated as
-     * unsatisfied forever instead of already-satisfied, permanently starving any dependent that
-     * also had at least one dependency actually in the plan.
+     * {@code checkout:integration} depends on both {@code pricing:build} (submitted, must actually
+     * run) and {@code payments:build} (never submitted — an "unaffected" dependency the plan omits
+     * on purpose, the way an affected-only plan is meant to work). Regression coverage for a
+     * scheduler bug where a dependency absent from the build was wrongly treated as unsatisfied
+     * forever instead of already-satisfied, permanently starving any dependent that also had at
+     * least one dependency actually in the plan.
      */
-    public static PlanSubmissionRequest partialDependencyPlan(String revision, String baseRevision, String suffix) {
+    public static PlanSubmissionRequest partialDependencyPlan(
+            String revision, String baseRevision, String suffix) {
         return new PlanSubmissionRequest(
                 revision,
                 baseRevision,
@@ -150,8 +160,12 @@ public final class TestFixtures {
                 List.of("payments:build"));
     }
 
-    /** Same shape as {@link #twoTaskPlan}, but with cache keys unique to this call — safe to reuse across tests. */
-    public static PlanSubmissionRequest twoTaskPlanWithUniqueKeys(String revision, String baseRevision, String suffix) {
+    /**
+     * Same shape as {@link #twoTaskPlan}, but with cache keys unique to this call — safe to reuse
+     * across tests.
+     */
+    public static PlanSubmissionRequest twoTaskPlanWithUniqueKeys(
+            String revision, String baseRevision, String suffix) {
         return new PlanSubmissionRequest(
                 revision,
                 baseRevision,
@@ -184,7 +198,8 @@ public final class TestFixtures {
      * path than the standalone {@code leaf:build}, even though both are immediately ready — for
      * testing the scheduler's critical-path-then-FIFO tie-break.
      */
-    public static PlanSubmissionRequest criticalPathPlan(String revision, String baseRevision, String suffix) {
+    public static PlanSubmissionRequest criticalPathPlan(
+            String revision, String baseRevision, String suffix) {
         return new PlanSubmissionRequest(
                 revision,
                 baseRevision,
@@ -221,8 +236,13 @@ public final class TestFixtures {
                 List.of());
     }
 
-    /** A shell command that deterministically produces one output file under {@code build/<name>/}. */
+    /**
+     * A shell command that deterministically produces one output file under {@code build/<name>/}.
+     */
     public static List<String> shellCommand(String name) {
-        return List.of("/bin/sh", "-c", "mkdir -p build/" + name + " && echo built > build/" + name + "/out.txt");
+        return List.of(
+                "/bin/sh",
+                "-c",
+                "mkdir -p build/" + name + " && echo built > build/" + name + "/out.txt");
     }
 }

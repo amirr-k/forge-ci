@@ -24,7 +24,11 @@ public final class GitWorkspace {
     private GitWorkspace(Path projectDirectory, Path repositoryRoot) {
         this.projectDirectory = projectDirectory;
         this.repositoryRoot = repositoryRoot;
-        String prefix = repositoryRoot.relativize(projectDirectory).toString().replace(File.separatorChar, '/');
+        String prefix =
+                repositoryRoot
+                        .relativize(projectDirectory)
+                        .toString()
+                        .replace(File.separatorChar, '/');
         this.pathPrefix = prefix.isEmpty() || prefix.endsWith("/") ? prefix : prefix + "/";
     }
 
@@ -41,14 +45,16 @@ public final class GitWorkspace {
                             + " is not inside a Git repository. ForgeCI decides what to rebuild from"
                             + " Git history — run 'git init' here, or run forge from a checkout.");
         }
-        Path root = realPath(Path.of(GitCommand.run(directory, "rev-parse", "--show-toplevel").trim()));
+        Path root =
+                realPath(Path.of(GitCommand.run(directory, "rev-parse", "--show-toplevel").trim()));
         return new GitWorkspace(directory, root);
     }
 
     /**
-     * Git reports the repository root as a resolved path, so the project directory has to be resolved
-     * the same way — otherwise a symlinked prefix (macOS {@code /var} → {@code /private/var}) makes
-     * the two look unrelated and every changed path is discarded as outside the project.
+     * Git reports the repository root as a resolved path, so the project directory has to be
+     * resolved the same way — otherwise a symlinked prefix (macOS {@code /var} → {@code
+     * /private/var}) makes the two look unrelated and every changed path is discarded as outside
+     * the project.
      */
     private static Path realPath(Path path) {
         try {
@@ -72,9 +78,11 @@ public final class GitWorkspace {
         if (!hasCommits()) {
             return "no commits yet";
         }
-        String branch = GitCommand.run(projectDirectory, "rev-parse", "--abbrev-ref", "HEAD").trim();
+        String branch =
+                GitCommand.run(projectDirectory, "rev-parse", "--abbrev-ref", "HEAD").trim();
         return branch.equals("HEAD")
-                ? "detached at " + GitCommand.run(projectDirectory, "rev-parse", "--short", "HEAD").trim()
+                ? "detached at "
+                        + GitCommand.run(projectDirectory, "rev-parse", "--short", "HEAD").trim()
                 : branch;
     }
 

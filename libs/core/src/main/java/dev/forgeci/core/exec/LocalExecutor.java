@@ -21,8 +21,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Runs a selected set of tasks locally with bounded concurrency: a task starts as soon as every
- * selected dependency has succeeded, so independent tasks overlap. Dependencies outside the selected
- * set are treated as already satisfied — that is what makes an incremental run incremental.
+ * selected dependency has succeeded, so independent tasks overlap. Dependencies outside the
+ * selected set are treated as already satisfied — that is what makes an incremental run
+ * incremental.
  *
  * <p>Nothing here talks to Kafka, Redis, MySQL, S3, or a control plane; local mode is standalone.
  */
@@ -39,7 +40,8 @@ public final class LocalExecutor {
 
     public LocalExecutor(TaskRunner runner, int concurrency, Duration defaultTimeout) {
         if (concurrency < 1) {
-            throw new IllegalArgumentException("concurrency must be at least 1, got " + concurrency);
+            throw new IllegalArgumentException(
+                    "concurrency must be at least 1, got " + concurrency);
         }
         this.runner = runner;
         this.concurrency = concurrency;
@@ -54,12 +56,17 @@ public final class LocalExecutor {
      * @param selected task names in topological order; dependencies of a selected task that are not
      *     themselves selected are treated as satisfied
      */
-    public ExecutionReport execute(TaskGraph graph, List<String> selected, ExecutionListener listener) {
+    public ExecutionReport execute(
+            TaskGraph graph, List<String> selected, ExecutionListener listener) {
         Set<String> selectedTasks = new LinkedHashSet<>(selected);
         Map<String, Integer> blockingDependencies = new HashMap<>();
         Deque<String> ready = new ArrayDeque<>();
         for (String task : selectedTasks) {
-            int blocking = (int) graph.dependenciesOf(task).stream().filter(selectedTasks::contains).count();
+            int blocking =
+                    (int)
+                            graph.dependenciesOf(task).stream()
+                                    .filter(selectedTasks::contains)
+                                    .count();
             blockingDependencies.put(task, blocking);
             if (blocking == 0) {
                 ready.add(task);
@@ -92,7 +99,8 @@ public final class LocalExecutor {
                         }
                     }
                 } else {
-                    blockDownstream(graph, selectedTasks, outcome, outcomes).forEach(listener::taskFinished);
+                    blockDownstream(graph, selectedTasks, outcome, outcomes)
+                            .forEach(listener::taskFinished);
                 }
             }
         } catch (RunCanceledException e) {
@@ -100,7 +108,8 @@ public final class LocalExecutor {
                 outcomes.putIfAbsent(task, TaskOutcome.canceled(task, Duration.ZERO));
             }
         } finally {
-            // shutdownNow on every path, including an unexpected one: interrupting the task threads is
+            // shutdownNow on every path, including an unexpected one: interrupting the task threads
+            // is
             // what makes them kill their process trees instead of leaving them orphaned
             pool.shutdownNow();
             awaitTaskThreads(pool);
@@ -116,13 +125,17 @@ public final class LocalExecutor {
 
     private TaskOutcome runTask(TaskGraph graph, String name, ExecutionListener listener) {
         var task = graph.task(name);
-        Duration timeout = task.timeout() == null ? defaultTimeout : Durations.parse(task.timeout());
+        Duration timeout =
+                task.timeout() == null ? defaultTimeout : Durations.parse(task.timeout());
         return runner.run(task, timeout, listener);
     }
 
     /** Marks every selected task downstream of an unsuccessful task as skipped, transitively. */
     private static List<TaskOutcome> blockDownstream(
-            TaskGraph graph, Set<String> selectedTasks, TaskOutcome cause, Map<String, TaskOutcome> outcomes) {
+            TaskGraph graph,
+            Set<String> selectedTasks,
+            TaskOutcome cause,
+            Map<String, TaskOutcome> outcomes) {
         List<TaskOutcome> blocked = new ArrayList<>();
         Deque<TaskOutcome> queue = new ArrayDeque<>();
         queue.add(cause);
@@ -133,7 +146,9 @@ public final class LocalExecutor {
                     continue;
                 }
                 TaskOutcome skipped =
-                        TaskOutcome.skipped(dependent, "dependency " + current.task() + " " + describe(current));
+                        TaskOutcome.skipped(
+                                dependent,
+                                "dependency " + current.task() + " " + describe(current));
                 outcomes.put(dependent, skipped);
                 blocked.add(skipped);
                 queue.add(skipped);
@@ -159,14 +174,15 @@ public final class LocalExecutor {
             Thread.currentThread().interrupt();
             throw new RunCanceledException();
         } catch (ExecutionException e) {
-            throw new IllegalStateException("task runner threw instead of reporting an outcome", e.getCause());
+            throw new IllegalStateException(
+                    "task runner threw instead of reporting an outcome", e.getCause());
         }
     }
 
     /**
-     * Gives interrupted tasks a moment to terminate their process trees. Runs with the interrupt flag
-     * temporarily cleared — on the cancellation path the flag is already set, and awaiting would
-     * otherwise return instantly and leave the very processes we are trying to kill running.
+     * Gives interrupted tasks a moment to terminate their process trees. Runs with the interrupt
+     * flag temporarily cleared — on the cancellation path the flag is already set, and awaiting
+     * would otherwise return instantly and leave the very processes we are trying to kill running.
      */
     private static void awaitTaskThreads(ExecutorService pool) {
         boolean interrupted = Thread.interrupted();

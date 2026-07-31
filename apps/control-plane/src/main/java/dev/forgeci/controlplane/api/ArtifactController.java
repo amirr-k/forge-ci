@@ -35,13 +35,18 @@ public class ArtifactController {
             @RequestParam String digest,
             @RequestParam long size,
             @RequestBody byte[] content) {
-        Artifact artifact = remoteArtifactService.commit(projectId, cacheKey, digest, size, content);
+        Artifact artifact =
+                remoteArtifactService.commit(projectId, cacheKey, digest, size, content);
         return ArtifactResponse.from(artifact);
     }
 
-    @GetMapping(value = "/api/artifacts/lookup", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public ResponseEntity<byte[]> lookup(@RequestParam long projectId, @RequestParam String cacheKey) {
-        RemoteArtifactService.DownloadResult result = remoteArtifactService.download(cacheKey, projectId);
+    @GetMapping(
+            value = "/api/artifacts/lookup",
+            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<byte[]> lookup(
+            @RequestParam long projectId, @RequestParam String cacheKey) {
+        RemoteArtifactService.DownloadResult result =
+                remoteArtifactService.download(cacheKey, projectId);
         return ResponseEntity.ok()
                 .header("X-Artifact-Digest", result.digest())
                 .header("X-Artifact-Size", String.valueOf(result.content().length))

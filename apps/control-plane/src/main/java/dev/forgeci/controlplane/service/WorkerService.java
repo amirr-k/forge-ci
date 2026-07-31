@@ -16,10 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Registration and heartbeat for worker processes. A worker's {@code externalId} is its own
- * stable identity (e.g. a Compose replica name) — re-registering the same id after a restart
- * reactivates the existing row instead of creating a duplicate, matching this codebase's
- * idempotent-acceptance convention elsewhere.
+ * Registration and heartbeat for worker processes. A worker's {@code externalId} is its own stable
+ * identity (e.g. a Compose replica name) — re-registering the same id after a restart reactivates
+ * the existing row instead of creating a duplicate, matching this codebase's idempotent-acceptance
+ * convention elsewhere.
  *
  * <p>MySQL's {@code last_heartbeat_at} stays the sole authority on liveness — {@link
  * #markStaleWorkersUnhealthy()} sweeps it unconditionally regardless of Redis's state. The Redis
@@ -29,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkerService {
 
-    /** A worker missing this many heartbeat intervals is marked unhealthy and excluded from claims. */
+    /**
+     * A worker missing this many heartbeat intervals is marked unhealthy and excluded from claims.
+     */
     private static final int MISSED_HEARTBEATS_BEFORE_UNHEALTHY = 3;
 
     private static final Logger log = LoggerFactory.getLogger(WorkerService.class);
@@ -50,15 +52,27 @@ public class WorkerService {
     }
 
     @Transactional
-    public Worker register(String externalId, List<String> capabilities, int maxConcurrency, String versionLabel) {
+    public Worker register(
+            String externalId, List<String> capabilities, int maxConcurrency, String versionLabel) {
         Worker worker =
                 workerRepository
                         .findByExternalId(externalId)
-                        .orElseGet(() -> workerRepository.save(new Worker(externalId, capabilities, maxConcurrency, versionLabel)));
+                        .orElseGet(
+                                () ->
+                                        workerRepository.save(
+                                                new Worker(
+                                                        externalId,
+                                                        capabilities,
+                                                        maxConcurrency,
+                                                        versionLabel)));
         worker.setState(WorkerState.ACTIVE);
         worker.setLastHeartbeatAt(Instant.now());
         worker.setCrashRequested(false);
-        log.info("worker {} ({}) registered, maxConcurrency={}", externalId, worker.getId(), maxConcurrency);
+        log.info(
+                "worker {} ({}) registered, maxConcurrency={}",
+                externalId,
+                worker.getId(),
+                maxConcurrency);
         markAliveInRedis(worker.getId());
         return worker;
     }
@@ -68,7 +82,11 @@ public class WorkerService {
     /** Consumes (clears) any pending crash-injection request in the same transaction it reports. */
     @Transactional
     public HeartbeatResult heartbeat(Long workerId) {
-        Worker worker = workerRepository.findById(workerId).orElseThrow(() -> new NotFoundException("worker " + workerId + " not found"));
+        Worker worker =
+                workerRepository
+                        .findById(workerId)
+                        .orElseThrow(
+                                () -> new NotFoundException("worker " + workerId + " not found"));
         worker.setLastHeartbeatAt(Instant.now());
         worker.setState(WorkerState.ACTIVE);
         boolean shouldCrash = worker.isCrashRequested();
@@ -77,10 +95,17 @@ public class WorkerService {
         return new HeartbeatResult(worker, shouldCrash);
     }
 
-    /** Backend half of crash injection (architecture.md's worker protocol) — the actual halt happens worker-side on its next heartbeat. */
+    /**
+     * Backend half of crash injection (architecture.md's worker protocol) — the actual halt happens
+     * worker-side on its next heartbeat.
+     */
     @Transactional
     public void requestCrash(Long workerId) {
-        Worker worker = workerRepository.findById(workerId).orElseThrow(() -> new NotFoundException("worker " + workerId + " not found"));
+        Worker worker =
+                workerRepository
+                        .findById(workerId)
+                        .orElseThrow(
+                                () -> new NotFoundException("worker " + workerId + " not found"));
         worker.setCrashRequested(true);
         log.info("crash requested for worker {} ({})", worker.getExternalId(), workerId);
     }
@@ -89,15 +114,23 @@ public class WorkerService {
         return heartbeatInterval;
     }
 
-    /** Runs at the heartbeat cadence: a worker silent for {@link #MISSED_HEARTBEATS_BEFORE_UNHEALTHY} intervals stops receiving claims. */
+    /**
+     * Runs at the heartbeat cadence: a worker silent for {@link
+     * #MISSED_HEARTBEATS_BEFORE_UNHEALTHY} intervals stops receiving claims.
+     */
     @Scheduled(fixedDelayString = "${forge.worker.heartbeat-interval-ms:5000}")
     @Transactional
     public void markStaleWorkersUnhealthy() {
         Instant cutoff = Instant.now().minus(unhealthyAfter);
-        List<Worker> stale = workerRepository.findByStateAndLastHeartbeatAtBefore(WorkerState.ACTIVE, cutoff);
+        List<Worker> stale =
+                workerRepository.findByStateAndLastHeartbeatAtBefore(WorkerState.ACTIVE, cutoff);
         for (Worker worker : stale) {
             worker.setState(WorkerState.UNHEALTHY);
-            log.warn("worker {} ({}) marked unhealthy — no heartbeat since {}", worker.getExternalId(), worker.getId(), worker.getLastHeartbeatAt());
+            log.warn(
+                    "worker {} ({}) marked unhealthy — no heartbeat since {}",
+                    worker.getExternalId(),
+                    worker.getId(),
+                    worker.getLastHeartbeatAt());
         }
     }
 
@@ -112,7 +145,11 @@ public class WorkerService {
         workerRepository
                 .findById(workerId)
                 .filter(w -> w.getState() == WorkerState.ACTIVE)
-                .filter(w -> w.getLastHeartbeatAt() == null || w.getLastHeartbeatAt().isBefore(Instant.now().minus(unhealthyAfter)))
+                .filter(
+                        w ->
+                                w.getLastHeartbeatAt() == null
+                                        || w.getLastHeartbeatAt()
+                                                .isBefore(Instant.now().minus(unhealthyAfter)))
                 .ifPresent(
                         worker -> {
                             worker.setState(WorkerState.UNHEALTHY);
@@ -134,13 +171,18 @@ public class WorkerService {
     public void reconcileRedisFromDatabase() {
         try {
             Instant cutoff = Instant.now().minus(unhealthyAfter);
-            for (Worker worker : workerRepository.findByStateAndLastHeartbeatAtBefore(WorkerState.ACTIVE, Instant.now())) {
-                if (worker.getLastHeartbeatAt() != null && worker.getLastHeartbeatAt().isAfter(cutoff)) {
+            for (Worker worker :
+                    workerRepository.findByStateAndLastHeartbeatAtBefore(
+                            WorkerState.ACTIVE, Instant.now())) {
+                if (worker.getLastHeartbeatAt() != null
+                        && worker.getLastHeartbeatAt().isAfter(cutoff)) {
                     markAliveInRedis(worker.getId());
                 }
             }
         } catch (RuntimeException redisUnavailable) {
-            log.debug("skipping Redis heartbeat reconciliation, Redis unavailable: {}", redisUnavailable.getMessage());
+            log.debug(
+                    "skipping Redis heartbeat reconciliation, Redis unavailable: {}",
+                    redisUnavailable.getMessage());
         }
     }
 
@@ -148,7 +190,10 @@ public class WorkerService {
         try {
             redis.opsForValue().set(RedisKeys.heartbeat(workerId), "1", unhealthyAfter);
         } catch (RuntimeException redisUnavailable) {
-            log.debug("could not mark worker {} alive in Redis: {}", workerId, redisUnavailable.getMessage());
+            log.debug(
+                    "could not mark worker {} alive in Redis: {}",
+                    workerId,
+                    redisUnavailable.getMessage());
         }
     }
 }

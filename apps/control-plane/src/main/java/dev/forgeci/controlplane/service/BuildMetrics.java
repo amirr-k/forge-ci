@@ -10,7 +10,9 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import org.springframework.stereotype.Component;
 
-/** Real counters/timers driven by genuine state transitions — never a hardcoded or sampled value. */
+/**
+ * Real counters/timers driven by genuine state transitions — never a hardcoded or sampled value.
+ */
 @Component
 public class BuildMetrics {
 
@@ -24,18 +26,36 @@ public class BuildMetrics {
     private final Counter taskRetries;
     private final Counter leaseExpirations;
 
-    public BuildMetrics(MeterRegistry registry, TaskRunRepository taskRunRepository, WorkerRepository workerRepository) {
+    public BuildMetrics(
+            MeterRegistry registry,
+            TaskRunRepository taskRunRepository,
+            WorkerRepository workerRepository) {
         this.buildsStarted = Counter.builder("forge.builds.started").register(registry);
-        this.buildsSucceeded = Counter.builder("forge.builds.completed").tag("result", "succeeded").register(registry);
-        this.buildsFailed = Counter.builder("forge.builds.completed").tag("result", "failed").register(registry);
-        this.buildsCanceled = Counter.builder("forge.builds.completed").tag("result", "canceled").register(registry);
+        this.buildsSucceeded =
+                Counter.builder("forge.builds.completed")
+                        .tag("result", "succeeded")
+                        .register(registry);
+        this.buildsFailed =
+                Counter.builder("forge.builds.completed")
+                        .tag("result", "failed")
+                        .register(registry);
+        this.buildsCanceled =
+                Counter.builder("forge.builds.completed")
+                        .tag("result", "canceled")
+                        .register(registry);
         this.buildDuration = Timer.builder("forge.builds.duration").register(registry);
         this.taskDuration = Timer.builder("forge.tasks.duration").register(registry);
         this.taskAttempts = Counter.builder("forge.tasks.attempts").register(registry);
         this.taskRetries = Counter.builder("forge.tasks.retries").register(registry);
         this.leaseExpirations = Counter.builder("forge.tasks.lease_expirations").register(registry);
-        registry.gauge("forge.scheduler.ready_queue_depth", taskRunRepository, repo -> repo.countByState(TaskRunState.READY));
-        registry.gauge("forge.workers.active", workerRepository, repo -> repo.countByState(WorkerState.ACTIVE));
+        registry.gauge(
+                "forge.scheduler.ready_queue_depth",
+                taskRunRepository,
+                repo -> repo.countByState(TaskRunState.READY));
+        registry.gauge(
+                "forge.workers.active",
+                workerRepository,
+                repo -> repo.countByState(WorkerState.ACTIVE));
     }
 
     public void buildStarted() {

@@ -14,7 +14,10 @@ import java.util.TreeSet;
  * @param fullBuild true when every task was selected on purpose rather than by change analysis
  */
 public record BuildPlan(
-        List<String> changedPaths, List<AffectedTask> selected, List<String> unaffected, boolean fullBuild) {
+        List<String> changedPaths,
+        List<AffectedTask> selected,
+        List<String> unaffected,
+        boolean fullBuild) {
 
     public BuildPlan {
         changedPaths = List.copyOf(new TreeSet<>(changedPaths));

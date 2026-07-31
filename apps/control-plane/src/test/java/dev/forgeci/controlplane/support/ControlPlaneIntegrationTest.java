@@ -21,7 +21,8 @@ public abstract class ControlPlaneIntegrationTest {
         registry.add("forge.artifacts.s3.secret-key", MinioTestContainer.INSTANCE::getPassword);
         registry.add("forge.artifacts.s3.bucket", () -> "forgeci-artifacts-test");
 
-        registry.add("spring.kafka.bootstrap-servers", KafkaTestContainer.INSTANCE::getBootstrapServers);
+        registry.add(
+                "spring.kafka.bootstrap-servers", KafkaTestContainer.INSTANCE::getBootstrapServers);
 
         registry.add("spring.data.redis.host", RedisTestContainer::host);
         registry.add("spring.data.redis.port", RedisTestContainer::port);

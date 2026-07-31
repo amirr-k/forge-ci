@@ -11,7 +11,9 @@ import java.util.HexFormat;
 /** SHA-256 content hashing, the digest algorithm every cache-key contributor is built from. */
 public final class Digests {
 
-    /** The digest of zero bytes — the stand-in for "no output" (an empty archive, an empty list). */
+    /**
+     * The digest of zero bytes — the stand-in for "no output" (an empty archive, an empty list).
+     */
     public static final String EMPTY = sha256(new byte[0]);
 
     private Digests() {}

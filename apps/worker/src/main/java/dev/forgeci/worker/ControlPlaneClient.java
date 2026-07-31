@@ -17,7 +17,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 
-/** The worker side of the REST worker protocol fixed in spec/reference/architecture.md#worker-protocol. */
+/**
+ * The worker side of the REST worker protocol fixed in
+ * spec/reference/architecture.md#worker-protocol.
+ */
 public final class ControlPlaneClient {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -39,29 +42,41 @@ public final class ControlPlaneClient {
     public WorkerRegistrationResponse register(WorkerRegistrationRequest request) {
         HttpResponse<String> response = post("/api/workers/register", request);
         if (response.statusCode() != 201) {
-            throw new ControlPlaneUnavailableException("worker registration failed: HTTP " + response.statusCode() + " " + response.body());
+            throw new ControlPlaneUnavailableException(
+                    "worker registration failed: HTTP "
+                            + response.statusCode()
+                            + " "
+                            + response.body());
         }
         return readValue(response.body(), WorkerRegistrationResponse.class);
     }
 
     public HeartbeatResponse heartbeat(long workerId) {
-        HttpRequest request = requestBuilder("/api/workers/" + workerId + "/heartbeat").POST(HttpRequest.BodyPublishers.noBody()).build();
+        HttpRequest request =
+                requestBuilder("/api/workers/" + workerId + "/heartbeat")
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build();
         HttpResponse<String> response = send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
-            throw new ControlPlaneUnavailableException("heartbeat failed: HTTP " + response.statusCode());
+            throw new ControlPlaneUnavailableException(
+                    "heartbeat failed: HTTP " + response.statusCode());
         }
         return readValue(response.body(), HeartbeatResponse.class);
     }
 
     /** Empty means no claimable task run right now — not an error, the caller should poll again. */
     public Optional<ClaimedTaskResponse> claim(long workerId) {
-        HttpRequest request = requestBuilder("/api/workers/" + workerId + "/claim").POST(HttpRequest.BodyPublishers.noBody()).build();
+        HttpRequest request =
+                requestBuilder("/api/workers/" + workerId + "/claim")
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build();
         HttpResponse<String> response = send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 204) {
             return Optional.empty();
         }
         if (response.statusCode() != 200) {
-            throw new ControlPlaneUnavailableException("claim failed: HTTP " + response.statusCode() + " " + response.body());
+            throw new ControlPlaneUnavailableException(
+                    "claim failed: HTTP " + response.statusCode() + " " + response.body());
         }
         return Optional.of(readValue(response.body(), ClaimedTaskResponse.class));
     }
@@ -69,14 +84,16 @@ public final class ControlPlaneClient {
     public void appendLogs(long taskRunId, LogChunkRequest request) {
         HttpResponse<String> response = post("/api/task-runs/" + taskRunId + "/logs", request);
         if (response.statusCode() != 204) {
-            throw new ControlPlaneUnavailableException("log append failed: HTTP " + response.statusCode() + " " + response.body());
+            throw new ControlPlaneUnavailableException(
+                    "log append failed: HTTP " + response.statusCode() + " " + response.body());
         }
     }
 
     public void reportResult(long taskRunId, TaskResultReportRequest request) {
         HttpResponse<String> response = post("/api/task-runs/" + taskRunId + "/result", request);
         if (response.statusCode() != 204) {
-            throw new ControlPlaneUnavailableException("result report failed: HTTP " + response.statusCode() + " " + response.body());
+            throw new ControlPlaneUnavailableException(
+                    "result report failed: HTTP " + response.statusCode() + " " + response.body());
         }
     }
 
@@ -84,7 +101,9 @@ public final class ControlPlaneClient {
         HttpRequest request =
                 requestBuilder(path)
                         .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(writeValue(body), StandardCharsets.UTF_8))
+                        .POST(
+                                HttpRequest.BodyPublishers.ofString(
+                                        writeValue(body), StandardCharsets.UTF_8))
                         .build();
         return send(request, HttpResponse.BodyHandlers.ofString());
     }
@@ -97,10 +116,12 @@ public final class ControlPlaneClient {
         try {
             return client.send(request, handler);
         } catch (IOException e) {
-            throw new ControlPlaneUnavailableException("could not reach control plane at " + baseUri + ": " + e.getMessage());
+            throw new ControlPlaneUnavailableException(
+                    "could not reach control plane at " + baseUri + ": " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ControlPlaneUnavailableException("interrupted while calling control plane at " + baseUri);
+            throw new ControlPlaneUnavailableException(
+                    "interrupted while calling control plane at " + baseUri);
         }
     }
 

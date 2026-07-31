@@ -4,7 +4,10 @@ import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Parses the {@code forgeci.yml} duration form: a positive integer plus {@code ms}, {@code s}, {@code m}, or {@code h}. */
+/**
+ * Parses the {@code forgeci.yml} duration form: a positive integer plus {@code ms}, {@code s},
+ * {@code m}, or {@code h}.
+ */
 public final class Durations {
 
     private static final Pattern PATTERN = Pattern.compile("^([0-9]+)(ms|s|m|h)$");
@@ -18,7 +21,9 @@ public final class Durations {
         Matcher matcher = PATTERN.matcher(value);
         if (!matcher.matches()) {
             throw new IllegalArgumentException(
-                    "invalid duration '" + value + "' (expected a number followed by ms, s, m, or h)");
+                    "invalid duration '"
+                            + value
+                            + "' (expected a number followed by ms, s, m, or h)");
         }
         String digits = matcher.group(1);
         String unit = matcher.group(2);
@@ -48,6 +53,8 @@ public final class Durations {
         long totalMillis = Math.max(duration.toMillis(), 0);
         long minutes = totalMillis / 60_000;
         double seconds = (totalMillis % 60_000) / 1000.0;
-        return minutes == 0 ? String.format("%.1fs", seconds) : String.format("%dm%.1fs", minutes, seconds);
+        return minutes == 0
+                ? String.format("%.1fs", seconds)
+                : String.format("%dm%.1fs", minutes, seconds);
     }
 }

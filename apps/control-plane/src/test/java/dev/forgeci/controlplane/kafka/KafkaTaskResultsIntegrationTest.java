@@ -37,9 +37,9 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 /**
  * Kafka is an alternate, durable ingress for {@code forge.task-results} alongside the direct HTTP
- * report — proves the two required properties from phase 5's acceptance criteria: redelivery of
- * the same message never re-applies its effect, and a message that can never be parsed ends up on
- * the dead-letter topic instead of blocking the consumer.
+ * report — proves the two required properties from phase 5's acceptance criteria: redelivery of the
+ * same message never re-applies its effect, and a message that can never be parsed ends up on the
+ * dead-letter topic instead of blocking the consumer.
  */
 class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
 
@@ -61,9 +61,19 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
         ClaimedTaskResponse task = claimMine(workerId, "solo:build");
 
         TaskResultEvent event =
-                new TaskResultEvent(task.taskRunId(), task.workerId(), task.leaseToken(), task.attemptId(), true, 0, null, null);
+                new TaskResultEvent(
+                        task.taskRunId(),
+                        task.workerId(),
+                        task.leaseToken(),
+                        task.attemptId(),
+                        true,
+                        0,
+                        null,
+                        null);
 
-        kafkaTemplate.send(KafkaTopics.TASK_RESULTS, String.valueOf(task.taskRunId()), event).get(10, TimeUnit.SECONDS);
+        kafkaTemplate
+                .send(KafkaTopics.TASK_RESULTS, String.valueOf(task.taskRunId()), event)
+                .get(10, TimeUnit.SECONDS);
         awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
         TaskRun afterFirstDelivery = taskRunRepository.findById(task.taskRunId()).orElseThrow();
@@ -71,11 +81,16 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
         int attemptCountFirst = afterFirstDelivery.getAttemptCount();
 
         // redeliver the identical message — as a rebalance or an at-least-once retry would
-        kafkaTemplate.send(KafkaTopics.TASK_RESULTS, String.valueOf(task.taskRunId()), event).get(10, TimeUnit.SECONDS);
-        Thread.sleep(1500); // give the (idle, no-op) redelivery a moment to have been processed if it were going to do anything
+        kafkaTemplate
+                .send(KafkaTopics.TASK_RESULTS, String.valueOf(task.taskRunId()), event)
+                .get(10, TimeUnit.SECONDS);
+        Thread.sleep(
+                1500); // give the (idle, no-op) redelivery a moment to have been processed if it
+        // were going to do anything
 
         TaskRun afterRedelivery = taskRunRepository.findById(task.taskRunId()).orElseThrow();
-        assertThat(afterRedelivery.getState()).isEqualTo(dev.forgeci.controlplane.domain.TaskRunState.SUCCEEDED);
+        assertThat(afterRedelivery.getState())
+                .isEqualTo(dev.forgeci.controlplane.domain.TaskRunState.SUCCEEDED);
         assertThat(afterRedelivery.getCompletedAt()).isEqualTo(completedAtFirst);
         assertThat(afterRedelivery.getAttemptCount()).isEqualTo(attemptCountFirst);
         assertThat(getBuild(build.id()).state()).isEqualTo(BuildState.SUCCEEDED);
@@ -87,32 +102,48 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
         String dlTopic = KafkaTopics.TASK_RESULTS + KafkaTopics.DEAD_LETTER_SUFFIX;
 
         try (KafkaProducer<String, String> rawProducer = rawStringProducer();
-                KafkaConsumer<String, String> dlConsumer = rawStringConsumer("dlt-watcher-" + UUID.randomUUID())) {
+                KafkaConsumer<String, String> dlConsumer =
+                        rawStringConsumer("dlt-watcher-" + UUID.randomUUID())) {
             dlConsumer.subscribe(List.of(dlTopic));
             // prime the subscription so the poll below doesn't miss the record due to partition
             // assignment happening after the send
             dlConsumer.poll(Duration.ofMillis(500));
 
-            rawProducer.send(new ProducerRecord<>(KafkaTopics.TASK_RESULTS, key, "this is not valid JSON at all"));
+            rawProducer.send(
+                    new ProducerRecord<>(
+                            KafkaTopics.TASK_RESULTS, key, "this is not valid JSON at all"));
             rawProducer.flush();
 
-            ConsumerRecord<String, String> deadLettered = KafkaTestUtils.getSingleRecord(dlConsumer, dlTopic, Duration.ofSeconds(30));
+            ConsumerRecord<String, String> deadLettered =
+                    KafkaTestUtils.getSingleRecord(dlConsumer, dlTopic, Duration.ofSeconds(30));
             assertThat(deadLettered.key()).isEqualTo(key);
         }
     }
 
     private ClaimedTaskResponse claimMine(long workerId, String taskName) {
         for (int i = 0; i < 100; i++) {
-            var response = rest.postForEntity("/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
+            var response =
+                    rest.postForEntity(
+                            "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
             if (response.getStatusCode().value() == 200 && response.getBody() != null) {
                 if (response.getBody().taskName().equals(taskName)) {
                     return response.getBody();
                 }
-                // foreign leftover from another test's global-queue backlog — harmlessly complete it
+                // foreign leftover from another test's global-queue backlog — harmlessly complete
+                // it
                 var report =
                         new dev.forgeci.protocol.TaskResultReportRequest(
-                                response.getBody().workerId(), response.getBody().leaseToken(), response.getBody().attemptId(), true, 0, null, null);
-                rest.postForEntity("/api/task-runs/" + response.getBody().taskRunId() + "/result", report, Void.class);
+                                response.getBody().workerId(),
+                                response.getBody().leaseToken(),
+                                response.getBody().attemptId(),
+                                true,
+                                0,
+                                null,
+                                null);
+                rest.postForEntity(
+                        "/api/task-runs/" + response.getBody().taskRunId() + "/result",
+                        report,
+                        Void.class);
                 continue;
             }
             try {
@@ -135,13 +166,16 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
     }
 
     private long registerProject() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         return project.id();
     }
 
     private BuildResponse createBuild(long projectId, Long planSubmissionId) {
         return rest.postForObject(
-                "/api/projects/" + projectId + "/builds", new BuildCreationRequest(planSubmissionId, "manual", 0), BuildResponse.class);
+                "/api/projects/" + projectId + "/builds",
+                new BuildCreationRequest(planSubmissionId, "manual", 0),
+                BuildResponse.class);
     }
 
     private BuildResponse getBuild(Long buildId) {
@@ -151,13 +185,17 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
     private long registerWorker(String externalId) {
         WorkerRegistrationResponse response =
                 rest.postForObject(
-                        "/api/workers/register", new WorkerRegistrationRequest(externalId, List.of(), 1, "test"), WorkerRegistrationResponse.class);
+                        "/api/workers/register",
+                        new WorkerRegistrationRequest(externalId, List.of(), 1, "test"),
+                        WorkerRegistrationResponse.class);
         return response.workerId();
     }
 
     private static KafkaProducer<String, String> rawStringProducer() {
         Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaTestContainer.INSTANCE.getBootstrapServers());
+        props.put(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                KafkaTestContainer.INSTANCE.getBootstrapServers());
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return new KafkaProducer<>(props);
@@ -165,7 +203,8 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
 
     private static KafkaConsumer<String, String> rawStringConsumer(String groupId) {
         Map<String, Object> props =
-                KafkaTestUtils.consumerProps(KafkaTestContainer.INSTANCE.getBootstrapServers(), groupId, "true");
+                KafkaTestUtils.consumerProps(
+                        KafkaTestContainer.INSTANCE.getBootstrapServers(), groupId, "true");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");

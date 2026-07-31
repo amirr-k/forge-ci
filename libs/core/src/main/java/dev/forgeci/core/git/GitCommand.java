@@ -30,7 +30,8 @@ final class GitCommand {
                             + "). Install Git and make sure it is on your PATH.");
         }
 
-        // both streams are drained concurrently: a chatty git must never fill a pipe and deadlock us,
+        // both streams are drained concurrently: a chatty git must never fill a pipe and deadlock
+        // us,
         // and waiting on the process itself is what makes the timeout below able to fire
         StringBuffer stdout = new StringBuffer();
         StringBuffer stderr = new StringBuffer();
@@ -40,7 +41,8 @@ final class GitCommand {
         try {
             if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new GitException(describe(arguments) + " timed out after " + TIMEOUT_SECONDS + "s");
+                throw new GitException(
+                        describe(arguments) + " timed out after " + TIMEOUT_SECONDS + "s");
             }
             drainOut.join();
             drainErr.join();
@@ -76,9 +78,11 @@ final class GitCommand {
                 new Thread(
                         () -> {
                             try (stream) {
-                                into.append(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+                                into.append(
+                                        new String(stream.readAllBytes(), StandardCharsets.UTF_8));
                             } catch (IOException e) {
-                                // the process died mid-read; its exit code is what decides the outcome
+                                // the process died mid-read; its exit code is what decides the
+                                // outcome
                             }
                         },
                         "forge-git-drain");

@@ -21,7 +21,8 @@ public class BuildStateMachine {
     private static final Map<BuildState, Set<BuildState>> ALLOWED =
             Map.of(
                     BuildState.CREATED, Set.of(BuildState.PLANNING, BuildState.CANCELED),
-                    BuildState.PLANNING, Set.of(BuildState.RUNNING, BuildState.CANCELED, BuildState.FAILED),
+                    BuildState.PLANNING,
+                            Set.of(BuildState.RUNNING, BuildState.CANCELED, BuildState.FAILED),
                     BuildState.RUNNING,
                             Set.of(BuildState.SUCCEEDED, BuildState.FAILED, BuildState.CANCELED),
                     BuildState.SUCCEEDED, Set.of(),
@@ -56,16 +57,23 @@ public class BuildStateMachine {
         Build build =
                 buildRepository
                         .findByIdForUpdate(buildId)
-                        .orElseThrow(() -> new NotFoundException("build " + buildId + " not found"));
+                        .orElseThrow(
+                                () -> new NotFoundException("build " + buildId + " not found"));
 
         if (build.getVersion() != expectedVersion) {
             throw new StaleTransitionException(
-                    "build " + buildId + " expected version " + expectedVersion + " but was " + build.getVersion());
+                    "build "
+                            + buildId
+                            + " expected version "
+                            + expectedVersion
+                            + " but was "
+                            + build.getVersion());
         }
 
         BuildState current = build.getState();
         if (!ALLOWED.getOrDefault(current, Set.of()).contains(target)) {
-            throw new InvalidTransitionException("build " + buildId + " cannot move from " + current + " to " + target);
+            throw new InvalidTransitionException(
+                    "build " + buildId + " cannot move from " + current + " to " + target);
         }
 
         build.setState(target);
@@ -75,7 +83,8 @@ public class BuildStateMachine {
         } else if (target.isTerminal()) {
             build.setCompletedAt(now);
         }
-        // flush now so the returned entity's bumped version is visible to a caller chaining transitions
+        // flush now so the returned entity's bumped version is visible to a caller chaining
+        // transitions
         Build saved = buildRepository.saveAndFlush(build);
 
         events.publish(

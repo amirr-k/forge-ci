@@ -17,8 +17,8 @@ public interface BuildRepository extends JpaRepository<Build, Long> {
     Page<Build> findByProjectIdOrderByCreatedAtDesc(Long projectId, Pageable pageable);
 
     /**
-     * Locks the build row for the duration of the transaction so a state transition and its
-     * {@code BuildEvent} sequence-number allocation happen atomically under concurrent submissions.
+     * Locks the build row for the duration of the transaction so a state transition and its {@code
+     * BuildEvent} sequence-number allocation happen atomically under concurrent submissions.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from Build b where b.id = :id")

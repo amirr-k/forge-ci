@@ -24,14 +24,21 @@ final class DoctorCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         Path directory = ProjectWorkspace.currentDirectory();
-        List<Check> checks = List.of(javaCheck(), gitCheck(directory), repositoryCheck(directory), configCheck());
+        List<Check> checks =
+                List.of(
+                        javaCheck(),
+                        gitCheck(directory),
+                        repositoryCheck(directory),
+                        configCheck());
 
         PrintWriter out = spec.commandLine().getOut();
         out.println("ForgeCI doctor");
         out.println();
         for (Check check : checks) {
             out.println(
-                    String.format("  %-14s %-5s %s", check.name(), check.ok() ? "OK" : "FAIL", check.detail()));
+                    String.format(
+                            "  %-14s %-5s %s",
+                            check.name(), check.ok() ? "OK" : "FAIL", check.detail()));
         }
 
         List<String> failed = new ArrayList<>();
@@ -95,7 +102,8 @@ final class DoctorCommand implements Callable<Integer> {
         try {
             ProjectWorkspace workspace = ProjectWorkspace.load();
             return Check.ok(
-                    "configuration", "forgeci.yml: " + workspace.graph().size() + " tasks, no cycles");
+                    "configuration",
+                    "forgeci.yml: " + workspace.graph().size() + " tasks, no cycles");
         } catch (RuntimeException e) {
             return Check.fail("configuration", e.getMessage());
         }

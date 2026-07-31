@@ -25,7 +25,8 @@ final class InitCommand implements Callable<Integer> {
 
         try {
             // CREATE_NEW rather than an exists() check, so two concurrent inits cannot both write
-            Files.writeString(configFile, template(projectName(directory)), StandardOpenOption.CREATE_NEW);
+            Files.writeString(
+                    configFile, template(projectName(directory)), StandardOpenOption.CREATE_NEW);
         } catch (FileAlreadyExistsException e) {
             throw new CliException(
                     configFile

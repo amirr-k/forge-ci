@@ -45,7 +45,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("unsupported schema version 2"));
     }
 
@@ -63,7 +65,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("unknown field 'extra'"));
     }
 
@@ -81,7 +85,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("tasks.a"));
         assertTrue(exception.getMessage().contains("unknown field 'bogus'"));
     }
@@ -99,7 +105,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("not a shell string"));
     }
 
@@ -116,7 +124,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("project.name"));
     }
 
@@ -134,7 +144,9 @@ class ForgeConfigParserTest {
                 """;
 
         ConfigValidationException exception =
-                assertThrows(ConfigValidationException.class, () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
+                assertThrows(
+                        ConfigValidationException.class,
+                        () -> ForgeConfigParser.parse(yaml, "forgeci.yml"));
         assertTrue(exception.getMessage().contains("invalid duration"));
     }
 
@@ -145,7 +157,9 @@ class ForgeConfigParserTest {
                         ConfigValidationException.class,
                         () -> ForgeConfigParser.parse(fixture("missing-task.yml")));
 
-        assertTrue(exception.getMessage().contains("forgeci.yml") || exception.getMessage().contains("missing-task.yml"));
+        assertTrue(
+                exception.getMessage().contains("forgeci.yml")
+                        || exception.getMessage().contains("missing-task.yml"));
         assertTrue(exception.getMessage().contains("checkout:integration.depends_on"));
         assertTrue(exception.getMessage().contains("undefined task 'pricing:build'"));
     }

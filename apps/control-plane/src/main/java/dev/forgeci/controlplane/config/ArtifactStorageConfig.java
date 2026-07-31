@@ -33,7 +33,8 @@ public class ArtifactStorageConfig {
             if (!props.getAccessKey().isBlank()) {
                 builder.credentialsProvider(
                         StaticCredentialsProvider.create(
-                                AwsBasicCredentials.create(props.getAccessKey(), props.getSecretKey())));
+                                AwsBasicCredentials.create(
+                                        props.getAccessKey(), props.getSecretKey())));
             }
         } else {
             builder.credentialsProvider(DefaultCredentialsProvider.create());
@@ -48,7 +49,10 @@ public class ArtifactStorageConfig {
         return Clock.systemUTC();
     }
 
-    /** Dev/test convenience only — production buckets are provisioned out of band, not created on boot. */
+    /**
+     * Dev/test convenience only — production buckets are provisioned out of band, not created on
+     * boot.
+     */
     private void ensureBucket(S3Client client, String bucket) {
         try {
             client.headBucket(b -> b.bucket(bucket));

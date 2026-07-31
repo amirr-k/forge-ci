@@ -11,12 +11,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Owns the single mutable, on-disk copy of the bundled demo repo that the control plane hashes
- * task inputs against. Workers execute the same {@code scripts/apply-scenario} against their own
- * shared workspace volume (apps/worker/Dockerfile, deploy/compose.yaml) — this class never talks
- * to that volume directly, it only needs its own copy to produce real, content-derived cache keys.
- * Both copies apply the identical script for the identical scenario id, so they always agree on
- * content even though they're on different hosts.
+ * Owns the single mutable, on-disk copy of the bundled demo repo that the control plane hashes task
+ * inputs against. Workers execute the same {@code scripts/apply-scenario} against their own shared
+ * workspace volume (apps/worker/Dockerfile, deploy/compose.yaml) — this class never talks to that
+ * volume directly, it only needs its own copy to produce real, content-derived cache keys. Both
+ * copies apply the identical script for the identical scenario id, so they always agree on content
+ * even though they're on different hosts.
  */
 @Component
 public class DemoWorkspace {
@@ -25,7 +25,8 @@ public class DemoWorkspace {
     private final Path workspace;
 
     public DemoWorkspace(
-            @Value("${forge.demo.repo-path}") String sourceRepo, @Value("${forge.demo.workspace-path}") String workspace) {
+            @Value("${forge.demo.repo-path}") String sourceRepo,
+            @Value("${forge.demo.workspace-path}") String workspace) {
         this.sourceRepo = Path.of(sourceRepo);
         this.workspace = Path.of(workspace);
     }
@@ -55,13 +56,15 @@ public class DemoWorkspace {
             String output = new String(process.getInputStream().readAllBytes());
             int exit = process.waitFor();
             if (exit != 0) {
-                throw new IllegalStateException("apply-scenario " + scenario.scriptId() + " failed: " + output);
+                throw new IllegalStateException(
+                        "apply-scenario " + scenario.scriptId() + " failed: " + output);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("interrupted applying demo scenario " + scenario.scriptId(), e);
+            throw new IllegalStateException(
+                    "interrupted applying demo scenario " + scenario.scriptId(), e);
         }
         return workspace;
     }
@@ -79,19 +82,23 @@ public class DemoWorkspace {
         }
     }
 
-    /** Test/dev support: drop the mutable copy so the next {@link #ensureSeeded()} reseeds clean. */
+    /**
+     * Test/dev support: drop the mutable copy so the next {@link #ensureSeeded()} reseeds clean.
+     */
     void reset() {
         if (!Files.exists(workspace)) {
             return;
         }
         try (Stream<Path> files = Files.walk(workspace)) {
-            files.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.delete(path);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+            files.sorted(Comparator.reverseOrder())
+                    .forEach(
+                            path -> {
+                                try {
+                                    Files.delete(path);
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

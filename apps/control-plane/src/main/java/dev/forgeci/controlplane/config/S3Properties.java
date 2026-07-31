@@ -6,8 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * S3 (or S3-compatible) settings for remote artifact storage. Leaving {@code endpointOverride}
  * blank targets real AWS S3 with the default credentials provider chain; setting it (Compose dev,
- * tests) switches to a path-style-addressed compatible service with static credentials — the
- * client code never branches on which one it is talking to.
+ * tests) switches to a path-style-addressed compatible service with static credentials — the client
+ * code never branches on which one it is talking to.
  */
 @ConfigurationProperties(prefix = "forge.artifacts.s3")
 public class S3Properties {
@@ -98,7 +98,10 @@ public class S3Properties {
         return endpointOverride != null && !endpointOverride.isBlank();
     }
 
-    /** {@code artifacts/<first two digest chars>/<digest>} — the one bucket-key convention workers reuse in phase 5. */
+    /**
+     * {@code artifacts/<first two digest chars>/<digest>} — the one bucket-key convention workers
+     * reuse in phase 5.
+     */
     public String objectKey(String digest) {
         return objectPrefix + digest.substring(0, 2) + "/" + digest;
     }

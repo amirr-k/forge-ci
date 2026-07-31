@@ -12,8 +12,8 @@ import java.util.TreeSet;
 
 /**
  * Computes the affected-task closure for a changed-path set: tasks whose declared inputs match a
- * changed path directly, plus every task reachable by following dependents from there (their
- * output may depend on the changed task's output).
+ * changed path directly, plus every task reachable by following dependents from there (their output
+ * may depend on the changed task's output).
  */
 public final class AffectedTaskAnalyzer {
 
@@ -58,7 +58,8 @@ public final class AffectedTaskAnalyzer {
         return new AffectedResult(affected, unaffected);
     }
 
-    private static boolean matchesAnyInput(TaskGraph graph, String taskName, Set<String> changedPaths) {
+    private static boolean matchesAnyInput(
+            TaskGraph graph, String taskName, Set<String> changedPaths) {
         List<String> inputs = graph.task(taskName).inputs();
         for (String changedPath : changedPaths) {
             for (String pattern : inputs) {

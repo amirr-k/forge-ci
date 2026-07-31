@@ -22,7 +22,8 @@ public class PlanSubmissionController {
 
     @PostMapping("/api/projects/{id}/plans")
     @ResponseStatus(HttpStatus.CREATED)
-    public PlanSubmissionResponse submit(@PathVariable("id") Long projectId, @Valid @RequestBody PlanSubmissionRequest request) {
+    public PlanSubmissionResponse submit(
+            @PathVariable("id") Long projectId, @Valid @RequestBody PlanSubmissionRequest request) {
         return PlanSubmissionResponse.from(planSubmissionService.submit(projectId, request));
     }
 }

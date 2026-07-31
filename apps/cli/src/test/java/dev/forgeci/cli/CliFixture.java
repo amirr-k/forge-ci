@@ -8,9 +8,9 @@ import java.nio.file.Path;
 import picocli.CommandLine;
 
 /**
- * Runs the CLI against a temporary project. Commands read the working directory from
- * {@code user.dir} rather than the JVM's cached process directory, which is what lets a test point
- * them at a temporary project.
+ * Runs the CLI against a temporary project. Commands read the working directory from {@code
+ * user.dir} rather than the JVM's cached process directory, which is what lets a test point them at
+ * a temporary project.
  */
 final class CliFixture implements AutoCloseable {
 
@@ -97,7 +97,9 @@ final class CliFixture implements AutoCloseable {
         outWriter.flush();
         errWriter.flush();
         return new Result(
-                exitCode, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+                exitCode,
+                out.toString(StandardCharsets.UTF_8),
+                err.toString(StandardCharsets.UTF_8));
     }
 
     @Override

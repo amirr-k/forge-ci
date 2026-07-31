@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Live build progress for the public demo — Server-Sent Events over a short poll of MySQL's
- * ordered event log (BuildEventRepository), the one-way "push task/build state to the browser"
- * case contracts.md leaves open between SSE and WebSocket. Polling MySQL directly rather than
- * Kafka keeps this endpoint correct even when the Kafka mirror lags or drops a message — MySQL is
- * still the source of truth for accepted state (contracts.md#redis-responsibilities table).
+ * Live build progress for the public demo — Server-Sent Events over a short poll of MySQL's ordered
+ * event log (BuildEventRepository), the one-way "push task/build state to the browser" case
+ * contracts.md leaves open between SSE and WebSocket. Polling MySQL directly rather than Kafka
+ * keeps this endpoint correct even when the Kafka mirror lags or drops a message — MySQL is still
+ * the source of truth for accepted state (contracts.md#redis-responsibilities table).
  */
 @RestController
 public class BuildEventsController {
@@ -31,7 +31,8 @@ public class BuildEventsController {
     private final BuildService buildService;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-    public BuildEventsController(BuildEventRepository buildEventRepository, BuildService buildService) {
+    public BuildEventsController(
+            BuildEventRepository buildEventRepository, BuildService buildService) {
         this.buildEventRepository = buildEventRepository;
         this.buildService = buildService;
     }
@@ -42,7 +43,10 @@ public class BuildEventsController {
         long[] lastSequence = {0};
         var task =
                 scheduler.scheduleAtFixedRate(
-                        () -> poll(buildId, emitter, lastSequence), 0, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                        () -> poll(buildId, emitter, lastSequence),
+                        0,
+                        POLL_INTERVAL_MS,
+                        TimeUnit.MILLISECONDS);
         emitter.onCompletion(() -> task.cancel(true));
         emitter.onTimeout(() -> task.cancel(true));
         emitter.onError(t -> task.cancel(true));
@@ -51,10 +55,14 @@ public class BuildEventsController {
 
     private void poll(Long buildId, SseEmitter emitter, long[] lastSequence) {
         try {
-            List<BuildEvent> events = buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(buildId);
+            List<BuildEvent> events =
+                    buildEventRepository.findByBuildIdOrderBySequenceNumberAsc(buildId);
             for (BuildEvent event : events) {
                 if (event.getSequenceNumber() > lastSequence[0]) {
-                    emitter.send(SseEmitter.event().name("build-event").data(BuildEventResponse.from(event)));
+                    emitter.send(
+                            SseEmitter.event()
+                                    .name("build-event")
+                                    .data(BuildEventResponse.from(event)));
                     lastSequence[0] = event.getSequenceNumber();
                 }
             }

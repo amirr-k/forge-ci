@@ -79,7 +79,15 @@ public class PlanSubmission {
             int timeoutSeconds) {
         tasks.add(
                 new TaskDefinitionEntity(
-                        this, taskName, dependsOn, cacheKey, reason, command, outputs, environment, timeoutSeconds));
+                        this,
+                        taskName,
+                        dependsOn,
+                        cacheKey,
+                        reason,
+                        command,
+                        outputs,
+                        environment,
+                        timeoutSeconds));
     }
 
     public Long getId() {

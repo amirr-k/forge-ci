@@ -27,9 +27,8 @@ import org.springframework.util.backoff.FixedBackOff;
 /**
  * Kafka is durable event delivery only — MySQL stays authoritative for accepted task/build state
  * (spec/reference/contracts.md#kafka-responsibilities). A malformed message (fails to deserialize)
- * or one whose processing keeps failing after a bounded number of retries is routed to a
- * {@code <topic>.DLT} dead-letter topic instead of blocking the partition or crashing the
- * consumer thread.
+ * or one whose processing keeps failing after a bounded number of retries is routed to a {@code
+ * <topic>.DLT} dead-letter topic instead of blocking the partition or crashing the consumer thread.
  */
 @Configuration
 public class KafkaConfig {
@@ -50,12 +49,14 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
+    public KafkaTemplate<String, Object> kafkaTemplate(
+            ProducerFactory<String, Object> producerFactory) {
         return new KafkaTemplate<>(producerFactory);
     }
 
     @Bean
-    public ConsumerFactory<String, TaskResultEvent> taskResultConsumerFactory(KafkaProperties properties) {
+    public ConsumerFactory<String, TaskResultEvent> taskResultConsumerFactory(
+            KafkaProperties properties) {
         Map<String, Object> props = properties.buildConsumerProperties(null);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
@@ -68,17 +69,25 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, TaskResultEvent> taskResultListenerContainerFactory(
-            ConsumerFactory<String, TaskResultEvent> taskResultConsumerFactory, KafkaTemplate<String, Object> kafkaTemplate) {
-        ConcurrentKafkaListenerContainerFactory<String, TaskResultEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+    public ConcurrentKafkaListenerContainerFactory<String, TaskResultEvent>
+            taskResultListenerContainerFactory(
+                    ConsumerFactory<String, TaskResultEvent> taskResultConsumerFactory,
+                    KafkaTemplate<String, Object> kafkaTemplate) {
+        ConcurrentKafkaListenerContainerFactory<String, TaskResultEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(taskResultConsumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
 
         DeadLetterPublishingRecoverer recoverer =
                 new DeadLetterPublishingRecoverer(
                         kafkaTemplate,
-                        (record, ex) -> new TopicPartition(record.topic() + KafkaTopics.DEAD_LETTER_SUFFIX, record.partition()));
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(RETRY_BACKOFF_MS, MAX_DELIVERY_ATTEMPTS - 1L));
+                        (record, ex) ->
+                                new TopicPartition(
+                                        record.topic() + KafkaTopics.DEAD_LETTER_SUFFIX,
+                                        record.partition()));
+        DefaultErrorHandler errorHandler =
+                new DefaultErrorHandler(
+                        recoverer, new FixedBackOff(RETRY_BACKOFF_MS, MAX_DELIVERY_ATTEMPTS - 1L));
         errorHandler.setLogLevel(KafkaException.Level.WARN);
         factory.setCommonErrorHandler(errorHandler);
         return factory;

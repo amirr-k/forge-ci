@@ -24,12 +24,17 @@ class TempUploadCleanupServiceTest extends ControlPlaneIntegrationTest {
     void removesTempObjectsOlderThanTheTtlButLeavesFreshOnesAlone() {
         String abandonedKey = props.getTempPrefix() + UUID.randomUUID();
         String freshKey = props.getTempPrefix() + UUID.randomUUID();
-        s3.putObject(b -> b.bucket(props.getBucket()).key(abandonedKey), RequestBody.fromBytes(new byte[] {1}));
-        s3.putObject(b -> b.bucket(props.getBucket()).key(freshKey), RequestBody.fromBytes(new byte[] {2}));
+        s3.putObject(
+                b -> b.bucket(props.getBucket()).key(abandonedKey),
+                RequestBody.fromBytes(new byte[] {1}));
+        s3.putObject(
+                b -> b.bucket(props.getBucket()).key(freshKey),
+                RequestBody.fromBytes(new byte[] {2}));
 
         // sweep as if run well after the TTL — both objects were created "now," so this proves the
         // TTL check works without needing to actually wait an hour in a test
-        int deleted = cleanup.sweep(Instant.now().plus(props.getTempTtl()).plus(Duration.ofMinutes(1)));
+        int deleted =
+                cleanup.sweep(Instant.now().plus(props.getTempTtl()).plus(Duration.ofMinutes(1)));
 
         assertThat(deleted).isGreaterThanOrEqualTo(2);
         assertThatObjectIsGone(abandonedKey);
@@ -39,12 +44,17 @@ class TempUploadCleanupServiceTest extends ControlPlaneIntegrationTest {
     @Test
     void aSweepRightAfterUploadLeavesObjectsAlone() {
         String key = props.getTempPrefix() + UUID.randomUUID();
-        s3.putObject(b -> b.bucket(props.getBucket()).key(key), RequestBody.fromBytes(new byte[] {3}));
+        s3.putObject(
+                b -> b.bucket(props.getBucket()).key(key), RequestBody.fromBytes(new byte[] {3}));
 
         cleanup.sweep(Instant.now());
 
         var listing =
-                s3.listObjectsV2(ListObjectsV2Request.builder().bucket(props.getBucket()).prefix(key).build());
+                s3.listObjectsV2(
+                        ListObjectsV2Request.builder()
+                                .bucket(props.getBucket())
+                                .prefix(key)
+                                .build());
         assertThat(listing.contents()).anyMatch(o -> o.key().equals(key));
     }
 

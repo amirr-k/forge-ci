@@ -34,41 +34,58 @@ class CacheKeyPropertyTest {
 
     @ParameterizedTest(name = "seed {0}")
     @MethodSource("seeds")
-    void theSameCanonicalInputsAlwaysProduceTheSameKey(long seed, @TempDir Path directory) throws IOException {
+    void theSameCanonicalInputsAlwaysProduceTheSameKey(long seed, @TempDir Path directory)
+            throws IOException {
         Scenario scenario = Scenario.generate(seed, directory);
 
         CacheKey first = scenario.compute();
         // the same declaration spelled with its lists and maps in a different order
         CacheKey second = scenario.permuted(seed).compute();
 
-        assertEquals(first.value(), second.value(), "declaration order is not part of a task's identity");
+        assertEquals(
+                first.value(),
+                second.value(),
+                "declaration order is not part of a task's identity");
     }
 
     @ParameterizedTest(name = "seed {0}")
     @MethodSource("seeds")
-    void changingAnyOneDeclaredContributorChangesTheKey(long seed, @TempDir Path directory) throws IOException {
+    void changingAnyOneDeclaredContributorChangesTheKey(long seed, @TempDir Path directory)
+            throws IOException {
         Scenario scenario = Scenario.generate(seed, directory);
         String original = scenario.compute().value();
 
         for (Map.Entry<String, CacheKey> mutation : scenario.mutations(seed).entrySet()) {
-            assertNotEquals(original, mutation.getValue().value(), "changing " + mutation.getKey() + " left the key untouched");
+            assertNotEquals(
+                    original,
+                    mutation.getValue().value(),
+                    "changing " + mutation.getKey() + " left the key untouched");
         }
     }
 
     @ParameterizedTest(name = "seed {0}")
     @MethodSource("seeds")
-    void aFileNoInputGlobDeclaresNeverChangesTheKey(long seed, @TempDir Path directory) throws IOException {
+    void aFileNoInputGlobDeclaresNeverChangesTheKey(long seed, @TempDir Path directory)
+            throws IOException {
         Scenario scenario = Scenario.generate(seed, directory);
         String original = scenario.compute().value();
 
-        Files.writeString(directory.resolve("undeclared-" + seed + ".txt"), "not an input of any task\n");
+        Files.writeString(
+                directory.resolve("undeclared-" + seed + ".txt"), "not an input of any task\n");
 
         assertEquals(original, scenario.compute().value());
     }
 
-    /** One generated task plus everything the calculator is allowed to read: its files, environment, and dependency digests. */
+    /**
+     * One generated task plus everything the calculator is allowed to read: its files, environment,
+     * and dependency digests.
+     */
     private record Scenario(
-            Path directory, TaskDefinition task, Map<String, String> environment, Map<String, String> dependencyDigests, String toolchain) {
+            Path directory,
+            TaskDefinition task,
+            Map<String, String> environment,
+            Map<String, String> dependencyDigests,
+            String toolchain) {
 
         static Scenario generate(long seed, Path directory) throws IOException {
             Random random = new Random(seed);
@@ -76,7 +93,8 @@ class CacheKeyPropertyTest {
             for (int i = 0; i <= random.nextInt(4); i++) {
                 String name = "src/file" + i + ".txt";
                 Files.createDirectories(directory.resolve("src"));
-                Files.writeString(directory.resolve(name), "content-" + random.nextInt(1000) + "\n");
+                Files.writeString(
+                        directory.resolve(name), "content-" + random.nextInt(1000) + "\n");
                 inputs.add(name);
             }
 
@@ -103,7 +121,8 @@ class CacheKeyPropertyTest {
         }
 
         CacheKey compute() {
-            return CacheKeyCalculator.compute(directory, task, environment, dependencyDigests, toolchain);
+            return CacheKeyCalculator.compute(
+                    directory, task, environment, dependencyDigests, toolchain);
         }
 
         Scenario permuted(long seed) {
@@ -112,26 +131,87 @@ class CacheKeyPropertyTest {
             List<String> inputs = shuffled(task.inputs(), random);
             TaskDefinition reordered =
                     new TaskDefinition(
-                            task.name(), dependsOn, inputs, task.outputs(), task.command(), task.environment(), task.timeout(), task.cacheable());
-            return new Scenario(directory, reordered, reversed(environment), reversed(dependencyDigests), toolchain);
+                            task.name(),
+                            dependsOn,
+                            inputs,
+                            task.outputs(),
+                            task.command(),
+                            task.environment(),
+                            task.timeout(),
+                            task.cacheable());
+            return new Scenario(
+                    directory,
+                    reordered,
+                    reversed(environment),
+                    reversed(dependencyDigests),
+                    toolchain);
         }
 
-        /** One key per single-contributor mutation, each differing from the original in exactly one way. */
+        /**
+         * One key per single-contributor mutation, each differing from the original in exactly one
+         * way.
+         */
         Map<String, CacheKey> mutations(long seed) throws IOException {
             Map<String, CacheKey> keys = new LinkedHashMap<>();
             keys.put(
                     "the task name",
-                    CacheKeyCalculator.compute(directory, withName(task.name() + "-renamed"), environment, dependencyDigests, toolchain));
-            keys.put("the command", CacheKeyCalculator.compute(directory, withCommand(List.of("./gradlew", "assemble")), environment, dependencyDigests, toolchain));
-            keys.put("the declared outputs", CacheKeyCalculator.compute(directory, withOutputs(List.of("build/elsewhere/**")), environment, dependencyDigests, toolchain));
-            keys.put("the timeout", CacheKeyCalculator.compute(directory, withTimeout("30m"), environment, dependencyDigests, toolchain));
-            keys.put("the toolchain", CacheKeyCalculator.compute(directory, task, environment, dependencyDigests, toolchain + "-patched"));
-            keys.put("an added environment value", CacheKeyCalculator.compute(directory, task, plus(environment, "FORGE_EXTRA", "x"), dependencyDigests, toolchain));
+                    CacheKeyCalculator.compute(
+                            directory,
+                            withName(task.name() + "-renamed"),
+                            environment,
+                            dependencyDigests,
+                            toolchain));
+            keys.put(
+                    "the command",
+                    CacheKeyCalculator.compute(
+                            directory,
+                            withCommand(List.of("./gradlew", "assemble")),
+                            environment,
+                            dependencyDigests,
+                            toolchain));
+            keys.put(
+                    "the declared outputs",
+                    CacheKeyCalculator.compute(
+                            directory,
+                            withOutputs(List.of("build/elsewhere/**")),
+                            environment,
+                            dependencyDigests,
+                            toolchain));
+            keys.put(
+                    "the timeout",
+                    CacheKeyCalculator.compute(
+                            directory,
+                            withTimeout("30m"),
+                            environment,
+                            dependencyDigests,
+                            toolchain));
+            keys.put(
+                    "the toolchain",
+                    CacheKeyCalculator.compute(
+                            directory,
+                            task,
+                            environment,
+                            dependencyDigests,
+                            toolchain + "-patched"));
+            keys.put(
+                    "an added environment value",
+                    CacheKeyCalculator.compute(
+                            directory,
+                            task,
+                            plus(environment, "FORGE_EXTRA", "x"),
+                            dependencyDigests,
+                            toolchain));
             keys.put(
                     "a dependency's artifact digest",
-                    CacheKeyCalculator.compute(directory, task, environment, plus(dependencyDigests, "extra:build", "sha256:new"), toolchain));
+                    CacheKeyCalculator.compute(
+                            directory,
+                            task,
+                            environment,
+                            plus(dependencyDigests, "extra:build", "sha256:new"),
+                            toolchain));
 
-            // mutate a declared source file last: it changes the on-disk state every later compute would see
+            // mutate a declared source file last: it changes the on-disk state every later compute
+            // would see
             if (!task.inputs().isEmpty()) {
                 String changed = task.inputs().get(0);
                 String before = Files.readString(directory.resolve(changed));
@@ -144,22 +224,50 @@ class CacheKeyPropertyTest {
 
         private TaskDefinition withName(String name) {
             return new TaskDefinition(
-                    name, task.dependsOn(), task.inputs(), task.outputs(), task.command(), task.environment(), task.timeout(), task.cacheable());
+                    name,
+                    task.dependsOn(),
+                    task.inputs(),
+                    task.outputs(),
+                    task.command(),
+                    task.environment(),
+                    task.timeout(),
+                    task.cacheable());
         }
 
         private TaskDefinition withCommand(List<String> command) {
             return new TaskDefinition(
-                    task.name(), task.dependsOn(), task.inputs(), task.outputs(), command, task.environment(), task.timeout(), task.cacheable());
+                    task.name(),
+                    task.dependsOn(),
+                    task.inputs(),
+                    task.outputs(),
+                    command,
+                    task.environment(),
+                    task.timeout(),
+                    task.cacheable());
         }
 
         private TaskDefinition withOutputs(List<String> outputs) {
             return new TaskDefinition(
-                    task.name(), task.dependsOn(), task.inputs(), outputs, task.command(), task.environment(), task.timeout(), task.cacheable());
+                    task.name(),
+                    task.dependsOn(),
+                    task.inputs(),
+                    outputs,
+                    task.command(),
+                    task.environment(),
+                    task.timeout(),
+                    task.cacheable());
         }
 
         private TaskDefinition withTimeout(String timeout) {
             return new TaskDefinition(
-                    task.name(), task.dependsOn(), task.inputs(), task.outputs(), task.command(), task.environment(), timeout, task.cacheable());
+                    task.name(),
+                    task.dependsOn(),
+                    task.inputs(),
+                    task.outputs(),
+                    task.command(),
+                    task.environment(),
+                    timeout,
+                    task.cacheable());
         }
 
         private static List<String> shuffled(List<String> values, Random random) {

@@ -12,7 +12,10 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.List;
 
-/** A registered worker process. {@code externalId} is the worker's own stable identity (survives restarts). */
+/**
+ * A registered worker process. {@code externalId} is the worker's own stable identity (survives
+ * restarts).
+ */
 @Entity
 @Table(name = "workers")
 public class Worker {
@@ -49,7 +52,8 @@ public class Worker {
 
     protected Worker() {}
 
-    public Worker(String externalId, List<String> capabilities, int maxConcurrency, String versionLabel) {
+    public Worker(
+            String externalId, List<String> capabilities, int maxConcurrency, String versionLabel) {
         this.externalId = externalId;
         this.capabilities = capabilities;
         this.maxConcurrency = maxConcurrency;

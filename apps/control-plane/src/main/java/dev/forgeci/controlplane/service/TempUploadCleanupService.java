@@ -42,13 +42,19 @@ public class TempUploadCleanupService {
         }
     }
 
-    /** Deletes every object under the temp prefix last modified before {@code now - ttl}. Returns how many it removed. */
+    /**
+     * Deletes every object under the temp prefix last modified before {@code now - ttl}. Returns
+     * how many it removed.
+     */
     public int sweep(Instant now) {
         Instant cutoff = now.minus(props.getTempTtl());
         int deleted = 0;
         ListObjectsV2Iterable pages =
                 s3.listObjectsV2Paginator(
-                        ListObjectsV2Request.builder().bucket(props.getBucket()).prefix(props.getTempPrefix()).build());
+                        ListObjectsV2Request.builder()
+                                .bucket(props.getBucket())
+                                .prefix(props.getTempPrefix())
+                                .build());
         for (S3Object object : pages.contents()) {
             if (object.lastModified().isBefore(cutoff)) {
                 s3.deleteObject(b -> b.bucket(props.getBucket()).key(object.key()));

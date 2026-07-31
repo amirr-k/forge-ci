@@ -1,9 +1,9 @@
 package dev.forgeci.cache;
 
 import dev.forgeci.core.glob.GlobMatcher;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;

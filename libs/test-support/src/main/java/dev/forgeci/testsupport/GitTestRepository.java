@@ -71,13 +71,16 @@ public final class GitTestRepository {
         command.addAll(List.of(arguments));
         try {
             ProcessBuilder builder =
-                    new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true);
+                    new ProcessBuilder(command)
+                            .directory(directory.toFile())
+                            .redirectErrorStream(true);
             // keep commits reproducible and independent of the developer's global git config
             Map<String, String> environment = builder.environment();
             environment.put("GIT_CONFIG_GLOBAL", "/dev/null");
             environment.put("GIT_CONFIG_SYSTEM", "/dev/null");
             Process process = builder.start();
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String output =
+                    new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             if (!process.waitFor(60, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 throw new IllegalStateException("git " + String.join(" ", arguments) + " hung");

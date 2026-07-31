@@ -44,8 +44,8 @@ import org.springframework.http.ResponseEntity;
 /**
  * The seven required failure-recovery scenarios from
  * spec/reference/quality-and-testing.md#test-taxonomy-phase-9--applies-across-all-layers, also
- * required by phase 6. Every scenario here simulates the crashed worker by simply going silent
- * (no more heartbeat/report calls) — exactly what a real crash looks like from the control plane's
+ * required by phase 6. Every scenario here simulates the crashed worker by simply going silent (no
+ * more heartbeat/report calls) — exactly what a real crash looks like from the control plane's
  * side, and how {@code WorkerSchedulingIntegrationTest} already proves the direct HTTP protocol
  * without a real Docker-executing worker process.
  *
@@ -66,7 +66,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void aBuildCompletesAfterItsWorkerCrashesBeforeDoingAnyWork() {
         long projectId = registerProject();
         String cacheKey = "sha256:crash-before-" + UUID.randomUUID();
-        PlanSubmissionResponse plan = submitShortTimeoutPlan(projectId, "crash-before:build", cacheKey);
+        PlanSubmissionResponse plan =
+                submitShortTimeoutPlan(projectId, "crash-before:build", cacheKey);
         BuildResponse build = createBuild(projectId, plan.id());
 
         long deadWorker = registerWorker("worker-crash-before-" + UUID.randomUUID());
@@ -85,7 +86,9 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
         Duration recovery = timer.elapsed();
-        log.info("recovery time (crash before start -> reassignment -> completion): {} ms", recovery.toMillis());
+        log.info(
+                "recovery time (crash before start -> reassignment -> completion): {} ms",
+                recovery.toMillis());
         assertThat(recovery).isLessThan(Duration.ofSeconds(30));
     }
 
@@ -93,7 +96,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void aBuildCompletesAfterItsWorkerCrashesMidExecution() {
         long projectId = registerProject();
         String cacheKey = "sha256:crash-during-" + UUID.randomUUID();
-        PlanSubmissionResponse plan = submitShortTimeoutPlan(projectId, "crash-during:build", cacheKey);
+        PlanSubmissionResponse plan =
+                submitShortTimeoutPlan(projectId, "crash-during:build", cacheKey);
         BuildResponse build = createBuild(projectId, plan.id());
 
         long deadWorker = registerWorker("worker-crash-during-" + UUID.randomUUID());
@@ -104,7 +108,11 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         ResponseEntity<Void> logResponse =
                 rest.postForEntity(
                         "/api/task-runs/" + firstAttempt.taskRunId() + "/logs",
-                        new LogChunkRequest(firstAttempt.workerId(), firstAttempt.leaseToken(), firstAttempt.attemptId(), List.of("compiling...")),
+                        new LogChunkRequest(
+                                firstAttempt.workerId(),
+                                firstAttempt.leaseToken(),
+                                firstAttempt.attemptId(),
+                                List.of("compiling...")),
                         Void.class);
         assertThat(logResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
@@ -119,7 +127,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         TaskRun taskRun = taskRunRepository.findById(firstAttempt.taskRunId()).orElseThrow();
         assertThat(taskRun.getState()).isEqualTo(TaskRunState.SUCCEEDED);
         assertThat(taskRun.getAttemptCount()).isEqualTo(2);
-        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId())).hasSize(2);
+        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId()))
+                .hasSize(2);
     }
 
     @Test
@@ -129,7 +138,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         PlanSubmissionResponse plan =
                 rest.postForObject(
                         "/api/projects/" + projectId + "/plans",
-                        TestFixtures.singleTaskPlan("rev-dup-" + UUID.randomUUID(), "rev-0", "dup:build", cacheKey),
+                        TestFixtures.singleTaskPlan(
+                                "rev-dup-" + UUID.randomUUID(), "rev-0", "dup:build", cacheKey),
                         PlanSubmissionResponse.class);
         BuildResponse build = createBuild(projectId, plan.id());
         long workerId = registerWorker("worker-dup-" + UUID.randomUUID());
@@ -151,10 +161,12 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         assertThat(afterDuplicate.getState()).isEqualTo(TaskRunState.SUCCEEDED);
         assertThat(afterDuplicate.getCompletedAt()).isEqualTo(completedAtFirst);
         assertThat(afterDuplicate.getAttemptCount()).isEqualTo(1);
-        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(task.taskRunId())).hasSize(1);
+        assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(task.taskRunId()))
+                .hasSize(1);
         assertThat(artifactRepository.findByDigest(digest)).isPresent();
 
-        List<Map> artifacts = rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
+        List<Map> artifacts =
+                rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
         assertThat(artifacts).hasSize(1);
     }
 
@@ -162,7 +174,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void aLateResultReportedAfterLeaseExpirationIsRejectedAndNeverOverwritesTheAcceptedResult() {
         long projectId = registerProject();
         String cacheKey = "sha256:late-result-" + UUID.randomUUID();
-        PlanSubmissionResponse plan = submitShortTimeoutPlan(projectId, "late-result:build", cacheKey);
+        PlanSubmissionResponse plan =
+                submitShortTimeoutPlan(projectId, "late-result:build", cacheKey);
         BuildResponse build = createBuild(projectId, plan.id());
 
         long slowWorker = registerWorker("worker-slow-" + UUID.randomUUID());
@@ -177,7 +190,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         reportResult(freshAttempt, true, 0, null, digest);
         awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
-        TaskRun afterFreshResult = taskRunRepository.findById(freshAttempt.taskRunId()).orElseThrow();
+        TaskRun afterFreshResult =
+                taskRunRepository.findById(freshAttempt.taskRunId()).orElseThrow();
         var completedAtFresh = afterFreshResult.getCompletedAt();
 
         // the crashed worker "comes back" and reports against its now-superseded lease
@@ -185,11 +199,18 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
                 rest.postForEntity(
                         "/api/task-runs/" + staleAttempt.taskRunId() + "/result",
                         new TaskResultReportRequest(
-                                staleAttempt.workerId(), staleAttempt.leaseToken(), staleAttempt.attemptId(), true, 0, null, "sha256:forged"),
+                                staleAttempt.workerId(),
+                                staleAttempt.leaseToken(),
+                                staleAttempt.attemptId(),
+                                true,
+                                0,
+                                null,
+                                "sha256:forged"),
                         Map.class);
         assertThat(lateReport.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
-        TaskRun afterLateReport = taskRunRepository.findById(staleAttempt.taskRunId()).orElseThrow();
+        TaskRun afterLateReport =
+                taskRunRepository.findById(staleAttempt.taskRunId()).orElseThrow();
         assertThat(afterLateReport.getArtifactDigest()).isEqualTo(digest);
         assertThat(afterLateReport.getCompletedAt()).isEqualTo(completedAtFresh);
     }
@@ -198,7 +219,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void anArtifactUploadedBeforeADelayedResultCommitIsNeverDuplicated() {
         long projectId = registerProject();
         String cacheKey = "sha256:delayed-commit-" + UUID.randomUUID();
-        PlanSubmissionResponse plan = submitShortTimeoutPlan(projectId, "delayed-commit:build", cacheKey);
+        PlanSubmissionResponse plan =
+                submitShortTimeoutPlan(projectId, "delayed-commit:build", cacheKey);
         BuildResponse build = createBuild(projectId, plan.id());
 
         long originalWorker = registerWorker("worker-delayed-" + UUID.randomUUID());
@@ -214,14 +236,16 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         ClaimedTaskResponse newAttempt = claimMine(survivor, "delayed-commit:build");
         assertThat(newAttempt.taskRunId()).isEqualTo(originalAttempt.taskRunId());
 
-        // the new attempt uploads (byte-identical, so it dedupes to the same artifact row) and reports
+        // the new attempt uploads (byte-identical, so it dedupes to the same artifact row) and
+        // reports
         String secondDigest = uploadArtifact(projectId, cacheKey, archive);
         assertThat(secondDigest).isEqualTo(digest);
         reportResult(newAttempt, true, 0, null, secondDigest);
         awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
         assertThat(artifactRepository.findByDigest(digest)).isPresent();
-        List<Map> artifacts = rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
+        List<Map> artifacts =
+                rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
         assertThat(artifacts).hasSize(1);
 
         // the original attempt's delayed result finally arrives — rejected, not re-applied
@@ -229,7 +253,13 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
                 rest.postForEntity(
                         "/api/task-runs/" + originalAttempt.taskRunId() + "/result",
                         new TaskResultReportRequest(
-                                originalAttempt.workerId(), originalAttempt.leaseToken(), originalAttempt.attemptId(), true, 0, null, digest),
+                                originalAttempt.workerId(),
+                                originalAttempt.leaseToken(),
+                                originalAttempt.attemptId(),
+                                true,
+                                0,
+                                null,
+                                digest),
                         Map.class);
         assertThat(delayedReport.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
@@ -238,7 +268,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void theSystemRecoversAfterARedisFlushDuringAnActiveBuild() {
         long projectId = registerProject();
         String cacheKey = "sha256:redis-flush-" + UUID.randomUUID();
-        PlanSubmissionResponse plan = submitShortTimeoutPlan(projectId, "redis-flush:build", cacheKey);
+        PlanSubmissionResponse plan =
+                submitShortTimeoutPlan(projectId, "redis-flush:build", cacheKey);
         BuildResponse build = createBuild(projectId, plan.id());
 
         long deadWorker = registerWorker("worker-redis-flush-" + UUID.randomUUID());
@@ -246,7 +277,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
 
         ClaimedTaskResponse firstAttempt = claimMine(deadWorker, "redis-flush:build");
 
-        // wipes every Redis key, including the lease/heartbeat acceleration entries this phase adds —
+        // wipes every Redis key, including the lease/heartbeat acceleration entries this phase adds
+        // —
         // MySQL's own lease_expiration sweep must recover the build regardless
         flushRedis();
 
@@ -260,29 +292,34 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     void aCrashInjectionRequestIsDeliveredOnTheWorkersNextHeartbeatAndThenCleared() {
         long workerId = registerWorker("worker-crash-injection-" + UUID.randomUUID());
 
-        ResponseEntity<Void> crashRequest = rest.postForEntity("/api/workers/" + workerId + "/crash", null, Void.class);
+        ResponseEntity<Void> crashRequest =
+                rest.postForEntity("/api/workers/" + workerId + "/crash", null, Void.class);
         assertThat(crashRequest.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 
         HeartbeatResponse first = heartbeat(workerId);
         assertThat(first.shouldCrash()).isTrue();
 
-        // consumed — a worker that (hypothetically) survived a halt request never re-crashes on its own
+        // consumed — a worker that (hypothetically) survived a halt request never re-crashes on its
+        // own
         HeartbeatResponse second = heartbeat(workerId);
         assertThat(second.shouldCrash()).isFalse();
     }
 
-    private PlanSubmissionResponse submitShortTimeoutPlan(long projectId, String taskName, String cacheKey) {
+    private PlanSubmissionResponse submitShortTimeoutPlan(
+            long projectId, String taskName, String cacheKey) {
         return rest.postForObject(
                 "/api/projects/" + projectId + "/plans",
-                TestFixtures.singleTaskPlanWithShortTimeout("rev-" + UUID.randomUUID(), "rev-0", taskName, cacheKey),
+                TestFixtures.singleTaskPlanWithShortTimeout(
+                        "rev-" + UUID.randomUUID(), "rev-0", taskName, cacheKey),
                 PlanSubmissionResponse.class);
     }
 
     /**
-     * Claims until a task named {@code taskName} shows up, waiting through lease-expiry/retry-backoff
-     * delay if needed. Heartbeats {@code workerId} on every poll — a real worker heartbeats on its
-     * own schedule the whole time it's alive, and this test's tightened heartbeat interval would
-     * otherwise mark a merely-idle (not crashed) polling worker unhealthy and starve it of claims.
+     * Claims until a task named {@code taskName} shows up, waiting through
+     * lease-expiry/retry-backoff delay if needed. Heartbeats {@code workerId} on every poll — a
+     * real worker heartbeats on its own schedule the whole time it's alive, and this test's
+     * tightened heartbeat interval would otherwise mark a merely-idle (not crashed) polling worker
+     * unhealthy and starve it of claims.
      */
     private ClaimedTaskResponse claimMine(long workerId, String taskName) {
         for (int i = 0; i < 400; i++) {
@@ -303,7 +340,8 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
 
     private Optional<ClaimedTaskResponse> claim(long workerId) {
         ResponseEntity<ClaimedTaskResponse> response =
-                rest.postForEntity("/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
+                rest.postForEntity(
+                        "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
         if (response.getStatusCode() == HttpStatus.NO_CONTENT) {
             return Optional.empty();
         }
@@ -311,17 +349,30 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         return Optional.ofNullable(response.getBody());
     }
 
-    private void reportResult(ClaimedTaskResponse task, boolean success, Integer exitCode, String failureReason, String artifactDigest) {
+    private void reportResult(
+            ClaimedTaskResponse task,
+            boolean success,
+            Integer exitCode,
+            String failureReason,
+            String artifactDigest) {
         ResponseEntity<Void> response =
                 rest.postForEntity(
                         "/api/task-runs/" + task.taskRunId() + "/result",
-                        new TaskResultReportRequest(task.workerId(), task.leaseToken(), task.attemptId(), success, exitCode, failureReason, artifactDigest),
+                        new TaskResultReportRequest(
+                                task.workerId(),
+                                task.leaseToken(),
+                                task.attemptId(),
+                                success,
+                                exitCode,
+                                failureReason,
+                                artifactDigest),
                         Void.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     private HeartbeatResponse heartbeat(long workerId) {
-        return rest.postForObject("/api/workers/" + workerId + "/heartbeat", null, HeartbeatResponse.class);
+        return rest.postForObject(
+                "/api/workers/" + workerId + "/heartbeat", null, HeartbeatResponse.class);
     }
 
     private void awaitBuildState(Long buildId, BuildState expected) {
@@ -331,7 +382,14 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
             }
             sleepQuietly(100);
         }
-        throw new AssertionError("build " + buildId + " never reached " + expected + " (was " + getBuild(buildId).state() + ")");
+        throw new AssertionError(
+                "build "
+                        + buildId
+                        + " never reached "
+                        + expected
+                        + " (was "
+                        + getBuild(buildId).state()
+                        + ")");
     }
 
     private static void flushRedis() {
@@ -351,13 +409,16 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     }
 
     private long registerProject() {
-        ProjectResponse project = rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
+        ProjectResponse project =
+                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
         return project.id();
     }
 
     private BuildResponse createBuild(long projectId, Long planSubmissionId) {
         return rest.postForObject(
-                "/api/projects/" + projectId + "/builds", new BuildCreationRequest(planSubmissionId, "manual", 0), BuildResponse.class);
+                "/api/projects/" + projectId + "/builds",
+                new BuildCreationRequest(planSubmissionId, "manual", 0),
+                BuildResponse.class);
     }
 
     private BuildResponse getBuild(Long buildId) {
@@ -367,16 +428,27 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
     private long registerWorker(String externalId) {
         WorkerRegistrationResponse response =
                 rest.postForObject(
-                        "/api/workers/register", new WorkerRegistrationRequest(externalId, List.of(), 1, "test"), WorkerRegistrationResponse.class);
+                        "/api/workers/register",
+                        new WorkerRegistrationRequest(externalId, List.of(), 1, "test"),
+                        WorkerRegistrationResponse.class);
         return response.workerId();
     }
 
     private String uploadArtifact(long projectId, String cacheKey, byte[] archive) {
         String digest = Digests.sha256(archive);
-        String path = "/api/artifacts?projectId=" + projectId + "&cacheKey=" + cacheKey + "&digest=" + digest + "&size=" + archive.length;
+        String path =
+                "/api/artifacts?projectId="
+                        + projectId
+                        + "&cacheKey="
+                        + cacheKey
+                        + "&digest="
+                        + digest
+                        + "&size="
+                        + archive.length;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        ResponseEntity<Map> response = rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
+        ResponseEntity<Map> response =
+                rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return digest;
     }

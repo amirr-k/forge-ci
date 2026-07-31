@@ -26,7 +26,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     private static final Pattern BUILD_ID = Pattern.compile("/api/builds/(\\d+)");
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String correlationId = request.getHeader(HEADER);
         if (correlationId == null || correlationId.isBlank()) {

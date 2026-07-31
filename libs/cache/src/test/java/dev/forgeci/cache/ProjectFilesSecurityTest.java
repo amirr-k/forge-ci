@@ -24,7 +24,9 @@ class ProjectFilesSecurityTest {
         Files.writeString(parent.resolve("outside-secret.txt"), "credentials\n");
         Files.writeString(project.resolve("inside.txt"), "fine\n");
 
-        List<String> matched = ProjectFiles.matching(project, List.of("../**", "../outside-secret.txt", "**/../**"));
+        List<String> matched =
+                ProjectFiles.matching(
+                        project, List.of("../**", "../outside-secret.txt", "**/../**"));
 
         assertEquals(List.of(), matched);
     }
@@ -51,7 +53,8 @@ class ProjectFilesSecurityTest {
     }
 
     @Test
-    void gitAndForgeInternalsAreNeverSelectedByAWildcardGlob(@TempDir Path project) throws IOException {
+    void gitAndForgeInternalsAreNeverSelectedByAWildcardGlob(@TempDir Path project)
+            throws IOException {
         Files.createDirectories(project.resolve(".git"));
         Files.writeString(project.resolve(".git/config"), "[remote]\n");
         Files.createDirectories(project.resolve(".forge/cache/objects"));

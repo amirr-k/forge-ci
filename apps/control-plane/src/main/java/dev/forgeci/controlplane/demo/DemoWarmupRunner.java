@@ -11,12 +11,16 @@ import org.springframework.stereotype.Component;
 /**
  * Fires the one real warm-up build after startup — best-effort, never blocks readiness on it.
  * Disabled in integration tests ({@code forge.demo.warmup.enabled=false}): every test in this
- * module shares the one Testcontainers Redis instance, and without a real worker present a
- * warm-up build never reaches a terminal state, so it would hold the single guest-build slot for
- * its full TTL and make every demo test in the suite flaky depending on startup timing.
+ * module shares the one Testcontainers Redis instance, and without a real worker present a warm-up
+ * build never reaches a terminal state, so it would hold the single guest-build slot for its full
+ * TTL and make every demo test in the suite flaky depending on startup timing.
  */
 @Component
-@ConditionalOnProperty(prefix = "forge.demo.warmup", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+        prefix = "forge.demo.warmup",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 public class DemoWarmupRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoWarmupRunner.class);
@@ -33,7 +37,9 @@ public class DemoWarmupRunner {
         try {
             demoScenarioService.warmUp();
         } catch (RuntimeException warmupFailure) {
-            log.warn("demo warm-up build failed to start, first guest visit will build cold: {}", warmupFailure.getMessage());
+            log.warn(
+                    "demo warm-up build failed to start, first guest visit will build cold: {}",
+                    warmupFailure.getMessage());
         }
     }
 }

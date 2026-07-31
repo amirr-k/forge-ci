@@ -11,7 +11,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
-/** Maps a project's cache key to the artifact it currently resolves to — the remote equivalent of libs/cache's manifest. */
+/**
+ * Maps a project's cache key to the artifact it currently resolves to — the remote equivalent of
+ * libs/cache's manifest.
+ */
 @Entity
 @Table(name = "cache_entries")
 public class CacheEntry {

@@ -43,7 +43,8 @@ class InitCommandTest {
             fixture.run("init");
 
             assertTrue(
-                    Files.readString(directory.resolve("forgeci.yml")).contains("name: sample-monorepo"),
+                    Files.readString(directory.resolve("forgeci.yml"))
+                            .contains("name: sample-monorepo"),
                     Files.readString(directory.resolve("forgeci.yml")));
         }
     }

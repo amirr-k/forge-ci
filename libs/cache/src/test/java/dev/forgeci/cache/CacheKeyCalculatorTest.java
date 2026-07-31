@@ -87,7 +87,8 @@ class CacheKeyCalculatorTest {
     }
 
     @Test
-    void aSelectedEnvironmentValueChangeInvalidatesTheKey(@TempDir Path directory) throws IOException {
+    void aSelectedEnvironmentValueChangeInvalidatesTheKey(@TempDir Path directory)
+            throws IOException {
         Files.writeString(directory.resolve("src.txt"), "hello\n");
         TaskDefinition task = task("a:build", List.of("src.txt"));
 
@@ -98,11 +99,15 @@ class CacheKeyCalculatorTest {
     }
 
     private static CacheKey compute(
-            Path directory, TaskDefinition task, Map<String, String> environment, Map<String, String> dependencies) {
+            Path directory,
+            TaskDefinition task,
+            Map<String, String> environment,
+            Map<String, String> dependencies) {
         return CacheKeyCalculator.compute(directory, task, environment, dependencies, TOOLCHAIN);
     }
 
     private static TaskDefinition task(String name, List<String> inputs) {
-        return new TaskDefinition(name, List.of(), inputs, List.of(), List.of("true"), List.of(), null, true);
+        return new TaskDefinition(
+                name, List.of(), inputs, List.of(), List.of("true"), List.of(), null, true);
     }
 }

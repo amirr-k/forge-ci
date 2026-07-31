@@ -11,7 +11,8 @@ import java.time.Duration;
  * @param duration wall-clock time the task itself took
  * @param detail short operator-facing explanation, empty when the status says everything
  */
-public record TaskOutcome(String task, TaskStatus status, Integer exitCode, Duration duration, String detail) {
+public record TaskOutcome(
+        String task, TaskStatus status, Integer exitCode, Duration duration, String detail) {
 
     public static TaskOutcome succeeded(String task, Duration duration) {
         return new TaskOutcome(task, TaskStatus.SUCCEEDED, 0, duration, "");
@@ -23,7 +24,8 @@ public record TaskOutcome(String task, TaskStatus status, Integer exitCode, Dura
     }
 
     public static TaskOutcome failed(String task, int exitCode, Duration duration) {
-        return new TaskOutcome(task, TaskStatus.FAILED, exitCode, duration, "exit code " + exitCode);
+        return new TaskOutcome(
+                task, TaskStatus.FAILED, exitCode, duration, "exit code " + exitCode);
     }
 
     public static TaskOutcome failedToStart(String task, Duration duration, String detail) {
@@ -32,7 +34,11 @@ public record TaskOutcome(String task, TaskStatus status, Integer exitCode, Dura
 
     public static TaskOutcome timedOut(String task, Duration timeout) {
         return new TaskOutcome(
-                task, TaskStatus.TIMED_OUT, null, timeout, "timed out after " + Durations.format(timeout));
+                task,
+                TaskStatus.TIMED_OUT,
+                null,
+                timeout,
+                "timed out after " + Durations.format(timeout));
     }
 
     public static TaskOutcome skipped(String task, String detail) {

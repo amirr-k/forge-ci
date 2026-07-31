@@ -6,10 +6,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Guest-demo safety, enforced server-side regardless of what the UI lets a visitor click
- * (contracts.md#redis-responsibilities: bounded distributed locks, guest-demo rate limiting).
- * Redis is acceleration/ephemeral-only here too — if it's unreachable, both checks fail closed
- * (deny), never open, since there is no MySQL fallback for either concern and "no Redis" must
- * never mean "no limit."
+ * (contracts.md#redis-responsibilities: bounded distributed locks, guest-demo rate limiting). Redis
+ * is acceleration/ephemeral-only here too — if it's unreachable, both checks fail closed (deny),
+ * never open, since there is no MySQL fallback for either concern and "no Redis" must never mean
+ * "no limit."
  */
 @Component
 public class DemoGuestGuard {
@@ -31,7 +31,8 @@ public class DemoGuestGuard {
     /** True if the caller acquired the single global "one guest demo build in flight" slot. */
     public boolean tryAcquireBuildSlot(String buildToken) {
         try {
-            Boolean acquired = redis.opsForValue().setIfAbsent(BUILD_LOCK_KEY, buildToken, BUILD_LOCK_TTL);
+            Boolean acquired =
+                    redis.opsForValue().setIfAbsent(BUILD_LOCK_KEY, buildToken, BUILD_LOCK_TTL);
             return Boolean.TRUE.equals(acquired);
         } catch (RuntimeException redisUnavailable) {
             return false;

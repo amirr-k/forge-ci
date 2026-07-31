@@ -20,10 +20,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * Orchestrates one guest demo visit end to end: scenario mutation, then two real, concurrently
- * scheduled builds against the same mutated workspace — a full rebuild ("traditional baseline")
- * and the affected-only incremental build — so the comparison the UI shows is two genuine
- * measured runs, never one live run next to a precomputed number (product-and-demo.md#demo-repository).
- * Both builds compete for the same worker fleet exactly like any two unrelated builds would
+ * scheduled builds against the same mutated workspace — a full rebuild ("traditional baseline") and
+ * the affected-only incremental build — so the comparison the UI shows is two genuine measured
+ * runs, never one live run next to a precomputed number (product-and-demo.md#demo-repository). Both
+ * builds compete for the same worker fleet exactly like any two unrelated builds would
  * (apps/control-plane's scheduler already claims across a single global queue, not per-build), and
  * both apply the identical, idempotent scenario mutation on every task, so running them at the same
  * time against the one shared demo workspace is safe.
@@ -72,13 +72,22 @@ public class DemoScenarioService {
         try {
             Project project = ensureDemoProject();
             Path mutatedWorkspace = workspace.applyScenario(scenario);
-            int workerCount = guard.boundWorkerCount(requestedWorkerCount <= 0 ? 2 : requestedWorkerCount);
+            int workerCount =
+                    guard.boundWorkerCount(requestedWorkerCount <= 0 ? 2 : requestedWorkerCount);
 
-            DemoPlanFactory.DemoPlan baselinePlan = planFactory.buildBaselineForComparison(mutatedWorkspace, scenario, token);
+            DemoPlanFactory.DemoPlan baselinePlan =
+                    planFactory.buildBaselineForComparison(mutatedWorkspace, scenario, token);
             Build baselineBuild =
-                    submitOne(project, baselinePlan, "demo-baseline-" + scenario.scriptId() + "-" + token, true, "guest-demo-baseline", workerCount);
+                    submitOne(
+                            project,
+                            baselinePlan,
+                            "demo-baseline-" + scenario.scriptId() + "-" + token,
+                            true,
+                            "guest-demo-baseline",
+                            workerCount);
 
-            DemoPlanFactory.DemoPlan incrementalPlan = planFactory.build(mutatedWorkspace, scenario);
+            DemoPlanFactory.DemoPlan incrementalPlan =
+                    planFactory.build(mutatedWorkspace, scenario);
             Build incrementalBuild =
                     submitOne(
                             project,
@@ -91,7 +100,9 @@ public class DemoScenarioService {
             watcher.watch(List.of(baselineBuild.getId(), incrementalBuild.getId()), token);
 
             List<DemoTaskResponse> incrementalTasks =
-                    incrementalPlan.tasks().stream().map(t -> new DemoTaskResponse(t.name(), t.dependsOn(), t.reason())).toList();
+                    incrementalPlan.tasks().stream()
+                            .map(t -> new DemoTaskResponse(t.name(), t.dependsOn(), t.reason()))
+                            .toList();
             List<String> baselineTasks = baselinePlan.tasks().stream().map(t -> t.name()).toList();
             return new DemoBuildResponse(
                     baselineBuild.getId(),
@@ -108,8 +119,8 @@ public class DemoScenarioService {
     }
 
     /**
-     * Runs once at control-plane startup, for real, so the very first guest's "no changes"
-     * scenario has genuine prior output to describe as "reused" rather than an empty history.
+     * Runs once at control-plane startup, for real, so the very first guest's "no changes" scenario
+     * has genuine prior output to describe as "reused" rather than an empty history.
      */
     public void warmUp() {
         String token = UUID.randomUUID().toString();
@@ -119,7 +130,8 @@ public class DemoScenarioService {
         try {
             Project project = ensureDemoProject();
             Path mutatedWorkspace = workspace.applyScenario(DemoScenario.NO_CHANGE);
-            DemoPlanFactory.DemoPlan plan = planFactory.buildFull(mutatedWorkspace, DemoScenario.NO_CHANGE);
+            DemoPlanFactory.DemoPlan plan =
+                    planFactory.buildFull(mutatedWorkspace, DemoScenario.NO_CHANGE);
             Build build = submitOne(project, plan, "demo-warmup-" + token, true, "warm-up", 2);
             watcher.watch(List.of(build.getId()), token);
         } catch (RuntimeException warmupFailure) {
@@ -129,14 +141,30 @@ public class DemoScenarioService {
     }
 
     private Build submitOne(
-            Project project, DemoPlanFactory.DemoPlan plan, String revision, boolean full, String triggerType, int workerCount) {
+            Project project,
+            DemoPlanFactory.DemoPlan plan,
+            String revision,
+            boolean full,
+            String triggerType,
+            int workerCount) {
         PlanSubmissionRequest planRequest =
-                new PlanSubmissionRequest(revision, "baseline", full, plan.changedPaths(), plan.tasks(), plan.unaffectedTasks());
+                new PlanSubmissionRequest(
+                        revision,
+                        "baseline",
+                        full,
+                        plan.changedPaths(),
+                        plan.tasks(),
+                        plan.unaffectedTasks());
         PlanSubmission submission = planSubmissionService.submit(project.getId(), planRequest);
-        return buildService.createBuild(project.getId(), new BuildCreationRequest(submission.getId(), triggerType, workerCount));
+        return buildService.createBuild(
+                project.getId(),
+                new BuildCreationRequest(submission.getId(), triggerType, workerCount));
     }
 
-    /** Crashes whichever worker currently holds a running task in this build, for the "Crash a Worker" demo. */
+    /**
+     * Crashes whichever worker currently holds a running task in this build, for the "Crash a
+     * Worker" demo.
+     */
     public long crashWorker(Long buildId) {
         List<TaskRun> runs = taskRunRepository.findByBuildId(buildId);
         Long workerId =
@@ -144,7 +172,10 @@ public class DemoScenarioService {
                         .filter(run -> run.getWorkerId() != null && !run.getState().isTerminal())
                         .max(Comparator.comparing(TaskRun::getId))
                         .map(TaskRun::getWorkerId)
-                        .orElseThrow(() -> new IllegalStateException("no running task to crash for build " + buildId));
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "no running task to crash for build " + buildId));
         workerService.requestCrash(workerId);
         return workerId;
     }
@@ -152,6 +183,13 @@ public class DemoScenarioService {
     private Project ensureDemoProject() {
         return projectRepository
                 .findByName(DEMO_PROJECT_NAME)
-                .orElseGet(() -> projectRepository.save(new Project(DEMO_PROJECT_NAME, "bundled/sample-monorepo", "main", 1)));
+                .orElseGet(
+                        () ->
+                                projectRepository.save(
+                                        new Project(
+                                                DEMO_PROJECT_NAME,
+                                                "bundled/sample-monorepo",
+                                                "main",
+                                                1)));
     }
 }

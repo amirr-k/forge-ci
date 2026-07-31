@@ -15,8 +15,8 @@ import org.springframework.test.context.DynamicPropertySource;
 /**
  * Proves the guest demo path end to end against the bundled repo for real: a leaf-module change
  * selects exactly the tasks the dependency graph says it should, the single guest-build slot
- * actually serializes concurrent attempts, and crashing a worker with nothing running fails
- * loudly instead of silently no-op'ing.
+ * actually serializes concurrent attempts, and crashing a worker with nothing running fails loudly
+ * instead of silently no-op'ing.
  */
 class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
 
@@ -24,7 +24,8 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
 
     @DynamicPropertySource
     static void demoProperties(DynamicPropertyRegistry registry) {
-        // tests run with the module directory as the working directory, two levels below the repo root
+        // tests run with the module directory as the working directory, two levels below the repo
+        // root
         registry.add("forge.demo.repo-path", () -> "../../demo/sample-monorepo");
         registry.add("forge.demo.workspace-path", () -> demoWorkspace.toString());
         registry.add("forge.demo.warmup.enabled", () -> "false");
@@ -37,7 +38,8 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
     /**
      * Nothing in this test class registers a real worker, so a build started here never reaches a
      * terminal state and {@link DemoBuildWatcher} never releases the slot on its own — clear it
-     * directly so each test starts from a clean lock, exactly like production's TTL eventually would.
+     * directly so each test starts from a clean lock, exactly like production's TTL eventually
+     * would.
      */
     @AfterEach
     void releaseGuestBuildSlot() {
@@ -46,7 +48,8 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
 
     @org.junit.jupiter.api.Test
     void leafModuleChangeSelectsExactlyItsDownstreamClosure() {
-        DemoBuildResponse response = demoScenarioService.startBuild(DemoScenario.LEAF_MODULE_CHANGE, 2);
+        DemoBuildResponse response =
+                demoScenarioService.startBuild(DemoScenario.LEAF_MODULE_CHANGE, 2);
 
         assertThat(response.baselineBuildId()).isNotNull();
         assertThat(response.incrementalBuildId()).isNotNull();
@@ -73,7 +76,8 @@ class DemoScenarioIntegrationTest extends ControlPlaneIntegrationTest {
 
     @org.junit.jupiter.api.Test
     void crashingAWorkerWithNothingRunningFailsRatherThanNoOp() {
-        DemoBuildResponse response = demoScenarioService.startBuild(DemoScenario.SHARED_CORE_CHANGE, 2);
+        DemoBuildResponse response =
+                demoScenarioService.startBuild(DemoScenario.SHARED_CORE_CHANGE, 2);
 
         assertThatThrownBy(() -> demoScenarioService.crashWorker(response.incrementalBuildId()))
                 .isInstanceOf(IllegalStateException.class);

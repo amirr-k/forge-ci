@@ -29,7 +29,8 @@ class CycleDetectorTest {
     @Test
     void cycleDetectedExceptionMatchesSpecFormat() {
         CycleDetectedException exception =
-                new CycleDetectedException(List.of("frontend:build", "api:generate", "frontend:build"));
+                new CycleDetectedException(
+                        List.of("frontend:build", "api:generate", "frontend:build"));
 
         assertEquals(
                 "Cycle detected:\nfrontend:build -> api:generate -> frontend:build",

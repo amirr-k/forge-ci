@@ -48,7 +48,11 @@ public class BuildEvent {
     protected BuildEvent() {}
 
     public BuildEvent(
-            Build build, long sequenceNumber, BuildEventType eventType, TaskRun taskRun, Map<String, Object> payload) {
+            Build build,
+            long sequenceNumber,
+            BuildEventType eventType,
+            TaskRun taskRun,
+            Map<String, Object> payload) {
         this.build = build;
         this.sequenceNumber = sequenceNumber;
         this.eventType = eventType;

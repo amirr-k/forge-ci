@@ -4,12 +4,12 @@ import java.util.regex.Pattern;
 
 /**
  * Matches a {@code forgeci.yml} input glob against a repository-relative path. Deliberately not
- * {@code java.nio.file.PathMatcher} — its {@code **} semantics vary subtly across platforms, and
- * a hand-rolled translation is easy to pin down with unit tests.
+ * {@code java.nio.file.PathMatcher} — its {@code **} semantics vary subtly across platforms, and a
+ * hand-rolled translation is easy to pin down with unit tests.
  *
- * <p>Supported syntax: {@code **} matches any sequence of characters, including {@code /};
- * {@code *} matches any sequence of characters except {@code /}; {@code ?} matches exactly one
- * character except {@code /}. Everything else is a literal.
+ * <p>Supported syntax: {@code **} matches any sequence of characters, including {@code /}; {@code
+ * *} matches any sequence of characters except {@code /}; {@code ?} matches exactly one character
+ * except {@code /}. Everything else is a literal.
  */
 public final class GlobMatcher {
 

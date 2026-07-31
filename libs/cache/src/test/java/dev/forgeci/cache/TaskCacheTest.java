@@ -48,11 +48,14 @@ class TaskCacheTest {
         cache.store(key, task.outputs());
         corruptTheOnlyStoredObject(directory);
 
-        assertFalse(cache.lookup(key).isPresent(), "a corrupted object must never be reported as a hit");
+        assertFalse(
+                cache.lookup(key).isPresent(),
+                "a corrupted object must never be reported as a hit");
     }
 
     @Test
-    void aManifestWithoutAStoredObjectIsNeverReportedAsAHit(@TempDir Path directory) throws IOException {
+    void aManifestWithoutAStoredObjectIsNeverReportedAsAHit(@TempDir Path directory)
+            throws IOException {
         Files.createDirectories(directory.resolve("build"));
         Files.writeString(directory.resolve("build/out.txt"), "result\n");
         TaskDefinition task = task("a:build", List.of("build/out.txt"));
@@ -95,6 +98,7 @@ class TaskCacheTest {
     }
 
     private static TaskDefinition task(String name, List<String> outputs) {
-        return new TaskDefinition(name, List.of(), List.of(), outputs, List.of("true"), List.of(), null, true);
+        return new TaskDefinition(
+                name, List.of(), List.of(), outputs, List.of("true"), List.of(), null, true);
     }
 }

@@ -3,7 +3,9 @@ package dev.forgeci.core.exec;
 import java.time.Duration;
 import java.util.List;
 
-/** The result of one local run: every selected task's outcome, in plan order, plus wall-clock time. */
+/**
+ * The result of one local run: every selected task's outcome, in plan order, plus wall-clock time.
+ */
 public record ExecutionReport(List<TaskOutcome> outcomes, Duration wallClock) {
 
     public ExecutionReport {

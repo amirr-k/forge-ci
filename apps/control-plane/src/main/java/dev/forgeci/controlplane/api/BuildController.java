@@ -32,7 +32,8 @@ public class BuildController {
 
     @PostMapping("/api/projects/{id}/builds")
     @ResponseStatus(HttpStatus.CREATED)
-    public BuildResponse create(@PathVariable("id") Long projectId, @Valid @RequestBody BuildCreationRequest request) {
+    public BuildResponse create(
+            @PathVariable("id") Long projectId, @Valid @RequestBody BuildCreationRequest request) {
         return BuildResponse.from(buildService.createBuild(projectId, request));
     }
 
@@ -42,7 +43,8 @@ public class BuildController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
         int boundedSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
-        Page<Build> builds = buildService.history(projectId, PageRequest.of(Math.max(page, 0), boundedSize));
+        Page<Build> builds =
+                buildService.history(projectId, PageRequest.of(Math.max(page, 0), boundedSize));
         return builds.map(BuildResponse::from);
     }
 

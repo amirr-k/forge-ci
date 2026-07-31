@@ -21,43 +21,54 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Component;
 
 /**
- * Turns a scenario-mutated demo-repo working copy into the plan a guest build submits: which
- * tasks run (real, content-derived cache keys), which are structurally unaffected and never
- * scheduled at all (the honest "reused previous output" case — nothing server-side short-circuits
- * an affected task's execution, so "reused" only ever means "not part of this build"), and the
- * exact command each affected task runs.
+ * Turns a scenario-mutated demo-repo working copy into the plan a guest build submits: which tasks
+ * run (real, content-derived cache keys), which are structurally unaffected and never scheduled at
+ * all (the honest "reused previous output" case — nothing server-side short-circuits an affected
+ * task's execution, so "reused" only ever means "not part of this build"), and the exact command
+ * each affected task runs.
  */
 @Component
 public class DemoPlanFactory {
 
-    /** Fixed rather than the host JVM's real toolchain — the demo has no notion of a build machine's own JDK. */
+    /**
+     * Fixed rather than the host JVM's real toolchain — the demo has no notion of a build machine's
+     * own JDK.
+     */
     private static final String TOOLCHAIN = "forge-demo-v1";
 
     public DemoPlan build(Path workspace, DemoScenario scenario) {
         return build(workspace, scenario, false, "");
     }
 
-    /** The one server-driven warm-up build: every task really executes once, so "reused previous output" is honest from the first guest visit onward. */
+    /**
+     * The one server-driven warm-up build: every task really executes once, so "reused previous
+     * output" is honest from the first guest visit onward.
+     */
     public DemoPlan buildFull(Path workspace, DemoScenario baselineScenario) {
         return build(workspace, baselineScenario, true, "");
     }
 
     /**
-     * The "traditional build" side of a guest comparison: also a full rebuild, but salted
-     * uniquely per guest visit so it can never hit the cache ForgeCI's own side just built up —
-     * a real non-incremental CI never reuses anything, and this build is standing in for one.
-     * Without this, a scenario a prior guest already ran would make the "traditional" side look
-     * fast too, once its own outputs from that prior run are sitting in the same cache.
+     * The "traditional build" side of a guest comparison: also a full rebuild, but salted uniquely
+     * per guest visit so it can never hit the cache ForgeCI's own side just built up — a real
+     * non-incremental CI never reuses anything, and this build is standing in for one. Without
+     * this, a scenario a prior guest already ran would make the "traditional" side look fast too,
+     * once its own outputs from that prior run are sitting in the same cache.
      */
-    public DemoPlan buildBaselineForComparison(Path workspace, DemoScenario scenario, String visitSalt) {
+    public DemoPlan buildBaselineForComparison(
+            Path workspace, DemoScenario scenario, String visitSalt) {
         return build(workspace, scenario, true, visitSalt);
     }
 
     private DemoPlan build(Path workspace, DemoScenario scenario, boolean full, String salt) {
         ForgeConfig config = ForgeConfigParser.parse(workspace.resolve("forgeci.yml"));
         TaskGraph graph = TaskGraph.build(config);
-        BuildPlan plan = full ? PlanBuilder.fullBuild(graph) : PlanBuilder.forChangedPaths(graph, scenario.changedPaths());
-        Map<String, String> environment = salt.isEmpty() ? Map.of() : Map.of("FORGE_DEMO_BASELINE_SALT", salt);
+        BuildPlan plan =
+                full
+                        ? PlanBuilder.fullBuild(graph)
+                        : PlanBuilder.forChangedPaths(graph, scenario.changedPaths());
+        Map<String, String> environment =
+                salt.isEmpty() ? Map.of() : Map.of("FORGE_DEMO_BASELINE_SALT", salt);
 
         Map<String, String> reasons = new LinkedHashMap<>();
         for (AffectedTask task : plan.selected()) {
@@ -72,7 +83,9 @@ public class DemoPlanFactory {
             for (String dependency : task.dependsOn()) {
                 dependencyDigests.put(dependency, digestByTask.get(dependency));
             }
-            CacheKey key = CacheKeyCalculator.compute(workspace, task, environment, dependencyDigests, TOOLCHAIN);
+            CacheKey key =
+                    CacheKeyCalculator.compute(
+                            workspace, task, environment, dependencyDigests, TOOLCHAIN);
             digestByTask.put(name, key.value());
 
             String reason = reasons.get(name);
@@ -93,11 +106,20 @@ public class DemoPlanFactory {
         return new DemoPlan(plan.changedPaths(), tasks, plan.unaffected());
     }
 
-    /** Every task first applies the same scenario the control plane just hashed against, then runs for real. */
+    /**
+     * Every task first applies the same scenario the control plane just hashed against, then runs
+     * for real.
+     */
     private static List<String> scenarioCommand(DemoScenario scenario, TaskDefinition task) {
         String original = String.join(" ", task.command());
-        return List.of("/bin/sh", "-c", "./scripts/apply-scenario " + scenario.scriptId() + " && " + original);
+        return List.of(
+                "/bin/sh",
+                "-c",
+                "./scripts/apply-scenario " + scenario.scriptId() + " && " + original);
     }
 
-    public record DemoPlan(List<String> changedPaths, List<TaskDefinitionRequest> tasks, List<String> unaffectedTasks) {}
+    public record DemoPlan(
+            List<String> changedPaths,
+            List<TaskDefinitionRequest> tasks,
+            List<String> unaffectedTasks) {}
 }

@@ -12,7 +12,11 @@ import picocli.CommandLine.Command;
         mixinStandardHelpOptions = true,
         version = "forge 0.1.0-SNAPSHOT",
         subcommands = {
-            InitCommand.class, PlanCommand.class, RunCommand.class, ExplainCommand.class, DoctorCommand.class
+            InitCommand.class,
+            PlanCommand.class,
+            RunCommand.class,
+            ExplainCommand.class,
+            DoctorCommand.class
         })
 public final class ForgeCli implements Runnable {
 

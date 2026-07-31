@@ -49,12 +49,13 @@ final class RandomGraphs {
                             "10m",
                             true));
         }
-        return new ForgeConfig(1, new ProjectInfo("seed-" + seed), new Defaults("10m", true), tasks);
+        return new ForgeConfig(
+                1, new ProjectInfo("seed-" + seed), new Defaults("10m", true), tasks);
     }
 
     /**
-     * The same graph with its task declaration order and every {@code depends_on} list shuffled —
-     * a different {@code forgeci.yml} spelling of an identical dependency structure.
+     * The same graph with its task declaration order and every {@code depends_on} list shuffled — a
+     * different {@code forgeci.yml} spelling of an identical dependency structure.
      */
     static ForgeConfig permute(ForgeConfig config, long seed) {
         Random random = new Random(seed);

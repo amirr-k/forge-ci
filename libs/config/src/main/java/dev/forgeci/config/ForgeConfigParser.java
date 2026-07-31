@@ -20,17 +20,25 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
 /**
- * Parses and strictly validates a {@code forgeci.yml} document into a {@link ForgeConfig}.
- * Rejects unknown fields, wrong types, and {@code depends_on} references to undefined tasks with
- * an actionable message naming the source file and the offending field path.
+ * Parses and strictly validates a {@code forgeci.yml} document into a {@link ForgeConfig}. Rejects
+ * unknown fields, wrong types, and {@code depends_on} references to undefined tasks with an
+ * actionable message naming the source file and the offending field path.
  */
 public final class ForgeConfigParser {
 
-    private static final Set<String> ROOT_FIELDS = Set.of("version", "project", "defaults", "tasks");
+    private static final Set<String> ROOT_FIELDS =
+            Set.of("version", "project", "defaults", "tasks");
     private static final Set<String> PROJECT_FIELDS = Set.of("name");
     private static final Set<String> DEFAULTS_FIELDS = Set.of("timeout", "cacheable");
     private static final Set<String> TASK_FIELDS =
-            Set.of("depends_on", "inputs", "outputs", "command", "environment", "timeout", "cacheable");
+            Set.of(
+                    "depends_on",
+                    "inputs",
+                    "outputs",
+                    "command",
+                    "environment",
+                    "timeout",
+                    "cacheable");
 
     private ForgeConfigParser() {}
 
@@ -44,7 +52,11 @@ public final class ForgeConfigParser {
             content = Files.readString(file);
         } catch (IOException e) {
             throw new ConfigValidationException(
-                    "cannot read " + file + ": " + e + ". Check that it is a readable UTF-8 text file.");
+                    "cannot read "
+                            + file
+                            + ": "
+                            + e
+                            + ". Check that it is a readable UTF-8 text file.");
         }
         return parse(content, file.toString());
     }
@@ -63,7 +75,10 @@ public final class ForgeConfigParser {
 
         int version = requireInt(rootMap, "version", sourceName, "");
         if (version != 1) {
-            throw fail(sourceName, "version", "unsupported schema version " + version + " (expected 1)");
+            throw fail(
+                    sourceName,
+                    "version",
+                    "unsupported schema version " + version + " (expected 1)");
         }
 
         ProjectInfo project = parseProject(rootMap, sourceName);
@@ -123,7 +138,8 @@ public final class ForgeConfigParser {
             List<String> inputs = optionalStringList(taskMap, "inputs", sourceName, context);
             List<String> outputs = optionalStringList(taskMap, "outputs", sourceName, context);
             List<String> command = requireCommand(taskMap, sourceName, context);
-            List<String> environment = optionalStringList(taskMap, "environment", sourceName, context);
+            List<String> environment =
+                    optionalStringList(taskMap, "environment", sourceName, context);
 
             String timeout = optionalString(taskMap, "timeout", sourceName, context);
             if (timeout != null) {
@@ -132,17 +148,26 @@ public final class ForgeConfigParser {
                 timeout = defaults.timeout();
             }
             boolean cacheable =
-                    optionalBoolean(taskMap, "cacheable", sourceName, context, defaults.cacheable());
+                    optionalBoolean(
+                            taskMap, "cacheable", sourceName, context, defaults.cacheable());
 
             tasks.put(
                     name,
                     new TaskDefinition(
-                            name, dependsOn, inputs, outputs, command, environment, timeout, cacheable));
+                            name,
+                            dependsOn,
+                            inputs,
+                            outputs,
+                            command,
+                            environment,
+                            timeout,
+                            cacheable));
         }
         return tasks;
     }
 
-    private static void validateTaskReferences(Map<String, TaskDefinition> tasks, String sourceName) {
+    private static void validateTaskReferences(
+            Map<String, TaskDefinition> tasks, String sourceName) {
         for (TaskDefinition task : tasks.values()) {
             for (String dependency : task.dependsOn()) {
                 if (!tasks.containsKey(dependency)) {
@@ -155,7 +180,8 @@ public final class ForgeConfigParser {
         }
     }
 
-    private static List<String> requireCommand(Map<String, Object> taskMap, String sourceName, String context) {
+    private static List<String> requireCommand(
+            Map<String, Object> taskMap, String sourceName, String context) {
         Object raw = taskMap.get("command");
         if (raw == null) {
             throw fail(sourceName, context, "missing required field 'command'");
@@ -173,7 +199,9 @@ public final class ForgeConfigParser {
         return command;
     }
 
-    /** Validated here, not at execution time, so a bad duration is reported with its file location. */
+    /**
+     * Validated here, not at execution time, so a bad duration is reported with its file location.
+     */
     private static void requireValidTimeout(String timeout, String sourceName, String context) {
         try {
             Durations.parse(timeout);
@@ -189,7 +217,11 @@ public final class ForgeConfigParser {
                 throw fail(
                         sourceName,
                         context,
-                        "unknown field '" + key + "' (allowed: " + String.join(", ", allowed) + ")");
+                        "unknown field '"
+                                + key
+                                + "' (allowed: "
+                                + String.join(", ", allowed)
+                                + ")");
             }
         }
     }
@@ -201,7 +233,8 @@ public final class ForgeConfigParser {
         }
         for (Object key : ((Map<?, ?>) value).keySet()) {
             if (!(key instanceof String)) {
-                throw fail(sourceName, context, "keys must be strings (got: " + typeName(key) + ")");
+                throw fail(
+                        sourceName, context, "keys must be strings (got: " + typeName(key) + ")");
             }
         }
         return (Map<String, Object>) value;
@@ -209,13 +242,18 @@ public final class ForgeConfigParser {
 
     private static List<String> asStringList(Object value, String sourceName, String context) {
         if (!(value instanceof List<?> list)) {
-            throw fail(sourceName, context, "must be a list of strings (got: " + typeName(value) + ")");
+            throw fail(
+                    sourceName,
+                    context,
+                    "must be a list of strings (got: " + typeName(value) + ")");
         }
         List<String> result = new ArrayList<>(list.size());
         for (Object element : list) {
             if (!(element instanceof String)) {
                 throw fail(
-                        sourceName, context, "must be a list of strings (found " + typeName(element) + ")");
+                        sourceName,
+                        context,
+                        "must be a list of strings (found " + typeName(element) + ")");
             }
             result.add((String) element);
         }
@@ -238,7 +276,10 @@ public final class ForgeConfigParser {
             return null;
         }
         if (!(raw instanceof String)) {
-            throw fail(sourceName, context + "." + field, "must be a string (got: " + typeName(raw) + ")");
+            throw fail(
+                    sourceName,
+                    context + "." + field,
+                    "must be a string (got: " + typeName(raw) + ")");
         }
         return (String) raw;
     }
@@ -256,24 +297,35 @@ public final class ForgeConfigParser {
     }
 
     private static boolean optionalBoolean(
-            Map<String, Object> map, String field, String sourceName, String context, boolean fallback) {
+            Map<String, Object> map,
+            String field,
+            String sourceName,
+            String context,
+            boolean fallback) {
         Object raw = map.get(field);
         if (raw == null) {
             return fallback;
         }
         if (!(raw instanceof Boolean)) {
-            throw fail(sourceName, context + "." + field, "must be true or false (got: " + typeName(raw) + ")");
+            throw fail(
+                    sourceName,
+                    context + "." + field,
+                    "must be true or false (got: " + typeName(raw) + ")");
         }
         return (Boolean) raw;
     }
 
-    private static int requireInt(Map<String, Object> map, String field, String sourceName, String context) {
+    private static int requireInt(
+            Map<String, Object> map, String field, String sourceName, String context) {
         Object raw = map.get(field);
         if (raw == null) {
             throw fail(sourceName, context, "missing required field '" + field + "'");
         }
         if (!(raw instanceof Integer)) {
-            throw fail(sourceName, context + "." + field, "must be an integer (got: " + typeName(raw) + ")");
+            throw fail(
+                    sourceName,
+                    context + "." + field,
+                    "must be an integer (got: " + typeName(raw) + ")");
         }
         return (Integer) raw;
     }
@@ -300,7 +352,8 @@ public final class ForgeConfigParser {
         return value.getClass().getSimpleName();
     }
 
-    private static ConfigValidationException fail(String sourceName, String context, String detail) {
+    private static ConfigValidationException fail(
+            String sourceName, String context, String detail) {
         String location = context.isEmpty() ? sourceName : sourceName + ": " + context;
         return new ConfigValidationException(location + ": " + detail);
     }

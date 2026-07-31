@@ -17,7 +17,23 @@ public record TaskResultEvent(
         String artifactDigest) {
 
     public TaskResultEvent(
-            long taskRunId, long workerId, String leaseToken, int attemptId, boolean success, Integer exitCode, String failureReason, String artifactDigest) {
-        this(1, taskRunId, workerId, leaseToken, attemptId, success, exitCode, failureReason, artifactDigest);
+            long taskRunId,
+            long workerId,
+            String leaseToken,
+            int attemptId,
+            boolean success,
+            Integer exitCode,
+            String failureReason,
+            String artifactDigest) {
+        this(
+                1,
+                taskRunId,
+                workerId,
+                leaseToken,
+                attemptId,
+                success,
+                exitCode,
+                failureReason,
+                artifactDigest);
     }
 }

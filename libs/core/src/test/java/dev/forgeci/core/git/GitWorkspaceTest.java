@@ -29,7 +29,10 @@ class GitWorkspaceTest {
                         .write("src/edit.txt", "before\n")
                         .write("src/remove.txt", "remove\n")
                         .commitAll("init");
-        repository.write("src/edit.txt", "after\n").delete("src/remove.txt").write("src/new.txt", "new\n");
+        repository
+                .write("src/edit.txt", "after\n")
+                .delete("src/remove.txt")
+                .write("src/new.txt", "new\n");
 
         assertEquals(
                 Set.of("src/edit.txt", "src/new.txt", "src/remove.txt"),
@@ -45,13 +48,16 @@ class GitWorkspaceTest {
         repository.move("src/old.txt", "src/new.txt");
 
         assertEquals(
-                Set.of("src/old.txt", "src/new.txt"), GitWorkspace.discover(directory).changedPaths(BASE));
+                Set.of("src/old.txt", "src/new.txt"),
+                GitWorkspace.discover(directory).changedPaths(BASE));
     }
 
     @Test
     void comparesAgainstAnEarlierRevision(@TempDir Path directory) {
         GitTestRepository repository =
-                GitTestRepository.initialize(directory).write("src/a.txt", "one\n").commitAll("first");
+                GitTestRepository.initialize(directory)
+                        .write("src/a.txt", "one\n")
+                        .commitAll("first");
         repository.write("src/a.txt", "two\n").write("src/b.txt", "b\n").commitAll("second");
 
         GitWorkspace workspace = GitWorkspace.discover(directory);
@@ -72,12 +78,14 @@ class GitWorkspaceTest {
 
         Path projectDirectory = directory.resolve("demo/project");
         assertEquals(
-                Set.of("src/inside.txt"), GitWorkspace.discover(projectDirectory).changedPaths(BASE));
+                Set.of("src/inside.txt"),
+                GitWorkspace.discover(projectDirectory).changedPaths(BASE));
     }
 
     @Test
     void treatsEveryFileAsNewBeforeTheFirstCommit(@TempDir Path directory) {
-        GitTestRepository repository = GitTestRepository.initialize(directory).write("src/a.txt", "a\n");
+        GitTestRepository repository =
+                GitTestRepository.initialize(directory).write("src/a.txt", "a\n");
         repository.git("add", "src/a.txt");
         repository.write("src/b.txt", "b\n");
 
@@ -88,9 +96,11 @@ class GitWorkspaceTest {
 
     @Test
     void refusesADirectoryOutsideAnyRepository(@TempDir Path directory) {
-        GitException failure = assertThrows(GitException.class, () -> GitWorkspace.discover(directory));
+        GitException failure =
+                assertThrows(GitException.class, () -> GitWorkspace.discover(directory));
 
-        assertTrue(failure.getMessage().contains("not inside a Git repository"), failure.getMessage());
+        assertTrue(
+                failure.getMessage().contains("not inside a Git repository"), failure.getMessage());
         assertTrue(failure.getMessage().contains("git init"), failure.getMessage());
     }
 

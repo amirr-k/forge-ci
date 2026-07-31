@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Per-task "remaining critical path" weight within one build's selected task set: the length of
- * the longest chain of still-to-run tasks from this task to a sink (a task nothing else in the
- * selected set depends on). The scheduler releases the highest-weight ready task first so work
- * feeding the longest remaining chain starts as early as possible — see
+ * Per-task "remaining critical path" weight within one build's selected task set: the length of the
+ * longest chain of still-to-run tasks from this task to a sink (a task nothing else in the selected
+ * set depends on). The scheduler releases the highest-weight ready task first so work feeding the
+ * longest remaining chain starts as early as possible — see
  * spec/reference/architecture.md#scheduler.
  */
 final class CriticalPathCalculator {
@@ -25,7 +25,9 @@ final class CriticalPathCalculator {
         }
         for (TaskDefinitionEntity task : tasks) {
             for (String dependency : task.getDependsOn()) {
-                dependents.computeIfAbsent(dependency, d -> new java.util.ArrayList<>()).add(task.getTaskName());
+                dependents
+                        .computeIfAbsent(dependency, d -> new java.util.ArrayList<>())
+                        .add(task.getTaskName());
             }
         }
 
@@ -36,7 +38,8 @@ final class CriticalPathCalculator {
         return memo;
     }
 
-    private static int weight(String name, Map<String, List<String>> dependents, Map<String, Integer> memo) {
+    private static int weight(
+            String name, Map<String, List<String>> dependents, Map<String, Integer> memo) {
         Integer cached = memo.get(name);
         if (cached != null) {
             return cached;
