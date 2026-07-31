@@ -316,6 +316,81 @@ log), bottom-pinned live timers, a result card populated from measured
 values once both builds finish, and a `Crash a Worker` action wired to
 the existing crash-injection endpoint.
 
+## Self-hosting and CI
+
+The repository root carries its own `forgeci.yml` (17 tasks) describing
+the Gradle multi-module graph one level down: a `<module>:build` /
+`<module>:test` pair per module, wired to the real `project(":...")`
+dependencies in each `build.gradle.kts` (e.g. `apps/control-plane` depends
+on `core`, `config`, `cache`, and `protocol`, so its tasks declare all
+four as `depends_on`), plus `ui:build` / `ui:test` for the Vite/React
+frontend. Every Gradle-invoking task declares `environment: ["JAVA_HOME"]`:
+`ProcessTaskRunner` starts each task from an empty environment by design
+(phase 2), so without that allowlist entry `./gradlew` fell back to the
+system default JVM (11) instead of the one `forge` itself resolved (21) —
+a real gap self-hosting surfaced, not a hypothetical one, fixed in
+`forgeci.yml` rather than in `ProcessTaskRunner` since the fix is exactly
+what the existing environment-allowlist field is for. Self-hosting also
+found `ui/`'s `npm test` had no `vitest` exclusion for `e2e/`, so it
+picked up a Playwright spec as a broken vitest suite; fixed with a `test:`
+block in `ui/vite.config.ts`.
+
+The CI wrapper (`.github/workflows/forgeci.yml`) runs on every pull
+request against `main`: resolves the merge-base of the PR against
+`origin/<base>`, runs `forge plan --base <merge-base>` then
+`forge run --base <merge-base>`, and feeds both text outputs to
+`.github/scripts/forgeci-summary.py`, which parses the CLI's fixed-width
+`Result`/`Plan` rows (the same format `PlanCommandTest`/`RunCommandTest`
+pin) into `forgeci-summary.json` — `{plan: {run, cached, unaffected,
+tasks}, run: {succeeded, failed, skipped, tasks}, ok}`. That file uploads
+as a workflow artifact on every run, and a PR comment (via
+`actions/github-script` and the default `GITHUB_TOKEN` — no additional
+credential wiring needed) reports the run/cached/unaffected and
+succeeded/failed/skipped counts, updating the same comment on later
+pushes rather than piling up new ones. `.forge/cache` (gitignored locally)
+is persisted across workflow runs with `actions/cache`, keyed by run id
+with a prefix `restore-keys` fallback — the mechanism that lets one PR's
+second CI run reuse the first run's cached task outputs instead of
+rebuilding.
+
+Measured evidence from applying this to ForgeCI's own repository:
+
+- A one-line change to `libs/core/.../Durations.java` produces a plan of
+  12 run / 0 cached / 5 unaffected — every module that depends on `core`
+  (directly or transitively) is selected, `ui:*` is not. Answers "can a
+  frontend-only change avoid rebuilding the backend and vice versa?" in
+  both directions: the same change set, restricted to `ui/src/main.tsx`
+  instead, produces 2 run (`ui:build`, `ui:test`) / 0 cached / 15
+  unaffected — no Gradle module is even considered.
+- Re-running that same core change end to end (`forge run`) showed
+  `core:build` and `core:test` actually execute, but every downstream
+  task (`cache:build`, `config:build`, `cli:build`,
+  `control-plane:build`, `worker:build`, and their `:test` tasks)
+  reports `restored from cache` rather than re-running — a comment-only
+  source edit recompiles to a byte-identical class output, so
+  `core:build`'s artifact digest is unchanged and nothing downstream's
+  cache key moves. This is real evidence the cache is keyed on artifact
+  content, not on "was an upstream task affected."
+- "Can the same cached output be reused between local and CI
+  environments?" — conditionally. `ToolchainFingerprint.current()`
+  (`"Java " + Runtime.version()`) is one direct input to every cache key,
+  so a cache entry is portable to another machine only if that machine's
+  `forge` CLI runs under the identical JVM build (major *and* patch
+  version) — the CI workflow pins `actions/setup-java` to Java 21 to
+  keep it close to the local toolchain, but an exact patch match with any
+  given developer's machine isn't guaranteed. Within CI itself, reuse is
+  unconditional and demonstrated: the `actions/cache` step restores the
+  same `.forge/cache` across two isolated job runs on the same PR, so a
+  second push that doesn't touch a given module's inputs restores that
+  module's prior artifact rather than rebuilding it.
+
+Self-hosting DispatchLab and Blackjack RL Lab (the phase's other two
+required repositories) is deferred by product decision — this pass
+applies ForgeCI only to itself; the sibling repos' `forgeci.yml`/CI-wrapper
+integration and their two self-hosting questions (matching-engine-affected
+DispatchLab benchmarks, C++-affected Blackjack native artifacts) are not
+yet answered.
+
 ## The `./forge` launcher
 
 `./forge` is a POSIX shell script at the repository root, not a packaged
