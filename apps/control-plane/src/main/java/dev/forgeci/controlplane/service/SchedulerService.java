@@ -33,11 +33,11 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Owns the parts of the worker protocol that aren't a single state transition: matching a
- * claiming worker against the highest-priority ready task run, promoting a task run's dependents
- * once it completes, retry backoff and attempt capping, lease expiry reclamation, and rolling a
- * task run's terminal result up into the owning build's state. See
- * spec/reference/architecture.md#scheduler for the tie-break rule this implements.
+ * Owns the parts of the worker protocol that aren't a single state transition: matching a claiming
+ * worker against the highest-priority ready task run, promoting a task run's dependents once it
+ * completes, retry backoff and attempt capping, lease expiry reclamation, and rolling a task run's
+ * terminal result up into the owning build's state. See spec/reference/architecture.md#scheduler
+ * for the tie-break rule this implements.
  */
 @Service
 public class SchedulerService {
@@ -93,15 +93,19 @@ public class SchedulerService {
      * stopped being eligible between the query and the lock is skipped in favor of the next one.
      *
      * <p>Each candidate attempt runs in its own {@code REQUIRES_NEW} transaction rather than
-     * joining this method's: {@link TaskRunStateMachine#transition} is itself {@code @Transactional}
-     * with the default (joining) propagation, and a losing candidate's exception would otherwise
-     * mark this whole method's transaction rollback-only — turning "skip this candidate, try the
-     * next one" into an {@code UnexpectedRollbackException} on whatever eventually succeeds.
+     * joining this method's: {@link TaskRunStateMachine#transition} is itself
+     * {@code @Transactional} with the default (joining) propagation, and a losing candidate's
+     * exception would otherwise mark this whole method's transaction rollback-only — turning "skip
+     * this candidate, try the next one" into an {@code UnexpectedRollbackException} on whatever
+     * eventually succeeds.
      */
     @Transactional
     public Optional<TaskRun> claim(Long workerId) {
         Worker worker =
-                workerRepository.findByIdForUpdate(workerId).orElseThrow(() -> new NotFoundException("worker " + workerId + " not found"));
+                workerRepository
+                        .findByIdForUpdate(workerId)
+                        .orElseThrow(
+                                () -> new NotFoundException("worker " + workerId + " not found"));
         if (worker.getState() != WorkerState.ACTIVE) {
             return Optional.empty();
         }
@@ -109,7 +113,8 @@ public class SchedulerService {
             return Optional.empty();
         }
 
-        List<TaskRun> candidates = taskRunRepository.findClaimCandidates(PageRequest.of(0, CLAIM_CANDIDATE_LIMIT));
+        List<TaskRun> candidates =
+                taskRunRepository.findClaimCandidates(PageRequest.of(0, CLAIM_CANDIDATE_LIMIT));
         for (TaskRun candidate : candidates) {
             Optional<TaskRun> leased = attemptLease(candidate, workerId);
             if (leased.isPresent()) {
@@ -124,19 +129,27 @@ public class SchedulerService {
 
     private Optional<TaskRun> attemptLease(TaskRun candidate, Long workerId) {
         try {
-            return Optional.of(leaseTransactionTemplate.execute(status -> leaseAndStart(candidate, workerId)));
-        } catch (StaleTransitionException | InvalidTransitionException | ObjectOptimisticLockingFailureException lostRace) {
+            return Optional.of(
+                    leaseTransactionTemplate.execute(status -> leaseAndStart(candidate, workerId)));
+        } catch (StaleTransitionException
+                | InvalidTransitionException
+                | ObjectOptimisticLockingFailureException lostRace) {
             return Optional.empty();
         }
     }
 
     private TaskRun leaseAndStart(TaskRun candidate, Long workerId) {
         TaskRun leased =
-                taskRunStateMachine.transition(candidate.getId(), candidate.getVersion(), TaskRunState.LEASED, TaskRunOutcome.NONE);
+                taskRunStateMachine.transition(
+                        candidate.getId(),
+                        candidate.getVersion(),
+                        TaskRunState.LEASED,
+                        TaskRunOutcome.NONE);
         TaskDefinitionEntity definition = definitionOf(leased);
         leased.setLeaseToken(UUID.randomUUID().toString());
         leased.setWorkerId(workerId);
-        Instant leaseExpiration = Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(leaseGrace);
+        Instant leaseExpiration =
+                Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(leaseGrace);
         leased.setLeaseExpiration(leaseExpiration);
         leased = taskRunRepository.saveAndFlush(leased);
         markLeaseInRedis(leased.getId(), leased.getLeaseToken(), leaseExpiration);
@@ -145,7 +158,8 @@ public class SchedulerService {
         // claiming a task run means the worker is about to execute it immediately, so this moves
         // it straight on to RUNNING in the same transaction. The re-fetch inside transition()
         // already picks up the lease fields just flushed above.
-        return taskRunStateMachine.transition(leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
+        return taskRunStateMachine.transition(
+                leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
     }
 
     /**
@@ -165,16 +179,24 @@ public class SchedulerService {
             Integer exitCode,
             String failureReason,
             String artifactDigest) {
-        TaskRun taskRun = taskRunRepository.findById(taskRunId).orElseThrow(() -> new NotFoundException("task run " + taskRunId + " not found"));
+        TaskRun taskRun =
+                taskRunRepository
+                        .findById(taskRunId)
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "task run " + taskRunId + " not found"));
 
         if (taskRun.getState().isTerminal()) {
             if (matchesLease(taskRun, workerId, leaseToken, attemptId)) {
                 return taskRun; // duplicate of an already-accepted result — no-op
             }
-            throw new LeaseRejectedException("task run " + taskRunId + " already resolved by a different attempt");
+            throw new LeaseRejectedException(
+                    "task run " + taskRunId + " already resolved by a different attempt");
         }
         if (!matchesLease(taskRun, workerId, leaseToken, attemptId)) {
-            throw new LeaseRejectedException("task run " + taskRunId + " lease token/worker/attempt mismatch");
+            throw new LeaseRejectedException(
+                    "task run " + taskRunId + " lease token/worker/attempt mismatch");
         }
 
         releaseWorkerLease(workerId);
@@ -183,9 +205,13 @@ public class SchedulerService {
         if (success) {
             TaskRun result =
                     taskRunStateMachine.transition(
-                            taskRunId, taskRun.getVersion(), TaskRunState.SUCCEEDED, new TaskRunOutcome(exitCode, null, artifactDigest));
+                            taskRunId,
+                            taskRun.getVersion(),
+                            TaskRunState.SUCCEEDED,
+                            new TaskRunOutcome(exitCode, null, artifactDigest));
             if (result.getStartedAt() != null && result.getCompletedAt() != null) {
-                metrics.taskCompleted(Duration.between(result.getStartedAt(), result.getCompletedAt()));
+                metrics.taskCompleted(
+                        Duration.between(result.getStartedAt(), result.getCompletedAt()));
             }
             promoteReadyDependents(result);
             maybeCompleteBuild(result.getBuild().getId());
@@ -195,7 +221,10 @@ public class SchedulerService {
         if (taskRun.getAttemptCount() < MAX_ATTEMPTS) {
             TaskRun result =
                     taskRunStateMachine.transition(
-                            taskRunId, taskRun.getVersion(), TaskRunState.RETRY_WAIT, new TaskRunOutcome(exitCode, failureReason, null));
+                            taskRunId,
+                            taskRun.getVersion(),
+                            TaskRunState.RETRY_WAIT,
+                            new TaskRunOutcome(exitCode, failureReason, null));
             result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
             taskRunRepository.save(result);
             metrics.taskRetried();
@@ -204,7 +233,10 @@ public class SchedulerService {
 
         TaskRun result =
                 taskRunStateMachine.transition(
-                        taskRunId, taskRun.getVersion(), TaskRunState.FAILED, new TaskRunOutcome(exitCode, failureReason, null));
+                        taskRunId,
+                        taskRun.getVersion(),
+                        TaskRunState.FAILED,
+                        new TaskRunOutcome(exitCode, failureReason, null));
         failBuild(result.getBuild().getId());
         return result;
     }
@@ -213,11 +245,18 @@ public class SchedulerService {
     @Scheduled(fixedDelayString = "${forge.scheduler.retry-sweep-interval-ms:2000}")
     @Transactional
     public void promoteDueRetries() {
-        for (TaskRun taskRun : taskRunRepository.findByStateAndRetryAtBefore(TaskRunState.RETRY_WAIT, Instant.now())) {
+        for (TaskRun taskRun :
+                taskRunRepository.findByStateAndRetryAtBefore(
+                        TaskRunState.RETRY_WAIT, Instant.now())) {
             try {
-                taskRunStateMachine.transition(taskRun.getId(), taskRun.getVersion(), TaskRunState.READY, TaskRunOutcome.NONE);
+                taskRunStateMachine.transition(
+                        taskRun.getId(),
+                        taskRun.getVersion(),
+                        TaskRunState.READY,
+                        TaskRunOutcome.NONE);
             } catch (StaleTransitionException | InvalidTransitionException raced) {
-                log.debug("task run {} already moved on before its retry promotion", taskRun.getId());
+                log.debug(
+                        "task run {} already moved on before its retry promotion", taskRun.getId());
             }
         }
     }
@@ -253,8 +292,12 @@ public class SchedulerService {
     }
 
     private void reclaimIfStillExpired(TaskRun taskRun) {
-        boolean stillLeased = taskRun.getState() == TaskRunState.LEASED || taskRun.getState() == TaskRunState.RUNNING;
-        boolean stillExpired = taskRun.getLeaseExpiration() != null && taskRun.getLeaseExpiration().isBefore(Instant.now());
+        boolean stillLeased =
+                taskRun.getState() == TaskRunState.LEASED
+                        || taskRun.getState() == TaskRunState.RUNNING;
+        boolean stillExpired =
+                taskRun.getLeaseExpiration() != null
+                        && taskRun.getLeaseExpiration().isBefore(Instant.now());
         if (!stillLeased || !stillExpired) {
             return;
         }
@@ -270,16 +313,30 @@ public class SchedulerService {
                                 TaskRunState.RETRY_WAIT,
                                 new TaskRunOutcome(null, "lease expired", null));
                 result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
+                // the state machine only ever moves state fields for RETRY_WAIT — clearing the
+                // lease
+                // token here too is what makes the reclaimed worker's late report fail the lease
+                // check (403) instead of coincidentally still matching and only then hitting an
+                // invalid-transition error (409) once it tries to move a RETRY_WAIT run to
+                // SUCCEEDED
+                result.setLeaseToken(null);
                 taskRunRepository.save(result);
                 metrics.taskRetried();
             } else {
                 TaskRun result =
                         taskRunStateMachine.transition(
-                                taskRun.getId(), taskRun.getVersion(), TaskRunState.FAILED, new TaskRunOutcome(null, "lease expired", null));
+                                taskRun.getId(),
+                                taskRun.getVersion(),
+                                TaskRunState.FAILED,
+                                new TaskRunOutcome(null, "lease expired", null));
+                result.setLeaseToken(null);
+                taskRunRepository.save(result);
                 failBuild(result.getBuild().getId());
             }
         } catch (StaleTransitionException | InvalidTransitionException raced) {
-            log.debug("task run {} already moved on before its lease expiry was reclaimed", taskRun.getId());
+            log.debug(
+                    "task run {} already moved on before its lease expiry was reclaimed",
+                    taskRun.getId());
         }
     }
 
@@ -293,13 +350,20 @@ public class SchedulerService {
     public void reconcileRedisLeases() {
         try {
             Instant now = Instant.now();
-            for (TaskRun taskRun : taskRunRepository.findByStateIn(List.of(TaskRunState.LEASED, TaskRunState.RUNNING))) {
-                if (taskRun.getLeaseExpiration() != null && taskRun.getLeaseExpiration().isAfter(now) && taskRun.getLeaseToken() != null) {
-                    markLeaseInRedis(taskRun.getId(), taskRun.getLeaseToken(), taskRun.getLeaseExpiration());
+            for (TaskRun taskRun :
+                    taskRunRepository.findByStateIn(
+                            List.of(TaskRunState.LEASED, TaskRunState.RUNNING))) {
+                if (taskRun.getLeaseExpiration() != null
+                        && taskRun.getLeaseExpiration().isAfter(now)
+                        && taskRun.getLeaseToken() != null) {
+                    markLeaseInRedis(
+                            taskRun.getId(), taskRun.getLeaseToken(), taskRun.getLeaseExpiration());
                 }
             }
         } catch (RuntimeException redisUnavailable) {
-            log.debug("skipping Redis lease reconciliation, Redis unavailable: {}", redisUnavailable.getMessage());
+            log.debug(
+                    "skipping Redis lease reconciliation, Redis unavailable: {}",
+                    redisUnavailable.getMessage());
         }
     }
 
@@ -311,7 +375,10 @@ public class SchedulerService {
         try {
             redis.opsForValue().set(RedisKeys.lease(taskRunId), leaseToken, ttl);
         } catch (RuntimeException redisUnavailable) {
-            log.debug("could not mark lease for task run {} in Redis: {}", taskRunId, redisUnavailable.getMessage());
+            log.debug(
+                    "could not mark lease for task run {} in Redis: {}",
+                    taskRunId,
+                    redisUnavailable.getMessage());
         }
     }
 
@@ -319,7 +386,10 @@ public class SchedulerService {
         try {
             redis.delete(RedisKeys.lease(taskRunId));
         } catch (RuntimeException redisUnavailable) {
-            log.debug("could not clear lease for task run {} in Redis: {}", taskRunId, redisUnavailable.getMessage());
+            log.debug(
+                    "could not clear lease for task run {} in Redis: {}",
+                    taskRunId,
+                    redisUnavailable.getMessage());
         }
     }
 
@@ -335,7 +405,10 @@ public class SchedulerService {
         }
         workerRepository
                 .findByIdForUpdate(workerId)
-                .ifPresent(worker -> worker.setActiveLeaseCount(Math.max(0, worker.getActiveLeaseCount() - 1)));
+                .ifPresent(
+                        worker ->
+                                worker.setActiveLeaseCount(
+                                        Math.max(0, worker.getActiveLeaseCount() - 1)));
     }
 
     private void promoteReadyDependents(TaskRun completed) {
@@ -359,7 +432,10 @@ public class SchedulerService {
             // before the build was planned, not that it's now permanently unsatisfiable
             boolean allSatisfied =
                     definition.getDependsOn().stream()
-                            .allMatch(dep -> !stateByName.containsKey(dep) || isSatisfied(stateByName.get(dep)));
+                            .allMatch(
+                                    dep ->
+                                            !stateByName.containsKey(dep)
+                                                    || isSatisfied(stateByName.get(dep)));
             if (allSatisfied) {
                 promoteToReadyOrCached(sibling, completed.getBuild().getProject().getId());
             }
@@ -377,17 +453,24 @@ public class SchedulerService {
      * SUCCEEDED} does ({@link #isSatisfied} already treats them identically) — nothing else will
      * ever call {@link #reportResult} for a task that was never claimed by a worker, so without
      * this a cache hit on any task with dependents would strand the rest of the build in {@code
-     * PENDING} forever. Completion itself is left to the caller (every call site already checks
-     * it right after triggering promotion) — calling {@link #maybeCompleteBuild} again from here
-     * would re-enter it inside the same transaction for no benefit.
+     * PENDING} forever. Completion itself is left to the caller (every call site already checks it
+     * right after triggering promotion) — calling {@link #maybeCompleteBuild} again from here would
+     * re-enter it inside the same transaction for no benefit.
      */
     @Transactional
     public void promoteToReadyOrCached(TaskRun taskRun, Long projectId) {
         TaskRun ready;
         try {
-            ready = taskRunStateMachine.transition(taskRun.getId(), taskRun.getVersion(), TaskRunState.READY, TaskRunOutcome.NONE);
+            ready =
+                    taskRunStateMachine.transition(
+                            taskRun.getId(),
+                            taskRun.getVersion(),
+                            TaskRunState.READY,
+                            TaskRunOutcome.NONE);
         } catch (StaleTransitionException | InvalidTransitionException raced) {
-            log.debug("task run {} readiness promotion raced with another transition", taskRun.getId());
+            log.debug(
+                    "task run {} readiness promotion raced with another transition",
+                    taskRun.getId());
             return;
         }
         Optional<Artifact> hit = remoteArtifactService.verifiedHit(ready.getCacheKey(), projectId);
@@ -398,9 +481,13 @@ public class SchedulerService {
         try {
             cached =
                     taskRunStateMachine.transition(
-                            ready.getId(), ready.getVersion(), TaskRunState.CACHED, new TaskRunOutcome(null, null, hit.get().getDigest()));
+                            ready.getId(),
+                            ready.getVersion(),
+                            TaskRunState.CACHED,
+                            new TaskRunOutcome(null, null, hit.get().getDigest()));
         } catch (StaleTransitionException | InvalidTransitionException raced) {
-            log.debug("task run {} cache-hit promotion raced with another transition", ready.getId());
+            log.debug(
+                    "task run {} cache-hit promotion raced with another transition", ready.getId());
             return;
         }
         promoteReadyDependents(cached);
@@ -410,20 +497,29 @@ public class SchedulerService {
         return state == TaskRunState.SUCCEEDED || state == TaskRunState.CACHED;
     }
 
-    /** Public so {@link BuildService} can also check completion right after materializing a build whose tasks were all cache hits. */
+    /**
+     * Public so {@link BuildService} can also check completion right after materializing a build
+     * whose tasks were all cache hits.
+     */
     @Transactional
     public void maybeCompleteBuild(Long buildId) {
         List<TaskRun> runs = taskRunRepository.findByBuildId(buildId);
         boolean allDone =
-                runs.stream().allMatch(r -> r.getState() == TaskRunState.SUCCEEDED || r.getState() == TaskRunState.CACHED);
+                runs.stream()
+                        .allMatch(
+                                r ->
+                                        r.getState() == TaskRunState.SUCCEEDED
+                                                || r.getState() == TaskRunState.CACHED);
         if (!allDone) {
             return;
         }
         try {
             Build build = buildRepository.findById(buildId).orElseThrow();
-            Build completed = buildStateMachine.transition(buildId, build.getVersion(), BuildState.SUCCEEDED);
+            Build completed =
+                    buildStateMachine.transition(buildId, build.getVersion(), BuildState.SUCCEEDED);
             if (completed.getStartedAt() != null && completed.getCompletedAt() != null) {
-                metrics.buildSucceeded(Duration.between(completed.getStartedAt(), completed.getCompletedAt()));
+                metrics.buildSucceeded(
+                        Duration.between(completed.getStartedAt(), completed.getCompletedAt()));
             }
         } catch (StaleTransitionException | InvalidTransitionException alreadyResolved) {
             log.debug("build {} already resolved", buildId);
@@ -433,24 +529,42 @@ public class SchedulerService {
     private void failBuild(Long buildId) {
         try {
             Build build = buildRepository.findById(buildId).orElseThrow();
-            Build failed = buildStateMachine.transition(buildId, build.getVersion(), BuildState.FAILED);
+            Build failed =
+                    buildStateMachine.transition(buildId, build.getVersion(), BuildState.FAILED);
             if (failed.getStartedAt() != null && failed.getCompletedAt() != null) {
-                metrics.buildFailed(Duration.between(failed.getStartedAt(), failed.getCompletedAt()));
+                metrics.buildFailed(
+                        Duration.between(failed.getStartedAt(), failed.getCompletedAt()));
             }
         } catch (StaleTransitionException | InvalidTransitionException alreadyResolved) {
             log.debug("build {} already resolved", buildId);
         }
     }
 
-    /** Log lines for one attempt, validated against the same lease every report is checked against. */
+    /**
+     * Log lines for one attempt, validated against the same lease every report is checked against.
+     */
     @Transactional(readOnly = true)
-    public void appendLogs(Long taskRunId, Long workerId, String leaseToken, int attemptId, List<String> lines) {
-        TaskRun taskRun = taskRunRepository.findById(taskRunId).orElseThrow(() -> new NotFoundException("task run " + taskRunId + " not found"));
+    public void appendLogs(
+            Long taskRunId, Long workerId, String leaseToken, int attemptId, List<String> lines) {
+        TaskRun taskRun =
+                taskRunRepository
+                        .findById(taskRunId)
+                        .orElseThrow(
+                                () ->
+                                        new NotFoundException(
+                                                "task run " + taskRunId + " not found"));
         if (!matchesLease(taskRun, workerId, leaseToken, attemptId)) {
-            throw new LeaseRejectedException("task run " + taskRunId + " lease token/worker/attempt mismatch");
+            throw new LeaseRejectedException(
+                    "task run " + taskRunId + " lease token/worker/attempt mismatch");
         }
         for (String line : lines) {
-            log.info("[build {} task {} attempt {} worker {}] {}", taskRun.getBuild().getId(), taskRun.getTaskName(), attemptId, workerId, line);
+            log.info(
+                    "[build {} task {} attempt {} worker {}] {}",
+                    taskRun.getBuild().getId(),
+                    taskRun.getTaskName(),
+                    attemptId,
+                    workerId,
+                    line);
         }
     }
 
@@ -460,7 +574,12 @@ public class SchedulerService {
                 return definition;
             }
         }
-        throw new IllegalStateException("no task definition for task run " + taskRun.getId() + " (" + taskRun.getTaskName() + ")");
+        throw new IllegalStateException(
+                "no task definition for task run "
+                        + taskRun.getId()
+                        + " ("
+                        + taskRun.getTaskName()
+                        + ")");
     }
 
     static Duration backoff(int attemptsSoFar) {
