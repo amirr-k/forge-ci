@@ -1,0 +1,25 @@
+#!/bin/sh
+# Resets the bundled demo repo to its pristine baseline, then overlays exactly the files one
+# allowlisted public-demo scenario changes. This is the single source of truth for "what does
+# scenario X change" — both the control plane (computing real cache keys from these files) and
+# the worker (executing scripts/task against these files) run this script before doing anything
+# else, so neither side can drift from the other.
+set -eu
+
+scenario=$1
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+
+cp -r scenarios/baseline/. .
+
+case "$scenario" in
+  no-change) ;;
+  leaf-module|worker-crash) cp -r scenarios/leaf-module/. . ;;
+  shared-core) cp -r scenarios/shared-core/. . ;;
+  config-toolchain) cp -r scenarios/config-toolchain/. . ;;
+  failed-test) cp -r scenarios/failed-test/. . ;;
+  *)
+    echo "unknown scenario: $scenario" >&2
+    exit 1
+    ;;
+esac

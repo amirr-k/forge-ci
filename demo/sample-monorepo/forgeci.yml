@@ -11,16 +11,65 @@ tasks:
   shared:build:
     inputs:
       - "services/shared/**"
+      - "toolchain.lock"
     outputs:
       - "build/shared/**"
     command: ["./scripts/task", "build", "shared"]
 
-  accounts:test:
+  shared:test:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/shared/**"
+    outputs:
+      - "build/shared/test.txt"
+    command: ["./scripts/task", "test", "shared"]
+
+  auth:build:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/auth/**"
+    outputs:
+      - "build/auth/**"
+    command: ["./scripts/task", "build", "auth"]
+
+  auth:test:
+    depends_on:
+      - "auth:build"
+    inputs:
+      - "services/auth/**"
+    outputs:
+      - "build/auth/test.txt"
+    command: ["./scripts/task", "test", "auth"]
+
+  accounts:build:
+    depends_on:
+      - "shared:build"
     inputs:
       - "services/accounts/**"
     outputs:
       - "build/accounts/**"
+    command: ["./scripts/task", "build", "accounts"]
+
+  accounts:test:
+    depends_on:
+      - "accounts:build"
+      - "auth:test"
+    inputs:
+      - "services/accounts/**"
+    outputs:
+      - "build/accounts/test.txt"
     command: ["./scripts/task", "test", "accounts"]
+
+  accounts:package:
+    depends_on:
+      - "accounts:test"
+    inputs:
+      - "services/accounts/**"
+    outputs:
+      - "build/accounts/package.txt"
+    command: ["./scripts/task", "package", "accounts"]
 
   catalog:build:
     depends_on:
@@ -31,6 +80,33 @@ tasks:
       - "build/catalog/**"
     command: ["./scripts/task", "build", "catalog"]
 
+  catalog:test:
+    depends_on:
+      - "catalog:build"
+    inputs:
+      - "services/catalog/**"
+    outputs:
+      - "build/catalog/test.txt"
+    command: ["./scripts/task", "test", "catalog"]
+
+  search:build:
+    depends_on:
+      - "catalog:build"
+    inputs:
+      - "services/search/**"
+    outputs:
+      - "build/search/**"
+    command: ["./scripts/task", "build", "search"]
+
+  search:test:
+    depends_on:
+      - "search:build"
+    inputs:
+      - "services/search/**"
+    outputs:
+      - "build/search/test.txt"
+    command: ["./scripts/task", "test", "search"]
+
   payments:build:
     depends_on:
       - "shared:build"
@@ -39,6 +115,15 @@ tasks:
     outputs:
       - "build/payments/**"
     command: ["./scripts/task", "build", "payments"]
+
+  payments:test:
+    depends_on:
+      - "payments:build"
+    inputs:
+      - "services/payments/**"
+    outputs:
+      - "build/payments/test.txt"
+    command: ["./scripts/task", "test", "payments"]
 
   pricing:test:
     depends_on:
@@ -58,25 +143,91 @@ tasks:
       - "build/pricing/build.txt"
     command: ["./scripts/task", "build", "pricing"]
 
+  orders:build:
+    depends_on:
+      - "catalog:build"
+      - "payments:build"
+    inputs:
+      - "services/orders/**"
+    outputs:
+      - "build/orders/**"
+    command: ["./scripts/task", "build", "orders"]
+
+  orders:test:
+    depends_on:
+      - "orders:build"
+    inputs:
+      - "services/orders/**"
+    outputs:
+      - "build/orders/test.txt"
+    command: ["./scripts/task", "test", "orders"]
+
+  notifications:build:
+    depends_on:
+      - "shared:build"
+    inputs:
+      - "services/notifications/**"
+    outputs:
+      - "build/notifications/**"
+    command: ["./scripts/task", "build", "notifications"]
+
+  notifications:test:
+    depends_on:
+      - "notifications:build"
+    inputs:
+      - "services/notifications/**"
+    outputs:
+      - "build/notifications/test.txt"
+    command: ["./scripts/task", "test", "notifications"]
+
   storefront:build:
     depends_on:
       - "catalog:build"
+      - "search:build"
     inputs:
       - "services/storefront/**"
     outputs:
       - "build/storefront/**"
     command: ["./scripts/task", "build", "storefront"]
 
+  storefront:test:
+    depends_on:
+      - "storefront:build"
+    inputs:
+      - "services/storefront/**"
+    outputs:
+      - "build/storefront/test.txt"
+    command: ["./scripts/task", "test", "storefront"]
+
+  storefront:package:
+    depends_on:
+      - "storefront:test"
+    inputs:
+      - "services/storefront/**"
+    outputs:
+      - "build/storefront/package.txt"
+    command: ["./scripts/task", "package", "storefront"]
+
   checkout:integration:
     depends_on:
       - "pricing:build"
       - "payments:build"
-      - "catalog:build"
+      - "orders:build"
+      - "auth:test"
     inputs:
       - "services/checkout/**"
     outputs:
       - "build/checkout/**"
     command: ["./scripts/task", "integration", "checkout"]
+
+  checkout:package:
+    depends_on:
+      - "checkout:integration"
+    inputs:
+      - "services/checkout/**"
+    outputs:
+      - "build/checkout/package.txt"
+    command: ["./scripts/task", "package", "checkout"]
 
   verify:contracts:
     depends_on:
