@@ -142,8 +142,12 @@ jobs:
           cat /tmp/vite.log >&2
           exit 1
 
+      # only the live-stack spec belongs here. e2e/static-demo.spec.ts exercises the built static
+      # bundle against the Pages base path and is run by .github/workflows/pages.yml, which builds
+      # ui/dist first; this job serves a dev server and has no dist to point it at.
       - name: run the primary-demo browser test
-        run: npm run e2e --prefix ui
+        working-directory: ui
+        run: npx playwright test e2e/primary-demo.spec.ts
 
       - name: dump compose logs on failure
         if: failure()
