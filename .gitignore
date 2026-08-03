@@ -35,3 +35,11 @@ test-results/
 # Python tooling
 __pycache__/
 *.pyc
+
+# Terraform (temporary AWS benchmark stack only)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+run.auto.tfvars
+crash.log

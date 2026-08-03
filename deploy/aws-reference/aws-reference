@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# One entry point for the temporary AWS benchmark environment.
+#
+#   ./aws-reference estimate    what the run will cost, and refuse if over the ceiling
+#   ./aws-reference provision   record the starting inventory, then terraform apply
+#   ./aws-reference deploy      ship the repo to the host and start the stack
+#   ./aws-reference smoke       prove the deployed stack is healthy
+#   ./aws-reference evidence    pull benchmark results back off the host
+#   ./aws-reference destroy     terraform destroy
+#   ./aws-reference audit       fail if any billable tagged resource still exists
+#   ./aws-reference run         estimate -> provision -> deploy -> smoke -> benchmark ->
+#                               evidence -> destroy -> audit, with destroy+audit guaranteed
+#
+# The whole point of this file is that step 'destroy' happens even when an earlier step fails.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
+EVIDENCE_DIR="$REPO/benchmarks/results/raw"
+
+# hard ceiling from spec/phases/phase-11: no more than $1.00 of one-time spend
+MAX_SPEND_USD="1.00"
+
+# on-demand us-east-1 list prices, USD/hour. Deliberately conservative and easy to re-check.
+PRICE_T3_MEDIUM="0.0416"
+PRICE_EBS_GP3_GB_MONTH="0.08"
+PRICE_PUBLIC_IPV4="0.005"
+BUDGET_HOURS="${BUDGET_HOURS:-2}"
+
+log()  { printf '\033[1m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[33m!!  %s\033[0m\n' "$*" >&2; }
+die()  { printf '\033[31mxx  %s\033[0m\n' "$*" >&2; exit 1; }
+
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required but not installed"; }
+
+tf() { terraform -chdir="$HERE" "$@"; }
+
+require_creds() {
+    need aws
+    aws sts get-caller-identity >/dev/null 2>&1 || die \
+        "AWS credentials are not valid. Run your SSO login (or refresh ~/.aws/credentials) and retry."
+}
+
+run_id()   { echo "${FORGE_RUN_ID:?run: set FORGE_RUN_ID (e.g. export FORGE_RUN_ID=bench-$(date -u +%Y%m%d-%H%M))}"; }
+region()   { echo "${AWS_REGION:-us-east-1}"; }
+
+tfvars() {
+    cat <<EOF
+run_id        = "$(run_id)"
+commit        = "$(git -C "$REPO" rev-parse --short HEAD)"
+expires_at    = "$(date -u -v+${BUDGET_HOURS}H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "+${BUDGET_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)"
+operator_cidr = "${FORGE_OPERATOR_CIDR:-$(curl -s https://checkip.amazonaws.com | tr -d '\n')/32}"
+region        = "$(region)"
+EOF
+}
+
+cmd_estimate() {
+    local ec2 ebs ip total
+    ec2=$(echo "$PRICE_T3_MEDIUM * $BUDGET_HOURS" | bc -l)
+    ebs=$(echo "$PRICE_EBS_GP3_GB_MONTH * 20 / 730 * $BUDGET_HOURS" | bc -l)
+    ip=$(echo "$PRICE_PUBLIC_IPV4 * $BUDGET_HOURS" | bc -l)
+    total=$(printf '%.4f' "$(echo "$ec2 + $ebs + $ip" | bc -l)")
+
+    log "cost estimate for a ${BUDGET_HOURS}h window in $(region)"
+    printf '  t3.medium on-demand   $%s/h x %sh = $%.4f\n' "$PRICE_T3_MEDIUM" "$BUDGET_HOURS" "$ec2"
+    printf '  20 GB gp3 EBS                         = $%.4f\n' "$ebs"
+    printf '  public IPv4                           = $%.4f\n' "$ip"
+    printf '  S3 (a few MB, deleted same hour)      ~ $0.0000\n'
+    printf '  ---------------------------------------------\n'
+    printf '  maximum one-time total                = $%s\n' "$total"
+    printf '  authorized ceiling                    = $%s\n' "$MAX_SPEND_USD"
+
+    if (( $(echo "$total > $MAX_SPEND_USD" | bc -l) )); then
+        die "estimate \$$total exceeds the \$$MAX_SPEND_USD ceiling — refusing to provision"
+    fi
+    log "estimate is within the authorized ceiling"
+}
+
+# A pre-existing ForgeCI resource would make the post-run audit ambiguous: we could not tell a leak
+# from something that was already there. So we record the starting inventory and refuse if it is dirty.
+cmd_inventory() {
+    require_creds
+    local out="${1:-/dev/stdout}"
+    {
+        echo "# AWS inventory for project=forgeci at $(date -u +%Y-%m-%dT%H:%M:%SZ) in $(region)"
+        echo "## ec2 instances"
+        aws ec2 describe-instances --region "$(region)" \
+            --filters "Name=tag:project,Values=forgeci" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query 'Reservations[].Instances[].[InstanceId,State.Name,Tags[?Key==`run_id`]|[0].Value]' --output text
+        echo "## ebs volumes"
+        aws ec2 describe-volumes --region "$(region)" \
+            --filters "Name=tag:project,Values=forgeci" --query 'Volumes[].[VolumeId,State]' --output text
+        echo "## elastic ips"
+        aws ec2 describe-addresses --region "$(region)" \
+            --filters "Name=tag:project,Values=forgeci" --query 'Addresses[].[AllocationId,PublicIp]' --output text
+        echo "## security groups"
+        aws ec2 describe-security-groups --region "$(region)" \
+            --filters "Name=tag:project,Values=forgeci" --query 'SecurityGroups[].[GroupId,GroupName]' --output text
+        echo "## s3 buckets"
+        aws s3api list-buckets --query 'Buckets[?starts_with(Name, `forgeci-bench-`)].Name' --output text
+        echo "## iam roles"
+        aws iam list-roles --query 'Roles[?starts_with(RoleName, `forgeci-bench-`)].RoleName' --output text
+        echo "## key pairs"
+        aws ec2 describe-key-pairs --region "$(region)" \
+            --query 'KeyPairs[?starts_with(KeyName, `forgeci-bench-`)].KeyName' --output text
+    } > "$out"
+}
+
+cmd_provision() {
+    require_creds
+    cmd_estimate
+
+    log "recording starting AWS inventory"
+    mkdir -p "$EVIDENCE_DIR"
+    cmd_inventory "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"
+    if grep -qE '^i-|^vol-|^eipalloc-' "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"; then
+        warn "pre-existing tagged ForgeCI resources found — a post-run audit could not distinguish"
+        warn "them from leaks. Clean them up first, or accept an inconclusive audit (phase 11 fails)."
+        die "refusing to provision onto a dirty account"
+    fi
+
+    tfvars > "$HERE/run.auto.tfvars"
+    tf init -input=false
+    tf apply -input=false -auto-approve
+    log "provisioned. host: $(tf output -raw public_ip)"
+}
+
+host() { tf output -raw public_ip; }
+ssh_host() { ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ec2-user@$(host)" "$@"; }
+
+cmd_deploy() {
+    log "waiting for cloud-init to finish"
+    for _ in $(seq 1 60); do
+        if ssh_host 'test -f /var/lib/cloud/forge-ready' 2>/dev/null; then break; fi
+        sleep 10
+    done
+    ssh_host 'test -f /var/lib/cloud/forge-ready' || die "host never became ready"
+
+    log "shipping the repository"
+    git -C "$REPO" archive --format=tar HEAD | ssh_host 'rm -rf ~/forge-ci && mkdir -p ~/forge-ci && tar -x -C ~/forge-ci'
+
+    log "starting the stack against real S3"
+    ssh_host "cd ~/forge-ci && \
+        FORGE_S3_BUCKET='$(tf output -raw bucket)' \
+        FORGE_S3_REGION='$(tf output -raw region)' \
+        FORGE_S3_ENDPOINT= \
+        FORGE_S3_PATH_STYLE=false \
+        FORGE_GIT_COMMIT='$(git -C "$REPO" rev-parse --short HEAD)' \
+        docker compose -f deploy/compose.yaml up --build -d"
+}
+
+cmd_smoke() {
+    log "smoke testing the deployed stack"
+    ssh_host 'curl -fsS localhost:8080/api/health' || die "health check failed"
+    ssh_host 'curl -fsS localhost:8080/api/ready'  || die "readiness check failed"
+    echo
+    log "stack is healthy on $(host)"
+}
+
+cmd_benchmark() {
+    log "running the official benchmark suite on AWS"
+    ssh_host "cd ~/forge-ci && JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto \
+        python3 benchmarks/scripts/run-benchmarks.py --warmups 3 --trials 10 --profile aws-reference"
+}
+
+cmd_evidence() {
+    log "pulling evidence back before anything is destroyed"
+    mkdir -p "$EVIDENCE_DIR"
+    scp -o StrictHostKeyChecking=accept-new -r \
+        "ec2-user@$(host):~/forge-ci/benchmarks/results/raw/*" "$EVIDENCE_DIR/" || \
+        warn "no raw results to copy"
+    ssh_host "cd ~/forge-ci && cat benchmarks/results/latest.json" \
+        > "$REPO/benchmarks/results/latest.json" || warn "no latest.json to copy"
+    log "evidence stored under benchmarks/results/"
+}
+
+cmd_destroy() {
+    log "destroying every resource in the stack"
+    tf destroy -input=false -auto-approve
+    rm -f "$HERE/run.auto.tfvars"
+}
+
+# The audit is the real deliverable of teardown: an inconclusive result means phase 11 failed.
+cmd_audit() {
+    require_creds
+    local after="$EVIDENCE_DIR/aws-inventory-after-$(run_id).txt"
+    mkdir -p "$EVIDENCE_DIR"
+    cmd_inventory "$after"
+
+    log "post-teardown audit"
+    cat "$after"
+
+    local leaks=0
+    while read -r line; do
+        case "$line" in
+            i-*|vol-*|eipalloc-*|sg-*|forgeci-bench-*)
+                warn "still present: $line"; leaks=$((leaks + 1)) ;;
+        esac
+    done < <(grep -vE '^#|^##' "$after" | tr '\t' '\n' | grep -v '^$' || true)
+
+    if [ "$leaks" -gt 0 ]; then
+        die "$leaks billable resource(s) survived teardown — audit is FAILED, recurring cost is not \$0"
+    fi
+    log "audit clean: no EC2 instance, EBS volume, Elastic IP, security group, S3 bucket, IAM role,"
+    log "or key pair tagged project=forgeci remains. Recurring AWS cost is \$0."
+}
+
+# destroy + audit run no matter how the middle of the run goes
+cmd_run() {
+    trap 'echo; warn "run interrupted — tearing down anyway"; cmd_destroy || true; cmd_audit || true' INT TERM ERR
+
+    cmd_provision
+    cmd_deploy
+    cmd_smoke
+    cmd_benchmark
+    cmd_evidence
+
+    trap - INT TERM ERR
+    cmd_destroy
+    cmd_audit
+    log "done. evidence is in benchmarks/results/, and nothing is left running."
+}
+
+need terraform
+need git
+case "${1:-}" in
+    estimate)  cmd_estimate ;;
+    inventory) cmd_inventory "${2:-/dev/stdout}" ;;
+    provision) cmd_provision ;;
+    deploy)    cmd_deploy ;;
+    smoke)     cmd_smoke ;;
+    benchmark) cmd_benchmark ;;
+    evidence)  cmd_evidence ;;
+    destroy)   cmd_destroy ;;
+    audit)     cmd_audit ;;
+    run)       cmd_run ;;
+    *) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

@@ -1,0 +1,22 @@
+# Scales the normal stack's worker service for distributed worker-count comparisons on named local
+# hardware. Everything else — control plane, MySQL, Kafka, Redis, MinIO — is inherited unchanged from
+# deploy/compose.yaml, so a scaling result is not confounded by a different stack.
+#
+#   docker compose -f deploy/compose.yaml -f deploy/local-benchmark/compose.yaml up -d --scale worker-1=4
+#
+# Note the distinction that matters for reporting: this varies *Docker workers*. The numbers in
+# docs/benchmarks.md vary `forge run -j N`, which is concurrent executors inside one CLI process.
+# They are different axes and must never be presented as the same measurement.
+name: forgeci
+
+services:
+  # the second named worker is redundant once worker-1 is scaled, and leaving it up would make
+  # "--scale worker-1=1" quietly mean two workers
+  worker-2:
+    deploy:
+      replicas: 0
+
+  worker-1:
+    environment:
+      # one task at a time per worker, so the worker count is the only variable in the comparison
+      FORGE_WORKER_MAX_CONCURRENCY: "1"
