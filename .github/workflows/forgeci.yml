@@ -3,6 +3,9 @@ name: forgeci
 on:
   pull_request:
     branches: [main]
+  # also gate main directly: work that lands without a PR would otherwise never be checked
+  push:
+    branches: [main]
 
 permissions:
   contents: read
