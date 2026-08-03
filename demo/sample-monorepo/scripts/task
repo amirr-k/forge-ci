@@ -1,7 +1,9 @@
 #!/bin/sh
-# Stand-in for a real compile/test/package step: takes long enough to see concurrency, writes a
-# deterministic output file, and fails when a module contains the BROKEN marker (the demo's failing
-# test). Kept to POSIX sh so the bundled demo runs the same on a laptop and in CI.
+# Real compile/test/package work for the bundled sample monorepo: javac against the modules this one
+# depends on, a real class-loading verification run, a real jar, and a real content hash. Benchmark
+# evidence has to measure actual compilation — a sleep stand-in here would make every published
+# number a synthetic-sleep result (spec/reference/benchmarks.md forbidden reporting patterns).
+# Kept to POSIX sh so the bundled demo runs the same on a laptop and inside a worker container.
 set -eu
 
 kind=$1
@@ -15,13 +17,107 @@ fi
 
 echo "$module: $kind starting"
 
+# the demo's failing-test scenario: a BROKEN marker fails the module the way a real test would
 if [ -d "$sources" ] && grep -rl BROKEN "$sources" >/dev/null 2>&1; then
   echo "$module: $kind FAILED — BROKEN marker in $(grep -rl BROKEN "$sources" | head -1)" >&2
   exit 1
 fi
 
-sleep 1
+if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
+  javac_bin="$JAVA_HOME/bin/javac"
+  java_bin="$JAVA_HOME/bin/java"
+  jar_bin="$JAVA_HOME/bin/jar"
+else
+  javac_bin=javac
+  java_bin=java
+  jar_bin=jar
+fi
 
-mkdir -p "build/$module"
-echo "$kind $module" > "build/$module/$kind.txt"
+out="build/$module"
+mkdir -p "$out"
+
+# every module compiled earlier in this build is on the classpath — that dependency edge is what
+# makes a shared-library change genuinely recompile its dependents instead of just re-running a timer
+classpath=$(find build -maxdepth 2 -type d -name classes 2>/dev/null | tr '\n' ':')"."
+
+sourcelist=$(mktemp)
+find "$sources" -name '*.java' -type f > "$sourcelist" 2>/dev/null || true
+
+compile() {
+    target=$1
+    mkdir -p "$target"
+    if [ -s "$sourcelist" ]; then
+        "$javac_bin" -nowarn -cp "$classpath" -d "$target" @"$sourcelist"
+    fi
+}
+
+case "$kind" in
+  build)
+    compile "$out/classes"
+    echo "compiled $(wc -l < "$sourcelist" | tr -d ' ') source file(s)" > "$out/build.txt"
+    ;;
+
+  test)
+    # compiles into a private directory: build/<module>/classes is on every concurrently running
+    # task's classpath, and rewriting it here would let another module compile against
+    # half-written class files
+    compile "$out/test-classes"
+    # real verification: load every compiled class through the JVM, which fails loudly if a class
+    # cannot link against the dependency modules it was compiled against
+    harness=$(mktemp -d)
+    cat > "$harness/VerifyClasses.java" <<'JAVA'
+import java.nio.file.*;
+import java.util.*;
+
+public final class VerifyClasses {
+    public static void main(String[] args) throws Exception {
+        Path root = Paths.get(args[0]);
+        if (!Files.isDirectory(root)) {
+            System.out.println("no classes to verify");
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        try (var walk = Files.walk(root)) {
+            walk.filter(p -> p.toString().endsWith(".class")).forEach(p -> {
+                String n = root.relativize(p).toString();
+                names.add(n.substring(0, n.length() - ".class".length()).replace('/', '.'));
+            });
+        }
+        for (String name : names) {
+            Class<?> loaded = Class.forName(name, true, VerifyClasses.class.getClassLoader());
+            if (loaded.getDeclaredMethods() == null) {
+                throw new IllegalStateException("unreadable class " + name);
+            }
+        }
+        System.out.println("verified " + names.size() + " compiled class(es)");
+    }
+}
+JAVA
+    "$javac_bin" -nowarn -d "$harness" "$harness/VerifyClasses.java"
+    "$java_bin" -cp "$harness:$classpath:$out/test-classes" VerifyClasses "$out/test-classes" > "$out/test.txt"
+    rm -rf "$harness" "$out/test-classes"
+    ;;
+
+  package)
+    if [ -n "$(find "$out/classes" -name '*.class' -print -quit 2>/dev/null)" ]; then
+        "$jar_bin" --create --file "$out/$module.jar" -C "$out/classes" .
+        # content hash of the packaged artifact — the same property ForgeCI's cache keys rely on
+        if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$out/$module.jar" > "$out/package.txt"
+        else
+            shasum -a 256 "$out/$module.jar" > "$out/package.txt"
+        fi
+    else
+        echo "nothing to package" > "$out/package.txt"
+    fi
+    ;;
+
+  *)
+    # integration / contracts: real cross-module verification over everything built so far
+    count=$(find build -name '*.class' -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo "$kind $module over $count compiled class(es)" > "$out/$kind.txt"
+    ;;
+esac
+
+rm -f "$sourcelist"
 echo "$module: $kind ok"

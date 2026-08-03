@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/amirr-k/forge-ci/demo/traces/trace.schema.json",
+  "title": "ForgeCI execution trace",
+  "description": "One recorded ForgeCI build. Benchmark evidence and the static demo both consume this exact shape; neither may carry numbers that are not in a trace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scenario",
+    "sourceCommit",
+    "environment",
+    "repository",
+    "graph",
+    "changedFiles",
+    "workerCount",
+    "cacheState",
+    "events",
+    "tasks",
+    "totals",
+    "benchmarkRunId"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "scenario": {
+      "type": "string",
+      "enum": [
+        "cold-full-build",
+        "leaf-module",
+        "shared-library",
+        "warm-remote-cache",
+        "config-change",
+        "worker-crash"
+      ]
+    },
+    "scenarioLabel": { "type": "string" },
+    "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+    "benchmarkRunId": { "type": "string", "minLength": 1 },
+    "recordedAt": { "type": "string" },
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "os", "cpuCores", "memoryGb", "javaVersion"],
+      "properties": {
+        "profile": { "type": "string", "enum": ["local-benchmark", "aws-reference"] },
+        "os": { "type": "string" },
+        "arch": { "type": "string" },
+        "cpuCores": { "type": "integer", "minimum": 1 },
+        "memoryGb": { "type": "number", "minimum": 0 },
+        "javaVersion": { "type": "string" },
+        "buildToolVersion": { "type": "string" },
+        "awsRegion": { "type": "string" },
+        "ec2InstanceType": { "type": "string" }
+      }
+    },
+
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "moduleCount", "taskCount"],
+      "properties": {
+        "name": { "type": "string" },
+        "moduleCount": { "type": "integer", "minimum": 1 },
+        "taskCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "module"],
+            "properties": {
+              "id": { "type": "string" },
+              "module": { "type": "string" },
+              "kind": { "type": "string" }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "workerCount": { "type": "integer", "minimum": 1 },
+    "cacheState": { "type": "string", "enum": ["cold", "warm"] },
+
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["RUN", "CACHE_HIT", "SKIP", "FAILED"] },
+          "reason": { "type": "string" },
+          "dependsOn": { "type": "array", "items": { "type": "string" } },
+          "worker": { "type": "string" },
+          "startedAt": { "type": "string" },
+          "finishedAt": { "type": "string" },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "artifactChecksum": { "type": "string" },
+          "attempts": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "type", "atMs"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1 },
+          "type": { "type": "string" },
+          "atMs": { "type": "integer", "minimum": 0 },
+          "task": { "type": "string" },
+          "worker": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationMs", "tasksExecuted", "tasksCacheHit", "tasksSkipped"],
+      "properties": {
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "tasksExecuted": { "type": "integer", "minimum": 0 },
+        "tasksCacheHit": { "type": "integer", "minimum": 0 },
+        "tasksSkipped": { "type": "integer", "minimum": 0 },
+        "tasksFailed": { "type": "integer", "minimum": 0 },
+        "planningOverheadMs": { "type": "integer", "minimum": 0 },
+        "bytesUploaded": { "type": "integer", "minimum": 0 },
+        "bytesDownloaded": { "type": "integer", "minimum": 0 },
+        "retries": { "type": "integer", "minimum": 0 },
+        "duplicateAcceptedResults": { "type": "integer", "minimum": 0 },
+        "inconsistentArtifacts": { "type": "integer", "minimum": 0 },
+        "failureDetectionMs": { "type": "integer", "minimum": 0 },
+        "recoveryMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "baseline": {
+      "description": "The comparison the demo renders against: what a system without affected-task selection would have run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tasksExecuted", "durationMs"],
+      "properties": {
+        "tasksExecuted": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "taskIds": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

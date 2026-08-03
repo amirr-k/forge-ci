@@ -125,7 +125,8 @@ services:
       FORGE_WORKSPACE_ROOT: /workspace
       FORGE_SEED_WORKSPACE_FROM: /opt/forge-demo-repo
       FORGE_WORKER_DOCKER_VOLUME: forgeci_worker-workspace
-      FORGE_WORKER_DOCKER_IMAGE: alpine:3.20
+      # the bundled demo's tasks run real javac/java/jar, so the task sandbox needs a JDK
+      FORGE_WORKER_DOCKER_IMAGE: eclipse-temurin:21-jdk-alpine
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker-workspace:/workspace

@@ -1,0 +1,1260 @@
+{
+  "benchmarkRunId": "20260803T183655Z",
+  "commit": "3e4f477",
+  "recordedAt": "2026-08-03T18:38:06.256871+00:00",
+  "environment": {
+    "profile": "local-benchmark",
+    "os": "Darwin 25.5.0",
+    "arch": "arm64",
+    "cpuCores": 10,
+    "memoryGb": 16.0,
+    "javaVersion": "21.0.12",
+    "buildToolVersion": "forge 0.1.0-SNAPSHOT"
+  },
+  "workload": {
+    "repository": "demo/sample-monorepo",
+    "description": "11-module Java monorepo; every task runs javac, verifies compiled classes by loading them, packages a jar, and hashes it",
+    "moduleCount": 11,
+    "taskCount": 25
+  },
+  "method": {
+    "warmups": 1,
+    "trials": 2,
+    "trialsDiscarded": 0,
+    "note": "every measured trial is retained; no cherry-picking"
+  },
+  "scenarios": [
+    {
+      "id": "cold-full-build-j1",
+      "jobs": 1,
+      "cacheState": "cold",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 7565.24,
+        "median_ms": 7565.24,
+        "p95_ms": 7620.79,
+        "stddev_ms": 78.56,
+        "min_ms": 7509.7,
+        "max_ms": 7620.79,
+        "samples_ms": [
+          7509.7,
+          7620.79
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 7.4
+      }
+    },
+    {
+      "id": "cold-full-build-j2",
+      "jobs": 2,
+      "cacheState": "cold",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 4521.12,
+        "median_ms": 4521.12,
+        "p95_ms": 4531.02,
+        "stddev_ms": 14.0,
+        "min_ms": 4511.21,
+        "max_ms": 4531.02,
+        "samples_ms": [
+          4511.21,
+          4531.02
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "RUN",
+            "reason": "0.6s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "RUN",
+            "reason": "0.6s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "RUN",
+            "reason": "0.6s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "RUN",
+            "reason": "0.5s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 4.4
+      }
+    },
+    {
+      "id": "cold-full-build-j4",
+      "jobs": 4,
+      "cacheState": "cold",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 3352.76,
+        "median_ms": 3352.76,
+        "p95_ms": 3392.04,
+        "stddev_ms": 55.55,
+        "min_ms": 3313.48,
+        "max_ms": 3392.04,
+        "samples_ms": [
+          3313.48,
+          3392.04
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "RUN",
+            "reason": "0.2s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "RUN",
+            "reason": "0.8s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "RUN",
+            "reason": "0.7s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "RUN",
+            "reason": "0.8s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "RUN",
+            "reason": "0.8s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "RUN",
+            "reason": "0.7s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "RUN",
+            "reason": "0.8s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "RUN",
+            "reason": "0.7s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "RUN",
+            "reason": "0.3s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "RUN",
+            "reason": "0.7s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "RUN",
+            "reason": "0.8s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "RUN",
+            "reason": "0.4s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "RUN",
+            "reason": "0.7s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "RUN",
+            "reason": "0.1s",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "RUN",
+            "reason": "0.0s",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 3.2
+      }
+    },
+    {
+      "id": "warm-no-change",
+      "jobs": 4,
+      "cacheState": "warm",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 246.92,
+        "median_ms": 246.92,
+        "p95_ms": 247.66,
+        "stddev_ms": 1.04,
+        "min_ms": 246.18,
+        "max_ms": 247.66,
+        "samples_ms": [
+          247.66,
+          246.18
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 0.1
+      }
+    },
+    {
+      "id": "leaf-module",
+      "jobs": 4,
+      "cacheState": "warm",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 243.08,
+        "median_ms": 243.08,
+        "p95_ms": 250.84,
+        "stddev_ms": 10.97,
+        "min_ms": 235.32,
+        "max_ms": 250.84,
+        "samples_ms": [
+          250.84,
+          235.32
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 0.1
+      }
+    },
+    {
+      "id": "shared-library",
+      "jobs": 4,
+      "cacheState": "warm",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 251.26,
+        "median_ms": 251.26,
+        "p95_ms": 252.1,
+        "stddev_ms": 1.18,
+        "min_ms": 250.42,
+        "max_ms": 252.1,
+        "samples_ms": [
+          252.1,
+          250.42
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 0.1
+      }
+    },
+    {
+      "id": "config-change",
+      "jobs": 4,
+      "cacheState": "warm",
+      "stats": {
+        "trials": 2,
+        "mean_ms": 254.24,
+        "median_ms": 254.24,
+        "p95_ms": 257.06,
+        "stddev_ms": 4.0,
+        "min_ms": 251.41,
+        "max_ms": 257.06,
+        "samples_ms": [
+          257.06,
+          251.41
+        ]
+      },
+      "final": {
+        "tasks": [
+          {
+            "id": "shared:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "auth:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "accounts:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "catalog:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "notifications:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "orders:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "payments:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "pricing:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:integration",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "checkout:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "search:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "shared:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:build",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:test",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "storefront:package",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          },
+          {
+            "id": "verify:contracts",
+            "status": "CACHE_HIT",
+            "reason": "restored from cache",
+            "raw_status": "SUCCEEDED"
+          }
+        ],
+        "succeeded": 25,
+        "failed": 0,
+        "skipped": 0,
+        "reported_seconds": 0.1
+      }
+    }
+  ]
+}

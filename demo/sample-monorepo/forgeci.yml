@@ -9,230 +9,329 @@ defaults:
 
 tasks:
   shared:build:
+    environment:
+      - "JAVA_HOME"
     inputs:
-      - "services/shared/**"
+      - "scripts/task"
       - "toolchain.lock"
+      - "services/shared/**"
     outputs:
       - "build/shared/**"
     command: ["./scripts/task", "build", "shared"]
 
   shared:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/shared/**"
     outputs:
       - "build/shared/test.txt"
     command: ["./scripts/task", "test", "shared"]
 
   auth:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/auth/**"
     outputs:
       - "build/auth/**"
     command: ["./scripts/task", "build", "auth"]
 
   auth:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "auth:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/auth/**"
     outputs:
       - "build/auth/test.txt"
     command: ["./scripts/task", "test", "auth"]
 
   accounts:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/accounts/**"
     outputs:
       - "build/accounts/**"
     command: ["./scripts/task", "build", "accounts"]
 
   accounts:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "accounts:build"
       - "auth:test"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/accounts/**"
     outputs:
       - "build/accounts/test.txt"
     command: ["./scripts/task", "test", "accounts"]
 
   accounts:package:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "accounts:test"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/accounts/**"
     outputs:
       - "build/accounts/package.txt"
     command: ["./scripts/task", "package", "accounts"]
 
   catalog:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/catalog/**"
     outputs:
       - "build/catalog/**"
     command: ["./scripts/task", "build", "catalog"]
 
   catalog:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "catalog:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/catalog/**"
     outputs:
       - "build/catalog/test.txt"
     command: ["./scripts/task", "test", "catalog"]
 
   search:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "catalog:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/search/**"
     outputs:
       - "build/search/**"
     command: ["./scripts/task", "build", "search"]
 
   search:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "search:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/search/**"
     outputs:
       - "build/search/test.txt"
     command: ["./scripts/task", "test", "search"]
 
   payments:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/payments/**"
     outputs:
       - "build/payments/**"
     command: ["./scripts/task", "build", "payments"]
 
   payments:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "payments:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/payments/**"
     outputs:
       - "build/payments/test.txt"
     command: ["./scripts/task", "test", "payments"]
 
   pricing:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/pricing/**"
     outputs:
       - "build/pricing/test.txt"
     command: ["./scripts/task", "test", "pricing"]
 
   pricing:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "pricing:test"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/pricing/**"
     outputs:
       - "build/pricing/build.txt"
     command: ["./scripts/task", "build", "pricing"]
 
   orders:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "catalog:build"
       - "payments:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/orders/**"
     outputs:
       - "build/orders/**"
     command: ["./scripts/task", "build", "orders"]
 
   orders:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "orders:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/orders/**"
     outputs:
       - "build/orders/test.txt"
     command: ["./scripts/task", "test", "orders"]
 
   notifications:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "shared:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/notifications/**"
     outputs:
       - "build/notifications/**"
     command: ["./scripts/task", "build", "notifications"]
 
   notifications:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "notifications:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/notifications/**"
     outputs:
       - "build/notifications/test.txt"
     command: ["./scripts/task", "test", "notifications"]
 
   storefront:build:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "catalog:build"
       - "search:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/storefront/**"
     outputs:
       - "build/storefront/**"
     command: ["./scripts/task", "build", "storefront"]
 
   storefront:test:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "storefront:build"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/storefront/**"
     outputs:
       - "build/storefront/test.txt"
     command: ["./scripts/task", "test", "storefront"]
 
   storefront:package:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "storefront:test"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/storefront/**"
     outputs:
       - "build/storefront/package.txt"
     command: ["./scripts/task", "package", "storefront"]
 
   checkout:integration:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "pricing:build"
       - "payments:build"
       - "orders:build"
       - "auth:test"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/checkout/**"
     outputs:
       - "build/checkout/**"
     command: ["./scripts/task", "integration", "checkout"]
 
   checkout:package:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "checkout:integration"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "services/checkout/**"
     outputs:
       - "build/checkout/package.txt"
     command: ["./scripts/task", "package", "checkout"]
 
   verify:contracts:
+    environment:
+      - "JAVA_HOME"
     depends_on:
       - "checkout:integration"
     inputs:
+      - "scripts/task"
+      - "toolchain.lock"
       - "contracts/**"
     outputs:
       - "build/contracts/**"
