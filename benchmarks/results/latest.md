@@ -39,15 +39,31 @@ All computed from the medians above.
 | Tasks executed vs reused (leaf-module) | **2 ran, 23 reused** | of 25 total |
 | Warm cache, no changes | **260 ms** | all 25 tasks restored |
 
-## Where ForgeCI does not help
+## Where ForgeCI does not help — and where it costs
 
 Reported because omitting them would misrepresent the system:
 
 - **Shared-library change** — median 3738 ms against a
-  3769 ms cold build. A change in the module most others depend on invalidates most of
-  the graph, so incremental selection saves little.
-- **Toolchain/config change** — median 3931 ms. `toolchain.lock` is
-  an input to every task, so every task is invalidated and the build is a full rebuild by design.
+  3769 ms cold build, i.e. -32 ms. With a
+  stddev of 434 ms that difference is inside the noise: a change to
+  the module most others depend on invalidates most of the graph, so incremental selection buys
+  nothing measurable. It is not slower, it is simply no better.
+- **Toolchain/config change — genuinely slower than a plain full build**, by
+  +161 ms
+  (+4.3%): median
+  3931 ms vs 3769 ms. `toolchain.lock` is a declared input
+  to every task, so every cache key changes. ForgeCI then hashes 25 sets of
+  inputs, looks up 25 keys, misses all of them, runs the full build anyway,
+  and writes 25 new entries into an already-populated store — bookkeeping
+  with zero reuse to amortize it. Isolating the starting state shows the cost comes from the
+  populated cache store (+1.4% with the cache primed and outputs cleared), not from stale build
+  outputs (−2.6% with outputs primed and the cache cleared).
+
+  This is the standard trade every caching build system makes, and it is bounded: a few percent on
+  the change that invalidates everything, against
+  3.9× on the ordinary single-module change. It is also amplified by this
+  workload's small tasks (~151 ms each) — the overhead is
+  roughly fixed per task, so it shrinks as a share of longer real-world tasks.
 - Adding executors past the graph's critical path stops helping: 1 → 2 gives 1.56× but
   2 → 4 only gives a further 1.29×,
   because the dependency chain, not CPU, is the limit.

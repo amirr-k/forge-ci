@@ -90,15 +90,31 @@ All computed from the medians above.
 | Tasks executed vs reused (leaf-module) | **{leaf_ran} ran, {leaf_cached} reused** | of {workload['taskCount']} total |
 | Warm cache, no changes | **{warm['stats']['median_ms']:.0f} ms** | all {workload['taskCount']} tasks restored |
 
-## Where ForgeCI does not help
+## Where ForgeCI does not help — and where it costs
 
 Reported because omitting them would misrepresent the system:
 
 - **Shared-library change** — median {shared['stats']['median_ms']:.0f} ms against a
-  {base_ms:.0f} ms cold build. A change in the module most others depend on invalidates most of
-  the graph, so incremental selection saves little.
-- **Toolchain/config change** — median {config['stats']['median_ms']:.0f} ms. `toolchain.lock` is
-  an input to every task, so every task is invalidated and the build is a full rebuild by design.
+  {base_ms:.0f} ms cold build, i.e. {(shared['stats']['median_ms'] - base_ms):+.0f} ms. With a
+  stddev of {shared['stats']['stddev_ms']:.0f} ms that difference is inside the noise: a change to
+  the module most others depend on invalidates most of the graph, so incremental selection buys
+  nothing measurable. It is not slower, it is simply no better.
+- **Toolchain/config change — genuinely slower than a plain full build**, by
+  {(config['stats']['median_ms'] - base_ms):+.0f} ms
+  ({(config['stats']['median_ms'] / base_ms - 1) * 100:+.1f}%): median
+  {config['stats']['median_ms']:.0f} ms vs {base_ms:.0f} ms. `toolchain.lock` is a declared input
+  to every task, so every cache key changes. ForgeCI then hashes {workload['taskCount']} sets of
+  inputs, looks up {workload['taskCount']} keys, misses all of them, runs the full build anyway,
+  and writes {workload['taskCount']} new entries into an already-populated store — bookkeeping
+  with zero reuse to amortize it. Isolating the starting state shows the cost comes from the
+  populated cache store (+1.4% with the cache primed and outputs cleared), not from stale build
+  outputs (−2.6% with outputs primed and the cache cleared).
+
+  This is the standard trade every caching build system makes, and it is bounded: a few percent on
+  the change that invalidates everything, against
+  {(base_ms / leaf_ms):.1f}× on the ordinary single-module change. It is also amplified by this
+  workload's small tasks (~{base_ms / workload['taskCount']:.0f} ms each) — the overhead is
+  roughly fixed per task, so it shrinks as a share of longer real-world tasks.
 - Adding executors past the graph's critical path stops helping: 1 → 2 gives {sp2:.2f}× but
   2 → 4 only gives a further {cold2['stats']['median_ms'] / cold4['stats']['median_ms']:.2f}×,
   because the dependency chain, not CPU, is the limit.
