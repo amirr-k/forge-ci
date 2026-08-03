@@ -22,13 +22,25 @@ export default function App() {
           <Route path="/" element={staticDemo ? <Showcase /> : <Home />} />
           <Route path="/showcase" element={<Showcase />} />
           {!staticDemo && <Route path="/builds/:id" element={<BuildDetail />} />}
-          <Route path="/benchmarks" element={<Benchmarks />} />
+          {!staticDemo && <Route path="/benchmarks" element={<Benchmarks />} />}
           <Route path="/architecture" element={<Architecture />} />
         </Routes>
       </main>
       <footer className="app-footer">
         <Link to="/architecture">How It Works</Link>
-        <Link to="/benchmarks">Benchmarks</Link>
+        {staticDemo ? (
+          // the static build has no control plane to serve /api/benchmarks/latest, so it links to
+          // the committed evidence the showcase actually replays instead of a route that would 404
+          <a
+            href="https://github.com/amirr-k/forge-ci/blob/main/docs/benchmarks.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Benchmarks
+          </a>
+        ) : (
+          <Link to="/benchmarks">Benchmarks</Link>
+        )}
         <a href="https://github.com/amirr-k/forge-ci" target="_blank" rel="noreferrer">
           Source
         </a>
