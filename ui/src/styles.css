@@ -363,3 +363,70 @@ a.button {
   gap: 1rem;
   margin-top: 0.5rem;
 }
+
+/* ---- static trace-replay showcase ---- */
+.showcase { display: flex; flex-direction: column; gap: 1.75rem; }
+.showcase-eyebrow {
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem;
+  color: var(--muted, #7c8798); margin: 0 0 0.5rem;
+}
+.showcase-hero h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); line-height: 1.15; margin: 0 0 0.6rem; }
+.showcase-changed { margin: 0 0 1rem; color: var(--muted, #7c8798); }
+.showcase-changed code, .showcase-evidence code { font-size: 0.9em; }
+.showcase-controls { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+.showcase-controls label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; }
+.showcase-run {
+  font-size: 1rem; font-weight: 600; padding: 0.7rem 1.4rem; border-radius: 8px;
+  border: none; cursor: pointer; background: var(--accent, #3b82f6); color: #fff;
+}
+.showcase-run:hover { filter: brightness(1.08); }
+.showcase-transport { display: flex; gap: 0.5rem; align-items: end; flex-wrap: wrap; }
+.showcase-transport button { padding: 0.5rem 0.9rem; border-radius: 6px; cursor: pointer; }
+.showcase-measured { margin: 1rem 0 0; font-size: 0.85rem; color: var(--muted, #7c8798); }
+
+.showcase-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.compare-card { border: 1px solid var(--border, #2a3242); border-radius: 10px; padding: 1rem; }
+.compare-card h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.4rem; color: var(--muted, #7c8798); }
+.compare-metric { font-size: 1.9rem; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+.compare-sub { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--muted, #7c8798); }
+.compare-card.result .compare-metric { color: var(--accent, #3b82f6); }
+
+.showcase-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); gap: 1.5rem; align-items: start; }
+.showcase-graph { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem; }
+.graph-column { display: flex; flex-direction: column; gap: 0.5rem; min-width: 150px; }
+.graph-node {
+  text-align: left; border-radius: 7px; padding: 0.45rem 0.6rem; cursor: pointer;
+  border: 1px solid var(--border, #2a3242); background: transparent; color: inherit;
+  display: flex; flex-direction: column; gap: 0.15rem; transition: opacity 120ms, border-color 120ms;
+}
+.node-name { font-size: 0.8rem; font-family: ui-monospace, monospace; }
+.node-status { font-size: 0.62rem; letter-spacing: 0.06em; color: var(--muted, #7c8798); }
+.graph-node.is-pending { opacity: 0.35; }
+.graph-node.is-running { border-color: var(--accent, #3b82f6); }
+.graph-node.status-run.is-done { border-color: #22c55e; }
+.graph-node.status-cache_hit.is-done { border-color: #a855f7; }
+.graph-node.status-skip.is-done { opacity: 0.45; }
+.graph-node.is-selected { outline: 2px solid var(--accent, #3b82f6); }
+
+.showcase-side { display: flex; flex-direction: column; gap: 1.25rem; }
+.task-detail h3 { margin: 0 0 0.3rem; font-family: ui-monospace, monospace; font-size: 0.95rem; }
+.task-status { font-size: 0.7rem; letter-spacing: 0.08em; margin: 0 0 0.4rem; color: var(--accent, #3b82f6); }
+.task-reason, .task-deps { font-size: 0.82rem; color: var(--muted, #7c8798); margin: 0.2rem 0; }
+.showcase-hint { font-size: 0.85rem; color: var(--muted, #7c8798); }
+
+.lanes h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.5rem; color: var(--muted, #7c8798); }
+.lane { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+.lane-name { font-size: 0.68rem; font-family: ui-monospace, monospace; width: 5.5rem; flex: none; color: var(--muted, #7c8798); }
+.lane-track { position: relative; height: 12px; flex: 1; background: rgba(127,127,127,0.12); border-radius: 3px; }
+.lane-block { position: absolute; top: 0; height: 12px; border-radius: 3px; background: #22c55e; opacity: 0; transition: opacity 150ms; }
+.lane-block.cached { background: #a855f7; }
+.lane-block.visible { opacity: 0.85; }
+
+.showcase-verdict { font-size: 1.05rem; line-height: 1.5; margin: 0; padding: 1rem; border-radius: 10px; border: 1px solid var(--border, #2a3242); }
+.showcase-evidence { font-size: 0.78rem; color: var(--muted, #7c8798); }
+.showcase-empty { padding: 2rem 0; }
+
+@media (max-width: 860px) {
+  .showcase-body { grid-template-columns: 1fr; }
+  .graph-column { min-width: 130px; }
+}

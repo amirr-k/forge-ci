@@ -3,8 +3,13 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // GitHub Pages serves the static demo from /<repo>/, so the asset base has to match; a local
+  // or container build leaves it at the root.
+  base: process.env.VITE_BASE ?? "/",
   server: {
     port: 5173,
+    // the committed traces live in demo/traces/, outside ui/ — they are build inputs, not assets
+    fs: { allow: [".."] },
     proxy: {
       "/api": {
         target: process.env.FORGE_API_PROXY_TARGET ?? "http://localhost:8080",

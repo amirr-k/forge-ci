@@ -1,0 +1,1100 @@
+{
+  "schemaVersion": 1,
+  "scenario": "warm-remote-cache",
+  "scenarioLabel": "Warm cache, no changes",
+  "sourceCommit": "2a2f0d6",
+  "benchmarkRunId": "20260803T184828Z",
+  "recordedAt": "2026-08-03T18:48:36.549213+00:00",
+  "environment": {
+    "profile": "local-benchmark",
+    "os": "Darwin 25.5.0",
+    "arch": "arm64",
+    "cpuCores": 10,
+    "memoryGb": 16.0,
+    "javaVersion": "21.0.12",
+    "buildToolVersion": "forge 0.1.0-SNAPSHOT"
+  },
+  "repository": {
+    "name": "sample-monorepo",
+    "moduleCount": 12,
+    "taskCount": 25
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "shared:build",
+        "module": "shared",
+        "kind": "build"
+      },
+      {
+        "id": "shared:test",
+        "module": "shared",
+        "kind": "test"
+      },
+      {
+        "id": "auth:build",
+        "module": "auth",
+        "kind": "build"
+      },
+      {
+        "id": "auth:test",
+        "module": "auth",
+        "kind": "test"
+      },
+      {
+        "id": "accounts:build",
+        "module": "accounts",
+        "kind": "build"
+      },
+      {
+        "id": "accounts:test",
+        "module": "accounts",
+        "kind": "test"
+      },
+      {
+        "id": "accounts:package",
+        "module": "accounts",
+        "kind": "package"
+      },
+      {
+        "id": "catalog:build",
+        "module": "catalog",
+        "kind": "build"
+      },
+      {
+        "id": "catalog:test",
+        "module": "catalog",
+        "kind": "test"
+      },
+      {
+        "id": "search:build",
+        "module": "search",
+        "kind": "build"
+      },
+      {
+        "id": "search:test",
+        "module": "search",
+        "kind": "test"
+      },
+      {
+        "id": "payments:build",
+        "module": "payments",
+        "kind": "build"
+      },
+      {
+        "id": "payments:test",
+        "module": "payments",
+        "kind": "test"
+      },
+      {
+        "id": "pricing:test",
+        "module": "pricing",
+        "kind": "test"
+      },
+      {
+        "id": "pricing:build",
+        "module": "pricing",
+        "kind": "build"
+      },
+      {
+        "id": "orders:build",
+        "module": "orders",
+        "kind": "build"
+      },
+      {
+        "id": "orders:test",
+        "module": "orders",
+        "kind": "test"
+      },
+      {
+        "id": "notifications:build",
+        "module": "notifications",
+        "kind": "build"
+      },
+      {
+        "id": "notifications:test",
+        "module": "notifications",
+        "kind": "test"
+      },
+      {
+        "id": "storefront:build",
+        "module": "storefront",
+        "kind": "build"
+      },
+      {
+        "id": "storefront:test",
+        "module": "storefront",
+        "kind": "test"
+      },
+      {
+        "id": "storefront:package",
+        "module": "storefront",
+        "kind": "package"
+      },
+      {
+        "id": "checkout:integration",
+        "module": "checkout",
+        "kind": "integration"
+      },
+      {
+        "id": "checkout:package",
+        "module": "checkout",
+        "kind": "package"
+      },
+      {
+        "id": "verify:contracts",
+        "module": "verify",
+        "kind": "contracts"
+      }
+    ],
+    "edges": [
+      {
+        "from": "shared:build",
+        "to": "shared:test"
+      },
+      {
+        "from": "shared:build",
+        "to": "auth:build"
+      },
+      {
+        "from": "auth:build",
+        "to": "auth:test"
+      },
+      {
+        "from": "shared:build",
+        "to": "accounts:build"
+      },
+      {
+        "from": "accounts:build",
+        "to": "accounts:test"
+      },
+      {
+        "from": "auth:test",
+        "to": "accounts:test"
+      },
+      {
+        "from": "accounts:test",
+        "to": "accounts:package"
+      },
+      {
+        "from": "shared:build",
+        "to": "catalog:build"
+      },
+      {
+        "from": "catalog:build",
+        "to": "catalog:test"
+      },
+      {
+        "from": "catalog:build",
+        "to": "search:build"
+      },
+      {
+        "from": "search:build",
+        "to": "search:test"
+      },
+      {
+        "from": "shared:build",
+        "to": "payments:build"
+      },
+      {
+        "from": "payments:build",
+        "to": "payments:test"
+      },
+      {
+        "from": "shared:build",
+        "to": "pricing:test"
+      },
+      {
+        "from": "pricing:test",
+        "to": "pricing:build"
+      },
+      {
+        "from": "catalog:build",
+        "to": "orders:build"
+      },
+      {
+        "from": "payments:build",
+        "to": "orders:build"
+      },
+      {
+        "from": "orders:build",
+        "to": "orders:test"
+      },
+      {
+        "from": "shared:build",
+        "to": "notifications:build"
+      },
+      {
+        "from": "notifications:build",
+        "to": "notifications:test"
+      },
+      {
+        "from": "catalog:build",
+        "to": "storefront:build"
+      },
+      {
+        "from": "search:build",
+        "to": "storefront:build"
+      },
+      {
+        "from": "storefront:build",
+        "to": "storefront:test"
+      },
+      {
+        "from": "storefront:test",
+        "to": "storefront:package"
+      },
+      {
+        "from": "pricing:build",
+        "to": "checkout:integration"
+      },
+      {
+        "from": "payments:build",
+        "to": "checkout:integration"
+      },
+      {
+        "from": "orders:build",
+        "to": "checkout:integration"
+      },
+      {
+        "from": "auth:test",
+        "to": "checkout:integration"
+      },
+      {
+        "from": "checkout:integration",
+        "to": "checkout:package"
+      },
+      {
+        "from": "checkout:integration",
+        "to": "verify:contracts"
+      }
+    ]
+  },
+  "changedFiles": [],
+  "workerCount": 4,
+  "cacheState": "warm",
+  "tasks": [
+    {
+      "id": "shared:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "accounts:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-3"
+    },
+    {
+      "id": "auth:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "auth:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "auth:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "accounts:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "accounts:build",
+        "auth:test"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "accounts:package",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "accounts:test"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "catalog:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "catalog:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "catalog:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "notifications:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "notifications:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "notifications:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "payments:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "orders:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "catalog:build",
+        "payments:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "orders:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "orders:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "payments:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "payments:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "pricing:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "pricing:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "pricing:test"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "checkout:integration",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "pricing:build",
+        "payments:build",
+        "orders:build",
+        "auth:test"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "checkout:package",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "checkout:integration"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "search:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "catalog:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "search:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "search:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "shared:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "shared:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "storefront:build",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "catalog:build",
+        "search:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "storefront:test",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "storefront:build"
+      ],
+      "durationMs": 0,
+      "worker": "executor-2"
+    },
+    {
+      "id": "storefront:package",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "storefront:test"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    },
+    {
+      "id": "verify:contracts",
+      "status": "CACHE_HIT",
+      "reason": "restored from cache",
+      "dependsOn": [
+        "checkout:integration"
+      ],
+      "durationMs": 0,
+      "worker": "executor-1"
+    }
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "type": "TASK_STARTED",
+      "atMs": 192,
+      "task": "shared:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 2,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 195,
+      "task": "shared:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 3,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 195,
+      "task": "shared:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 4,
+      "type": "TASK_STARTED",
+      "atMs": 207,
+      "task": "auth:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 5,
+      "type": "TASK_STARTED",
+      "atMs": 207,
+      "task": "shared:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 6,
+      "type": "TASK_STARTED",
+      "atMs": 207,
+      "task": "accounts:build",
+      "worker": "executor-3"
+    },
+    {
+      "sequence": 7,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 207,
+      "task": "shared:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 8,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 207,
+      "task": "auth:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 9,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 207,
+      "task": "shared:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 10,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 207,
+      "task": "auth:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 11,
+      "type": "TASK_STARTED",
+      "atMs": 207,
+      "task": "catalog:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 12,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 208,
+      "task": "catalog:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 13,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 208,
+      "task": "accounts:build",
+      "worker": "executor-3"
+    },
+    {
+      "sequence": 14,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 208,
+      "task": "catalog:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 15,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 208,
+      "task": "accounts:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 16,
+      "type": "TASK_STARTED",
+      "atMs": 215,
+      "task": "payments:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 17,
+      "type": "TASK_STARTED",
+      "atMs": 215,
+      "task": "notifications:build",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 18,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 215,
+      "task": "notifications:build",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 19,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 215,
+      "task": "notifications:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 20,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 215,
+      "task": "payments:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 21,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 215,
+      "task": "payments:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 22,
+      "type": "TASK_STARTED",
+      "atMs": 215,
+      "task": "auth:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 23,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 216,
+      "task": "auth:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 24,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 216,
+      "task": "auth:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 25,
+      "type": "TASK_STARTED",
+      "atMs": 216,
+      "task": "pricing:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 26,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 216,
+      "task": "pricing:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 27,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 216,
+      "task": "pricing:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 28,
+      "type": "TASK_STARTED",
+      "atMs": 224,
+      "task": "search:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 29,
+      "type": "TASK_STARTED",
+      "atMs": 224,
+      "task": "notifications:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 30,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "search:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 31,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "notifications:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 32,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "search:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 33,
+      "type": "TASK_STARTED",
+      "atMs": 224,
+      "task": "payments:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 34,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "notifications:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 35,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "payments:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 36,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 224,
+      "task": "payments:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 37,
+      "type": "TASK_STARTED",
+      "atMs": 227,
+      "task": "catalog:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 38,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 227,
+      "task": "catalog:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 39,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 227,
+      "task": "catalog:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 40,
+      "type": "TASK_STARTED",
+      "atMs": 230,
+      "task": "orders:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 41,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 230,
+      "task": "orders:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 42,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 230,
+      "task": "orders:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 43,
+      "type": "TASK_STARTED",
+      "atMs": 230,
+      "task": "pricing:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 44,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 230,
+      "task": "pricing:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 45,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 230,
+      "task": "pricing:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 46,
+      "type": "TASK_STARTED",
+      "atMs": 231,
+      "task": "accounts:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 47,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 231,
+      "task": "accounts:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 48,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 231,
+      "task": "accounts:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 49,
+      "type": "TASK_STARTED",
+      "atMs": 232,
+      "task": "search:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 50,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 232,
+      "task": "search:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 51,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 232,
+      "task": "search:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 52,
+      "type": "TASK_STARTED",
+      "atMs": 235,
+      "task": "storefront:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 53,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "storefront:build",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 54,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "storefront:build",
+      "worker": "cache"
+    },
+    {
+      "sequence": 55,
+      "type": "TASK_STARTED",
+      "atMs": 236,
+      "task": "orders:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 56,
+      "type": "TASK_STARTED",
+      "atMs": 236,
+      "task": "checkout:integration",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 57,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "orders:test",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 58,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "checkout:integration",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 59,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "orders:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 60,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 236,
+      "task": "checkout:integration",
+      "worker": "cache"
+    },
+    {
+      "sequence": 61,
+      "type": "TASK_STARTED",
+      "atMs": 241,
+      "task": "accounts:package",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 62,
+      "type": "TASK_STARTED",
+      "atMs": 241,
+      "task": "storefront:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 63,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 241,
+      "task": "accounts:package",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 64,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 241,
+      "task": "storefront:test",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 65,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 241,
+      "task": "accounts:package",
+      "worker": "cache"
+    },
+    {
+      "sequence": 66,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 241,
+      "task": "storefront:test",
+      "worker": "cache"
+    },
+    {
+      "sequence": 67,
+      "type": "TASK_STARTED",
+      "atMs": 241,
+      "task": "verify:contracts",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 68,
+      "type": "TASK_STARTED",
+      "atMs": 242,
+      "task": "checkout:package",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 69,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 242,
+      "task": "checkout:package",
+      "worker": "executor-2"
+    },
+    {
+      "sequence": 70,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 242,
+      "task": "verify:contracts",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 71,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 242,
+      "task": "checkout:package",
+      "worker": "cache"
+    },
+    {
+      "sequence": 72,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 242,
+      "task": "verify:contracts",
+      "worker": "cache"
+    },
+    {
+      "sequence": 73,
+      "type": "TASK_STARTED",
+      "atMs": 245,
+      "task": "storefront:package",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 74,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 245,
+      "task": "storefront:package",
+      "worker": "executor-1"
+    },
+    {
+      "sequence": 75,
+      "type": "TASK_CACHE_HIT",
+      "atMs": 245,
+      "task": "storefront:package",
+      "worker": "cache"
+    }
+  ],
+  "totals": {
+    "durationMs": 250,
+    "tasksExecuted": 0,
+    "tasksCacheHit": 25,
+    "tasksSkipped": 0,
+    "tasksFailed": 0,
+    "retries": 0,
+    "duplicateAcceptedResults": 0,
+    "inconsistentArtifacts": 0
+  },
+  "baseline": {
+    "tasksExecuted": 25,
+    "durationMs": 3466,
+    "taskIds": [
+      "shared:build",
+      "accounts:build",
+      "auth:build",
+      "auth:test",
+      "accounts:test",
+      "accounts:package",
+      "catalog:build",
+      "catalog:test",
+      "notifications:build",
+      "notifications:test",
+      "payments:build",
+      "orders:build",
+      "orders:test",
+      "payments:test",
+      "pricing:test",
+      "pricing:build",
+      "checkout:integration",
+      "checkout:package",
+      "search:build",
+      "search:test",
+      "shared:test",
+      "storefront:build",
+      "storefront:test",
+      "storefront:package",
+      "verify:contracts"
+    ]
+  }
+}

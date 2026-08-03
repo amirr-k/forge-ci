@@ -58,6 +58,16 @@ jobs:
       - name: frontend unit tests
         run: npm run test --prefix ui
 
+      # the published demo and every benchmark figure read this format; a malformed or
+      # self-contradicting trace has to fail here rather than on the public page
+      - name: execution-trace schema validation
+        run: node benchmarks/scripts/validate-traces.mjs
+
+      - name: static demo builds with no backend
+        env:
+          VITE_STATIC_DEMO: "true"
+        run: npm run build --prefix ui
+
   # container images must actually build from a clean checkout — a Dockerfile that only worked
   # because a developer's local build cache papered over a missing file is exactly what this catches
   container-images:
