@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.24.0
+      - uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: .
@@ -122,18 +122,24 @@ jobs:
       - run: npm ci --prefix ui
       - run: npx --prefix ui playwright install --with-deps chromium
 
+      # Started and waited for in one step on purpose: `npx ... &` at the end of a step is not
+      # reliably still running by the next one. It also has to run *from* ui/, or vite picks the
+      # repository root as its project root and never finds ui/index.html or ui/vite.config.ts.
       - name: serve the ui against the live compose stack
-        run: FORGE_API_PROXY_TARGET=http://localhost:8080 npx --prefix ui vite --port 5173 &
-
-      - name: wait for the ui dev server
+        working-directory: ui
+        env:
+          FORGE_API_PROXY_TARGET: http://localhost:8080
         run: |
+          npx vite --port 5173 > /tmp/vite.log 2>&1 &
           for i in $(seq 1 30); do
             if curl -sf http://localhost:5173 >/dev/null; then
+              echo "ui dev server is up"
               exit 0
             fi
             sleep 2
           done
           echo "ui dev server never came up" >&2
+          cat /tmp/vite.log >&2
           exit 1
 
       - name: run the primary-demo browser test
@@ -178,11 +184,27 @@ jobs:
           restore-keys: |
             forgeci-local-cache-
 
-      - name: resolve merge base
+      # On a PR the interesting baseline is the merge base with the target branch. On a push to
+      # main it is the commit that was there before — `github.base_ref` is empty for push events,
+      # and an empty --base makes `forge run` exit non-zero on usage rather than build anything.
+      - name: resolve base revision
         id: base
         run: |
-          git fetch origin "${{ github.base_ref }}"
-          echo "revision=$(git merge-base origin/${{ github.base_ref }} HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ github.base_ref }}" ]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            revision=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          else
+            before="${{ github.event.before }}"
+            # zeroed on a branch's first push, and absent for workflow_dispatch
+            if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              revision=$(git rev-parse HEAD~1)
+            else
+              revision="$before"
+            fi
+          fi
+          echo "resolved base revision: $revision"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
       - name: install (build the CLI)
         run: ./forge doctor
