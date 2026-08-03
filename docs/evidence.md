@@ -11,11 +11,24 @@ JDK 21.0.12, Docker Desktop. Commit `2a2f0d6`.
 
 `./gradlew check` — 1263 tests, 0 errors, 2 failures.
 
-The two failures were `BuildEventsIntegrationTest.streamsEventsForACompletedBuildThenCloses`
-(TimeoutException) and `KafkaTaskResultsIntegrationTest.aRedeliveredTaskResultMessageDoesNotReapplyItsEffect`.
-Both pass when re-run in isolation. They are contention flakes when the full Testcontainers suite
-runs on a memory-pressured 16 GB laptop, not defects — recorded here rather than papered over by
-editing the tests.
+The two failures are `BuildEventsIntegrationTest.streamsEventsForACompletedBuildThenCloses`
+(TimeoutException) and
+`KafkaTaskResultsIntegrationTest.aRedeliveredTaskResultMessageDoesNotReapplyItsEffect`
+(`worker N never claimed solo:build`).
+
+**This is an open defect, not an environment artifact.** They were first assumed to be contention
+flakes on a memory-pressured laptop. That was wrong: they fail the same way on a clean
+`ubuntu-latest` GitHub runner. They pass reliably when their classes run in isolation and fail
+reliably when the whole `integrationTest` suite runs, which points at state leaking between tests
+sharing one Spring context — worker registrations from earlier tests appear to compete for the
+task the assertion is waiting on.
+
+Raising the polling budgets (claim loop 2.5 s → 20 s, SSE collection 15 s → 60 s) did **not** fix
+it, which rules out the simple timing explanation. That change was reverted rather than left in
+place asserting a cause that had not been demonstrated.
+
+Consequence: the `required-checks` CI job is red on `main`. The other four jobs pass. This is
+tracked honestly rather than worked around by excluding the tests or retrying until green.
 
 ## Distributed end-to-end validation
 
