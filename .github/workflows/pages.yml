@@ -40,6 +40,13 @@ jobs:
           VITE_BASE: "/${{ github.event.repository.name }}/"
         run: npm run build --prefix ui
 
+      # a build served under /<repo>/ but routed at "/" renders an empty page that still returns
+      # 200 with the right title — only a browser check against the real base path catches it
+      - name: verify the built demo actually renders
+        run: |
+          npx --prefix ui playwright install --with-deps chromium
+          npx --prefix ui playwright test e2e/static-demo.spec.ts --config ui/playwright.config.ts
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ui/dist
@@ -60,4 +67,12 @@ jobs:
           echo "checking $url"
           code=$(curl -sS -o /tmp/page.html -w '%{http_code}' --retry 5 --retry-delay 5 "$url")
           test "$code" = "200" || { echo "expected 200, got $code"; exit 1; }
-          grep -q "ForgeCI" /tmp/page.html || { echo "page did not render the app shell"; exit 1; }
+
+          # the JS bundle has to load from the published base path, and it has to carry the
+          # traces — grepping index.html alone would pass on a page that renders nothing
+          asset=$(grep -o '/[^"]*/assets/index-[A-Za-z0-9_-]*\.js' /tmp/page.html | head -1)
+          test -n "$asset" || { echo "no JS bundle referenced by index.html"; exit 1; }
+          origin=$(echo "$url" | sed -E 's#(https://[^/]+).*#\1#')
+          code=$(curl -sS -o /tmp/bundle.js -w '%{http_code}' "$origin$asset")
+          test "$code" = "200" || { echo "bundle $asset returned $code"; exit 1; }
+          grep -q "leaf-module" /tmp/bundle.js || { echo "bundle carries no traces"; exit 1; }

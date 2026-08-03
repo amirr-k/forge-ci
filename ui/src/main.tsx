@@ -9,9 +9,13 @@ if (!container) {
   throw new Error("no #root element to mount into — index.html and main.tsx have diverged");
 }
 
+// GitHub Pages serves the site from /<repo>/, so the router has to strip that prefix before
+// matching — without it every route falls through and the app renders an empty <main>.
+const basename = import.meta.env.BASE_URL;
+
 ReactDOM.createRoot(container).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>
   </React.StrictMode>,
