@@ -31,3 +31,7 @@ test-results/
 .idea/
 *.iml
 .vscode/
+
+# Python tooling
+__pycache__/
+*.pyc
