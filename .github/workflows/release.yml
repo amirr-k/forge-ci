@@ -104,9 +104,30 @@ jobs:
       - name: run the fixed public demo scenario
         id: demo
         run: |
-          response=$(curl -sf -X POST http://localhost:8080/api/demo/builds \
-            -H "Content-Type: application/json" \
-            -d '{"scenario":"no-change","workerCount":2}')
+          # the demo serves one build at a time, and the startup warm-up build holds that slot for
+          # its first ~20s — the control plane reports healthy well before it finishes, so a single
+          # attempt here races the warm-up and gets a legitimate 429. Retry rather than treat the
+          # demo's own back-pressure as a deploy failure.
+          for attempt in $(seq 1 30); do
+            response=$(curl -s -w '\n%{http_code}' -X POST http://localhost:8080/api/demo/builds \
+              -H "Content-Type: application/json" \
+              -d '{"scenario":"no-change","workerCount":2}')
+            http_status=$(echo "$response" | tail -1)
+            response=$(echo "$response" | sed '$d')
+            if [ "$http_status" = "201" ]; then
+              break
+            fi
+            if [ "$http_status" != "429" ]; then
+              echo "demo request failed with HTTP $http_status: $response" >&2
+              exit 1
+            fi
+            echo "demo busy (warm-up still holds the build slot), retrying in 5s"
+            sleep 5
+          done
+          if [ "$http_status" != "201" ]; then
+            echo "demo stayed busy for 150s" >&2
+            exit 1
+          fi
           echo "$response"
           baseline_id=$(echo "$response" | grep -o '"baselineBuildId":[0-9]*' | grep -o '[0-9]*')
           incremental_id=$(echo "$response" | grep -o '"incrementalBuildId":[0-9]*' | grep -o '[0-9]*')
