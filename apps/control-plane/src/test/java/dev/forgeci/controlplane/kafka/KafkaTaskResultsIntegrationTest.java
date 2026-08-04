@@ -2,19 +2,17 @@ package dev.forgeci.controlplane.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.forgeci.controlplane.api.dto.BuildCreationRequest;
 import dev.forgeci.controlplane.api.dto.BuildResponse;
 import dev.forgeci.controlplane.api.dto.PlanSubmissionResponse;
-import dev.forgeci.controlplane.api.dto.ProjectResponse;
 import dev.forgeci.controlplane.domain.BuildState;
 import dev.forgeci.controlplane.domain.TaskRun;
+import dev.forgeci.controlplane.domain.TaskRunState;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
 import dev.forgeci.controlplane.support.ControlPlaneIntegrationTest;
 import dev.forgeci.controlplane.support.KafkaTestContainer;
+import dev.forgeci.controlplane.support.ProtocolTestClient;
 import dev.forgeci.controlplane.support.TestFixtures;
 import dev.forgeci.protocol.ClaimedTaskResponse;
-import dev.forgeci.protocol.WorkerRegistrationRequest;
-import dev.forgeci.protocol.WorkerRegistrationResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +27,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -47,18 +46,25 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
     @Autowired private KafkaTemplate<String, Object> kafkaTemplate;
     @Autowired private TaskRunRepository taskRunRepository;
 
+    private ProtocolTestClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = new ProtocolTestClient(rest);
+    }
+
     @Test
     void aRedeliveredTaskResultMessageDoesNotReapplyItsEffect() throws Exception {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String cacheKey = "sha256:kafka-idempotent-" + UUID.randomUUID();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.singleTaskPlan("rev-kafka-1", "rev-0", "solo:build", cacheKey),
-                        PlanSubmissionResponse.class);
-        BuildResponse build = createBuild(projectId, plan.id());
-        long workerId = registerWorker("worker-kafka-idempotent-" + UUID.randomUUID());
-        ClaimedTaskResponse task = claimMine(workerId, "solo:build");
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.singleTaskPlan(
+                                "rev-kafka-1", "rev-0", "kafka-idempotent:build", cacheKey));
+        BuildResponse build = client.createBuild(projectId, plan.id());
+        long workerId = client.registerWorker("worker-kafka-idempotent-" + UUID.randomUUID());
+        ClaimedTaskResponse task = client.claimNamed(workerId, "kafka-idempotent:build");
 
         TaskResultEvent event =
                 new TaskResultEvent(
@@ -74,7 +80,7 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
         kafkaTemplate
                 .send(KafkaTopics.TASK_RESULTS, String.valueOf(task.taskRunId()), event)
                 .get(10, TimeUnit.SECONDS);
-        awaitBuildState(build.id(), BuildState.SUCCEEDED);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
         TaskRun afterFirstDelivery = taskRunRepository.findById(task.taskRunId()).orElseThrow();
         var completedAtFirst = afterFirstDelivery.getCompletedAt();
@@ -89,11 +95,10 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
         // were going to do anything
 
         TaskRun afterRedelivery = taskRunRepository.findById(task.taskRunId()).orElseThrow();
-        assertThat(afterRedelivery.getState())
-                .isEqualTo(dev.forgeci.controlplane.domain.TaskRunState.SUCCEEDED);
+        assertThat(afterRedelivery.getState()).isEqualTo(TaskRunState.SUCCEEDED);
         assertThat(afterRedelivery.getCompletedAt()).isEqualTo(completedAtFirst);
         assertThat(afterRedelivery.getAttemptCount()).isEqualTo(attemptCountFirst);
-        assertThat(getBuild(build.id()).state()).isEqualTo(BuildState.SUCCEEDED);
+        assertThat(client.getBuild(build.id()).state()).isEqualTo(BuildState.SUCCEEDED);
     }
 
     @Test
@@ -118,77 +123,6 @@ class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
                     KafkaTestUtils.getSingleRecord(dlConsumer, dlTopic, Duration.ofSeconds(30));
             assertThat(deadLettered.key()).isEqualTo(key);
         }
-    }
-
-    private ClaimedTaskResponse claimMine(long workerId, String taskName) {
-        for (int i = 0; i < 100; i++) {
-            var response =
-                    rest.postForEntity(
-                            "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
-            if (response.getStatusCode().value() == 200 && response.getBody() != null) {
-                if (response.getBody().taskName().equals(taskName)) {
-                    return response.getBody();
-                }
-                // foreign leftover from another test's global-queue backlog — harmlessly complete
-                // it
-                var report =
-                        new dev.forgeci.protocol.TaskResultReportRequest(
-                                response.getBody().workerId(),
-                                response.getBody().leaseToken(),
-                                response.getBody().attemptId(),
-                                true,
-                                0,
-                                null,
-                                null);
-                rest.postForEntity(
-                        "/api/task-runs/" + response.getBody().taskRunId() + "/result",
-                        report,
-                        Void.class);
-                continue;
-            }
-            try {
-                Thread.sleep(25);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        throw new AssertionError("worker " + workerId + " never claimed " + taskName);
-    }
-
-    private void awaitBuildState(Long buildId, BuildState expected) throws InterruptedException {
-        for (int i = 0; i < 100; i++) {
-            if (getBuild(buildId).state() == expected) {
-                return;
-            }
-            Thread.sleep(25);
-        }
-        throw new AssertionError("build " + buildId + " never reached " + expected);
-    }
-
-    private long registerProject() {
-        ProjectResponse project =
-                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
-        return project.id();
-    }
-
-    private BuildResponse createBuild(long projectId, Long planSubmissionId) {
-        return rest.postForObject(
-                "/api/projects/" + projectId + "/builds",
-                new BuildCreationRequest(planSubmissionId, "manual", 0),
-                BuildResponse.class);
-    }
-
-    private BuildResponse getBuild(Long buildId) {
-        return rest.getForObject("/api/builds/" + buildId, BuildResponse.class);
-    }
-
-    private long registerWorker(String externalId) {
-        WorkerRegistrationResponse response =
-                rest.postForObject(
-                        "/api/workers/register",
-                        new WorkerRegistrationRequest(externalId, List.of(), 1, "test"),
-                        WorkerRegistrationResponse.class);
-        return response.workerId();
     }
 
     private static KafkaProducer<String, String> rawStringProducer() {

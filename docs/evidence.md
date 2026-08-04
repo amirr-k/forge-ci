@@ -9,26 +9,43 @@ JDK 21.0.12, Docker Desktop. Commit `2a2f0d6`.
 
 ## Test suite
 
-`./gradlew check` — 1263 tests, 0 errors, 2 failures.
+`./gradlew check --rerun-tasks` — 1263 tests across 44 classes, 0 errors, 0 failures. Verified
+additionally by three consecutive forced runs of the Testcontainers integration suite, all clean.
 
-The two failures are `BuildEventsIntegrationTest.streamsEventsForACompletedBuildThenCloses`
-(TimeoutException) and
-`KafkaTaskResultsIntegrationTest.aRedeliveredTaskResultMessageDoesNotReapplyItsEffect`
-(`worker N never claimed solo:build`).
+Two integration tests used to fail here. The cause was in the tests, not in the control plane, and
+it is worth recording because the mechanism is easy to reintroduce.
 
-**This is an open defect, not an environment artifact.** They were first assumed to be contention
-flakes on a memory-pressured laptop. That was wrong: they fail the same way on a clean
-`ubuntu-latest` GitHub runner. They pass reliably when their classes run in isolation and fail
-reliably when the whole `integrationTest` suite runs, which points at state leaking between tests
-sharing one Spring context — worker registrations from earlier tests appear to compete for the
-task the assertion is waiting on.
+The integration profile compresses `forge.worker.heartbeat-interval-ms` to 1 s so the
+failure-recovery suite can observe lease expiry in seconds. `WorkerService` marks a worker
+unhealthy after three missed intervals, so a worker that stops heartbeating is excluded from
+claims after **3 s** and stays excluded until it heartbeats again. Two test classes registered a
+worker and then polled `/claim` without ever heartbeating, so their own worker died mid-loop. The
+reproducing run logged `worker worker-kafka-idempotent-… (35) marked unhealthy` — worker 35 being
+exactly the worker named by the assertion that failed, `worker 35 never claimed solo:build`. This
+is why enlarging the polling budgets never helped, and enlarging them further would have made it
+worse: past 3 s the worker cannot be handed a task at any budget.
 
-Raising the polling budgets (claim loop 2.5 s → 20 s, SSE collection 15 s → 60 s) did **not** fix
-it, which rules out the simple timing explanation. That change was reverted rather than left in
-place asserting a cause that had not been demonstrated.
+`BuildEventsIntegrationTest` had a second, independent bug. The claim queue is deliberately global
+across every build in the system, and that test accepted whichever task run came back instead of
+its own. In the reproducing run its `events:build` became READY at `16:46:39.140` and 26 ms later
+the same worker leased `checkout:integration` — a leftover from an earlier test class — ran that
+to SUCCEEDED, and never claimed its own task. Its build therefore never reached a terminal state,
+and `GET /api/builds/{id}/events` only closes its emitter once the build is terminal, so the test
+failed collecting the stream rather than at the real fault.
 
-Consequence: the `required-checks` CI job is red on `main`. The other four jobs pass. This is
-tracked honestly rather than worked around by excluding the tests or retrying until green.
+The fix routes claim polling through `ProtocolTestClient.claimOneOf`, which heartbeats on each
+poll like a live worker and completes foreign backlog instead of mistaking it for its own, and
+makes the scheduling tests finish the builds they start so they stop feeding leftovers into
+unrelated classes a minute later. Nothing was disabled, excluded, retried, or given a longer
+timeout.
+
+One constraint that is load-bearing and not obvious from the diff: the two cache-reuse tests in
+`WorkerSchedulingIntegrationTest` must upload artifacts with the cache key spelled exactly as the
+plan declares it. Routing those uploads through the shared client's percent-encoding upload
+round-trips fine against its own lookup but commits an entry the cache-hit check never matches, so
+the second build misses cache and stalls. Related: claim filtering is by task *name*, and several
+tests in that class share names, so a stalled build's task runs can be picked up by the next test
+as if they were its own.
 
 ## Distributed end-to-end validation
 

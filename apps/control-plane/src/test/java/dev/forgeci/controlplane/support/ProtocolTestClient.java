@@ -17,6 +17,7 @@ import dev.forgeci.protocol.WorkerRegistrationResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -64,9 +65,14 @@ public final class ProtocolTestClient {
     }
 
     public long registerWorker(String externalId) {
+        return registerWorker(externalId, 1);
+    }
+
+    public long registerWorker(String externalId, int maxConcurrency) {
         return rest.postForObject(
                         "/api/workers/register",
-                        new WorkerRegistrationRequest(externalId, List.of(), 1, "test"),
+                        new WorkerRegistrationRequest(
+                                externalId, List.of(), maxConcurrency, "test"),
                         WorkerRegistrationResponse.class)
                 .workerId();
     }
@@ -89,6 +95,22 @@ public final class ProtocolTestClient {
 
     /** Polls (heartbeating like a live worker would) until this worker claims {@code taskName}. */
     public ClaimedTaskResponse claimNamed(long workerId, String taskName) {
+        return claimOneOf(workerId, Set.of(taskName));
+    }
+
+    /**
+     * Polls until this worker claims one of {@code taskNames}. Two things here are what make a
+     * claim-polling test survive running alongside the rest of the suite, and neither is optional.
+     *
+     * <p>Heartbeating on every poll: the integration profile marks a worker unhealthy after three
+     * missed intervals — three seconds — and an unhealthy worker is excluded from claims until it
+     * heartbeats again, so a silently polling worker starves itself no matter how long it waits.
+     *
+     * <p>Completing foreign claims rather than keeping them: the claim queue is global across every
+     * build in the system, so a poll can hand back another test class's task run. Holding one
+     * strands its build; returning it as if it were ours strands ours.
+     */
+    public ClaimedTaskResponse claimOneOf(long workerId, Set<String> taskNames) {
         for (int i = 0; i < 400; i++) {
             heartbeat(workerId);
             Optional<ClaimedTaskResponse> claimed = claim(workerId);
@@ -96,12 +118,21 @@ public final class ProtocolTestClient {
                 sleepQuietly(100);
                 continue;
             }
-            if (claimed.get().taskName().equals(taskName)) {
+            if (taskNames.contains(claimed.get().taskName())) {
                 return claimed.get();
             }
-            reportResult(claimed.get(), true, 0, null, null); // harmlessly complete foreign backlog
+            drain(claimed.get());
         }
-        throw new AssertionError("worker " + workerId + " never claimed " + taskName);
+        throw new AssertionError("worker " + workerId + " never claimed one of " + taskNames);
+    }
+
+    /**
+     * Harmlessly completes a foreign backlog task. The report is allowed to be rejected — a
+     * leftover whose lease expired between the claim and this call is already being reclaimed by
+     * the lease sweep, which releases the worker's slot either way.
+     */
+    public void drain(ClaimedTaskResponse foreign) {
+        reportResultStatus(foreign, true, 0, null, null);
     }
 
     public void reportResult(

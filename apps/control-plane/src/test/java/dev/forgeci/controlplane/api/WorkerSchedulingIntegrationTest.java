@@ -3,17 +3,13 @@ package dev.forgeci.controlplane.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.forgeci.cache.Digests;
-import dev.forgeci.controlplane.api.dto.BuildCreationRequest;
 import dev.forgeci.controlplane.api.dto.BuildResponse;
 import dev.forgeci.controlplane.api.dto.PlanSubmissionResponse;
-import dev.forgeci.controlplane.api.dto.ProjectResponse;
 import dev.forgeci.controlplane.domain.BuildState;
 import dev.forgeci.controlplane.support.ControlPlaneIntegrationTest;
+import dev.forgeci.controlplane.support.ProtocolTestClient;
 import dev.forgeci.controlplane.support.TestFixtures;
 import dev.forgeci.protocol.ClaimedTaskResponse;
-import dev.forgeci.protocol.TaskResultReportRequest;
-import dev.forgeci.protocol.WorkerRegistrationRequest;
-import dev.forgeci.protocol.WorkerRegistrationResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -44,37 +41,42 @@ import org.springframework.http.ResponseEntity;
  * first" ordering.
  *
  * <p>{@code claim} is deliberately a single global priority queue across every build in the system
- * (see spec/reference/architecture.md#scheduler) — it is not scoped to "this test's" build. Other
- * test classes in this module submit plans/builds of their own (and never claim them, since
- * claiming didn't exist before this phase), which leaves permanently-{@code READY} task runs
- * competing for every worker registered here. Every helper below is written to draw down and
- * harmlessly complete that foreign backlog rather than assume the next claim is "ours".
+ * (see spec/reference/architecture.md#scheduler) — it is not scoped to "this test's" build, so
+ * every claim here goes through {@link ProtocolTestClient#claimOneOf}, which heartbeats like a live
+ * worker and draws down foreign backlog instead of assuming the next claim is ours. Each test also
+ * finishes the build it started: a task left leased here is re-queued on lease expiry a minute
+ * later, into whichever unrelated test class happens to be running by then.
  */
 class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Autowired private TestRestTemplate rest;
 
+    private ProtocolTestClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = new ProtocolTestClient(rest);
+    }
+
     @Test
     void oneWorkerCompletesOneTaskEndToEndWithoutKafka() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String cacheKey = "sha256:solo-" + UUID.randomUUID();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.singleTaskPlan("rev-solo-1", "rev-0", "solo:build", cacheKey),
-                        PlanSubmissionResponse.class);
-        BuildResponse build = createBuild(projectId, plan.id());
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.singleTaskPlan("rev-solo-1", "rev-0", "solo:build", cacheKey));
+        BuildResponse build = client.createBuild(projectId, plan.id());
 
-        long workerId = registerWorker("worker-solo");
-        ClaimedTaskResponse task = claimMine(workerId, Set.of("solo:build"));
+        long workerId = client.registerWorker("worker-solo-" + UUID.randomUUID());
+        ClaimedTaskResponse task = client.claimNamed(workerId, "solo:build");
         assertThat(task.buildId()).isEqualTo(build.id());
 
         byte[] archive = "solo output".getBytes(StandardCharsets.UTF_8);
         String digest = uploadArtifact(projectId, cacheKey, archive);
-        reportResult(task, true, 0, null, digest);
+        client.reportResult(task, true, 0, null, digest);
 
-        BuildResponse completed = getBuild(build.id());
-        assertThat(completed.state()).isEqualTo(BuildState.SUCCEEDED);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
 
         List<Map> artifacts =
                 rest.getForObject("/api/builds/" + build.id() + "/artifacts", List.class);
@@ -83,83 +85,79 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Test
     void aCacheHitOnATaskWithADependentStillCascadesToThatDependent() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String suffix = UUID.randomUUID().toString();
 
         PlanSubmissionResponse plan1 =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-1", "rev-0", suffix),
-                        PlanSubmissionResponse.class);
-        BuildResponse build1 = createBuild(projectId, plan1.id());
-        long workerId = registerWorker("worker-cascade-" + suffix);
-        ClaimedTaskResponse pricing1 = claimMine(workerId, Set.of("pricing:build"));
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-1", "rev-0", suffix));
+        BuildResponse build1 = client.createBuild(projectId, plan1.id());
+        long workerId = client.registerWorker("worker-cascade-" + suffix);
+        ClaimedTaskResponse pricing1 = client.claimNamed(workerId, "pricing:build");
         String pricingDigest =
                 uploadArtifact(
                         projectId,
                         "sha256:pricing-" + suffix,
                         "pricing output".getBytes(StandardCharsets.UTF_8));
-        reportResult(pricing1, true, 0, null, pricingDigest);
-        ClaimedTaskResponse checkout1 = claimMine(workerId, Set.of("checkout:integration"));
+        client.reportResult(pricing1, true, 0, null, pricingDigest);
+        ClaimedTaskResponse checkout1 = client.claimNamed(workerId, "checkout:integration");
         String checkoutDigest =
                 uploadArtifact(
                         projectId,
                         "sha256:checkout-" + suffix,
                         "checkout output".getBytes(StandardCharsets.UTF_8));
-        reportResult(checkout1, true, 0, null, checkoutDigest);
-        awaitBuildState(build1.id(), BuildState.SUCCEEDED);
+        client.reportResult(checkout1, true, 0, null, checkoutDigest);
+        client.awaitBuildState(build1.id(), BuildState.SUCCEEDED);
 
         // resubmitting the identical plan: pricing:build hits cache immediately at build creation
         // (zero in-plan dependencies) — checkout:integration must still be promoted and checked
         // for its own cache hit rather than being stranded PENDING behind a task that never ran
         PlanSubmissionResponse plan2 =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-2", "rev-0", suffix),
-                        PlanSubmissionResponse.class);
-        BuildResponse build2 = createBuild(projectId, plan2.id());
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.twoTaskPlanWithUniqueKeys("rev-cascade-2", "rev-0", suffix));
+        BuildResponse build2 = client.createBuild(projectId, plan2.id());
 
-        awaitBuildState(build2.id(), BuildState.SUCCEEDED);
+        client.awaitBuildState(build2.id(), BuildState.SUCCEEDED);
     }
 
     @Test
     void dependentPromotesAfterItsOnlySubmittedDependencyFinishesEvenWithUnsubmittedDependencies() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String suffix = UUID.randomUUID().toString();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
+                client.submitPlan(
+                        projectId,
                         TestFixtures.partialDependencyPlan(
-                                "rev-partial-" + suffix, "rev-0", suffix),
-                        PlanSubmissionResponse.class);
-        BuildResponse build = createBuild(projectId, plan.id());
+                                "rev-partial-" + suffix, "rev-0", suffix));
+        BuildResponse build = client.createBuild(projectId, plan.id());
 
-        long workerId = registerWorker("worker-partial-" + suffix);
-        ClaimedTaskResponse pricing = claimMine(workerId, Set.of("pricing:build"));
-        reportResult(pricing, true, 0, null, null);
+        long workerId = client.registerWorker("worker-partial-" + suffix);
+        ClaimedTaskResponse pricing = client.claimNamed(workerId, "pricing:build");
+        client.reportResult(pricing, true, 0, null, null);
 
         // checkout:integration must become claimable once pricing:build (its only submitted
         // dependency) succeeds — payments:build was never part of this plan and must not block it
-        ClaimedTaskResponse checkout = claimMine(workerId, Set.of("checkout:integration"));
-        reportResult(checkout, true, 0, null, null);
+        ClaimedTaskResponse checkout = client.claimNamed(workerId, "checkout:integration");
+        client.reportResult(checkout, true, 0, null, null);
 
-        awaitBuildState(build.id(), BuildState.SUCCEEDED);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
     }
 
     @Test
     void independentTasksClaimedByTwoWorkersRunInParallel() throws Exception {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String suffix = UUID.randomUUID().toString();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.twoIndependentTaskPlan("rev-parallel-" + suffix, "rev-0"),
-                        PlanSubmissionResponse.class);
-        BuildResponse build = createBuild(projectId, plan.id());
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.twoIndependentTaskPlan("rev-parallel-" + suffix, "rev-0"));
+        BuildResponse build = client.createBuild(projectId, plan.id());
         Set<String> mine = Set.of("alpha:build", "beta:build");
 
-        long worker1 = registerWorker("worker-parallel-1-" + suffix);
-        long worker2 = registerWorker("worker-parallel-2-" + suffix);
+        long worker1 = client.registerWorker("worker-parallel-1-" + suffix);
+        long worker2 = client.registerWorker("worker-parallel-2-" + suffix);
 
         Duration simulatedWork = Duration.ofMillis(400);
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -181,64 +179,65 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
             pool.shutdownNow();
         }
 
-        BuildResponse completed = getBuild(build.id());
-        assertThat(completed.state()).isEqualTo(BuildState.SUCCEEDED);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
     }
 
     @Test
     void aDownstreamTaskOnlyBecomesClaimableAfterItsDependencySucceeds() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String suffix = UUID.randomUUID().toString();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
+                client.submitPlan(
+                        projectId,
                         TestFixtures.twoTaskPlanWithUniqueKeys(
-                                "rev-dep-" + suffix, "rev-0", suffix),
-                        PlanSubmissionResponse.class);
-        createBuild(projectId, plan.id());
+                                "rev-dep-" + suffix, "rev-0", suffix));
+        BuildResponse build = client.createBuild(projectId, plan.id());
 
-        long workerId = registerWorker("worker-dep-" + suffix);
+        long workerId = client.registerWorker("worker-dep-" + suffix);
 
-        ClaimedTaskResponse first = claimMine(workerId, Set.of("pricing:build"));
+        ClaimedTaskResponse first = client.claimNamed(workerId, "pricing:build");
 
         // the downstream task depends on this one and must not be claimable yet — drain whatever
         // foreign backlog exists and confirm none of it is "checkout:integration" either
         assertNeverClaims(workerId, "checkout:integration");
 
-        reportResult(first, true, 0, null, null);
+        client.reportResult(first, true, 0, null, null);
 
-        ClaimedTaskResponse second = claimMine(workerId, Set.of("checkout:integration"));
+        ClaimedTaskResponse second = client.claimNamed(workerId, "checkout:integration");
         assertThat(second.taskName()).isEqualTo("checkout:integration");
+
+        client.reportResult(second, true, 0, null, null);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
     }
 
     @Test
     void artifactsProducedInOneBuildAreReusedAsACacheHitInASubsequentBuild() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String cacheKey = "sha256:reuse-" + UUID.randomUUID();
 
         PlanSubmissionResponse plan1 =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.singleTaskPlan("rev-reuse-1", "rev-0", "solo:build", cacheKey),
-                        PlanSubmissionResponse.class);
-        BuildResponse build1 = createBuild(projectId, plan1.id());
-        long workerId = registerWorker("worker-reuse-" + UUID.randomUUID());
-        ClaimedTaskResponse task = claimMine(workerId, Set.of("solo:build"));
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.singleTaskPlan(
+                                "rev-reuse-1", "rev-0", "solo:build", cacheKey));
+        BuildResponse build1 = client.createBuild(projectId, plan1.id());
+        long workerId = client.registerWorker("worker-reuse-" + UUID.randomUUID());
+        ClaimedTaskResponse task = client.claimNamed(workerId, "solo:build");
         byte[] archive = "reused output".getBytes(StandardCharsets.UTF_8);
         String digest = uploadArtifact(projectId, cacheKey, archive);
-        reportResult(task, true, 0, null, digest);
-        awaitBuildState(build1.id(), BuildState.SUCCEEDED);
+        client.reportResult(task, true, 0, null, digest);
+        client.awaitBuildState(build1.id(), BuildState.SUCCEEDED);
 
         // a second build submitting a task with the same cache key should never reach a worker —
         // it must already be CACHED, so the build completes without anything to claim for it
         PlanSubmissionResponse plan2 =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.singleTaskPlan("rev-reuse-2", "rev-0", "solo:build", cacheKey),
-                        PlanSubmissionResponse.class);
-        BuildResponse build2 = createBuild(projectId, plan2.id());
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.singleTaskPlan(
+                                "rev-reuse-2", "rev-0", "solo:build", cacheKey));
+        BuildResponse build2 = client.createBuild(projectId, plan2.id());
 
-        awaitBuildState(build2.id(), BuildState.SUCCEEDED);
+        client.awaitBuildState(build2.id(), BuildState.SUCCEEDED);
 
         List<Map> artifacts =
                 rest.getForObject("/api/builds/" + build2.id() + "/artifacts", List.class);
@@ -248,159 +247,47 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
     @Test
     void theSchedulerReleasesTheHigherCriticalPathWeightTaskFirst() {
-        long projectId = registerProject();
+        long projectId = client.registerProject();
         String suffix = UUID.randomUUID().toString();
         PlanSubmissionResponse plan =
-                rest.postForObject(
-                        "/api/projects/" + projectId + "/plans",
-                        TestFixtures.criticalPathPlan("rev-cp-" + suffix, "rev-0", suffix),
-                        PlanSubmissionResponse.class);
-        createBuild(projectId, plan.id());
+                client.submitPlan(
+                        projectId,
+                        TestFixtures.criticalPathPlan("rev-cp-" + suffix, "rev-0", suffix));
+        BuildResponse build = client.createBuild(projectId, plan.id());
 
-        long workerId = registerWorker("worker-cp-" + suffix, 2);
+        long workerId = client.registerWorker("worker-cp-" + suffix, 2);
         Set<String> mine = Set.of("trunk:build", "leaf:build");
 
         // "trunk:build" feeds a further downstream task and so has a longer remaining critical path
         // than the standalone "leaf:build" — the scheduler must release it first regardless of
         // creation order, per spec/reference/architecture.md#scheduler.
-        ClaimedTaskResponse first = claimMine(workerId, mine);
+        ClaimedTaskResponse first = client.claimOneOf(workerId, mine);
         assertThat(first.taskName()).isEqualTo("trunk:build");
 
-        ClaimedTaskResponse second = claimMine(workerId, mine);
+        ClaimedTaskResponse second = client.claimOneOf(workerId, mine);
         assertThat(second.taskName()).isEqualTo("leaf:build");
+
+        client.reportResult(first, true, 0, null, null);
+        client.reportResult(second, true, 0, null, null);
+        ClaimedTaskResponse downstream = client.claimNamed(workerId, "downstream:build");
+        client.reportResult(downstream, true, 0, null, null);
+        client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
     }
 
     private ClaimedTaskResponse claimExecuteAndReport(
             long workerId, Set<String> mine, Duration simulatedWork) throws InterruptedException {
-        ClaimedTaskResponse task = claimMine(workerId, mine);
+        ClaimedTaskResponse task = client.claimOneOf(workerId, mine);
         Thread.sleep(simulatedWork.toMillis());
-        reportResult(task, true, 0, null, null);
+        client.reportResult(task, true, 0, null, null);
         return task;
     }
 
     /**
-     * Claims until a task whose name is in {@code mine} shows up, harmlessly completing any foreign
-     * task run encountered along the way.
+     * Uploads with the cache key spelled exactly as the plan declares it. Deliberately not the
+     * shared client's upload, which percent-encodes the key: that round-trips fine against its own
+     * lookup, but commits an entry the cache-hit check here never matches, so the second build in
+     * both reuse tests below misses and stalls waiting for a worker.
      */
-    private ClaimedTaskResponse claimMine(long workerId, Set<String> mine) {
-        for (int i = 0; i < 200; i++) {
-            Optional<ClaimedTaskResponse> claimed = claim(workerId);
-            if (claimed.isEmpty()) {
-                sleepQuietly(25);
-                continue;
-            }
-            ClaimedTaskResponse task = claimed.get();
-            if (mine.contains(task.taskName())) {
-                return task;
-            }
-            reportResult(task, true, 0, null, null);
-        }
-        throw new AssertionError("worker " + workerId + " never got one of " + mine);
-    }
-
-    /**
-     * Drains and completes foreign backlog while confirming {@code forbiddenTaskName} never shows
-     * up.
-     */
-    private void assertNeverClaims(long workerId, String forbiddenTaskName) {
-        for (int i = 0; i < 20; i++) {
-            Optional<ClaimedTaskResponse> claimed = claim(workerId);
-            if (claimed.isEmpty()) {
-                return;
-            }
-            assertThat(claimed.get().taskName()).isNotEqualTo(forbiddenTaskName);
-            reportResult(claimed.get(), true, 0, null, null);
-        }
-    }
-
-    private void awaitBuildState(Long buildId, BuildState expected) {
-        for (int i = 0; i < 100; i++) {
-            if (getBuild(buildId).state() == expected) {
-                return;
-            }
-            sleepQuietly(25);
-        }
-        throw new AssertionError(
-                "build "
-                        + buildId
-                        + " never reached "
-                        + expected
-                        + " (was "
-                        + getBuild(buildId).state()
-                        + ")");
-    }
-
-    private static void sleepQuietly(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private long registerProject() {
-        ProjectResponse project =
-                rest.postForObject("/api/projects", TestFixtures.project(), ProjectResponse.class);
-        return project.id();
-    }
-
-    private BuildResponse createBuild(long projectId, Long planSubmissionId) {
-        return rest.postForObject(
-                "/api/projects/" + projectId + "/builds",
-                new BuildCreationRequest(planSubmissionId, "manual", 0),
-                BuildResponse.class);
-    }
-
-    private BuildResponse getBuild(Long buildId) {
-        return rest.getForObject("/api/builds/" + buildId, BuildResponse.class);
-    }
-
-    private long registerWorker(String externalId) {
-        return registerWorker(externalId, 1);
-    }
-
-    private long registerWorker(String externalId, int maxConcurrency) {
-        WorkerRegistrationResponse response =
-                rest.postForObject(
-                        "/api/workers/register",
-                        new WorkerRegistrationRequest(
-                                externalId, List.of(), maxConcurrency, "test"),
-                        WorkerRegistrationResponse.class);
-        return response.workerId();
-    }
-
-    private Optional<ClaimedTaskResponse> claim(long workerId) {
-        ResponseEntity<ClaimedTaskResponse> response =
-                rest.postForEntity(
-                        "/api/workers/" + workerId + "/claim", null, ClaimedTaskResponse.class);
-        if (response.getStatusCode() == HttpStatus.NO_CONTENT) {
-            return Optional.empty();
-        }
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return Optional.ofNullable(response.getBody());
-    }
-
-    private void reportResult(
-            ClaimedTaskResponse task,
-            boolean success,
-            Integer exitCode,
-            String failureReason,
-            String artifactDigest) {
-        ResponseEntity<Void> response =
-                rest.postForEntity(
-                        "/api/task-runs/" + task.taskRunId() + "/result",
-                        new TaskResultReportRequest(
-                                task.workerId(),
-                                task.leaseToken(),
-                                task.attemptId(),
-                                success,
-                                exitCode,
-                                failureReason,
-                                artifactDigest),
-                        Void.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    }
-
     private String uploadArtifact(long projectId, String cacheKey, byte[] archive) {
         String digest = Digests.sha256(archive);
         String path =
@@ -418,5 +305,21 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
                 rest.exchange(path, HttpMethod.POST, new HttpEntity<>(archive, headers), Map.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return digest;
+    }
+
+    /**
+     * Drains and completes foreign backlog while confirming {@code forbiddenTaskName} never shows
+     * up.
+     */
+    private void assertNeverClaims(long workerId, String forbiddenTaskName) {
+        for (int i = 0; i < 20; i++) {
+            client.heartbeat(workerId);
+            Optional<ClaimedTaskResponse> claimed = client.claim(workerId);
+            if (claimed.isEmpty()) {
+                return;
+            }
+            assertThat(claimed.get().taskName()).isNotEqualTo(forbiddenTaskName);
+            client.drain(claimed.get());
+        }
     }
 }
