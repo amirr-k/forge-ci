@@ -59,6 +59,7 @@ public class SchedulerService {
     private final BuildMetrics metrics;
     private final StringRedisTemplate redis;
     private final Duration leaseGrace;
+    private final SchedulingPolicy policy;
     private final TransactionTemplate leaseTransactionTemplate;
 
     public SchedulerService(
@@ -71,6 +72,7 @@ public class SchedulerService {
             BuildMetrics metrics,
             StringRedisTemplate redis,
             @Value("${forge.scheduler.lease-grace-seconds:30}") long leaseGraceSeconds,
+            @Value("${forge.scheduler.policy:critical-path}") String policy,
             PlatformTransactionManager transactionManager) {
         this.taskRunRepository = taskRunRepository;
         this.workerRepository = workerRepository;
@@ -81,6 +83,8 @@ public class SchedulerService {
         this.metrics = metrics;
         this.redis = redis;
         this.leaseGrace = Duration.ofSeconds(leaseGraceSeconds);
+        this.policy = SchedulingPolicy.from(policy);
+        log.info("scheduler policy: {}", this.policy);
         DefaultTransactionDefinition requiresNew = new DefaultTransactionDefinition();
         requiresNew.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.leaseTransactionTemplate = new TransactionTemplate(transactionManager, requiresNew);
@@ -113,8 +117,7 @@ public class SchedulerService {
             return Optional.empty();
         }
 
-        List<TaskRun> candidates =
-                taskRunRepository.findClaimCandidates(PageRequest.of(0, CLAIM_CANDIDATE_LIMIT));
+        List<TaskRun> candidates = claimCandidates();
         for (TaskRun candidate : candidates) {
             Optional<TaskRun> leased = attemptLease(candidate, workerId);
             if (leased.isPresent()) {
@@ -125,6 +128,20 @@ public class SchedulerService {
             log.debug("claim candidate {} no longer available, trying next", candidate.getId());
         }
         return Optional.empty();
+    }
+
+    /**
+     * The ready-task ordering for the configured policy. All three read the same eligibility rule
+     * and differ only in {@code order by}, so a policy change never affects which tasks may run,
+     * only which of the eligible ones runs first.
+     */
+    private List<TaskRun> claimCandidates() {
+        PageRequest limit = PageRequest.of(0, CLAIM_CANDIDATE_LIMIT);
+        return switch (policy) {
+            case FIFO -> taskRunRepository.findClaimCandidatesFifo(limit);
+            case CRITICAL_PATH_DURATION -> taskRunRepository.findClaimCandidatesByDuration(limit);
+            case CRITICAL_PATH -> taskRunRepository.findClaimCandidates(limit);
+        };
     }
 
     private Optional<TaskRun> attemptLease(TaskRun candidate, Long workerId) {

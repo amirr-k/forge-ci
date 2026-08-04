@@ -34,6 +34,7 @@ public class BuildService {
     private final ArtifactRepository artifactRepository;
     private final BuildStateMachine buildStateMachine;
     private final SchedulerService schedulerService;
+    private final TaskDurationEstimator durationEstimator;
     private final BuildMetrics metrics;
 
     public BuildService(
@@ -44,6 +45,7 @@ public class BuildService {
             ArtifactRepository artifactRepository,
             BuildStateMachine buildStateMachine,
             SchedulerService schedulerService,
+            TaskDurationEstimator durationEstimator,
             BuildMetrics metrics) {
         this.projectRepository = projectRepository;
         this.planSubmissionRepository = planSubmissionRepository;
@@ -52,6 +54,7 @@ public class BuildService {
         this.artifactRepository = artifactRepository;
         this.buildStateMachine = buildStateMachine;
         this.schedulerService = schedulerService;
+        this.durationEstimator = durationEstimator;
         this.metrics = metrics;
     }
 
@@ -110,10 +113,23 @@ public class BuildService {
         List<TaskDefinitionEntity> tasks = planSubmission.getTasks();
         Map<String, Integer> criticalPathWeights = CriticalPathCalculator.weights(tasks);
 
+        // both orderings are computed for every build regardless of the active policy, so switching
+        // forge.scheduler.policy takes effect on the next build without a backfill — and so a
+        // benchmark can compare policies over identically materialized builds
+        Map<String, Long> medians =
+                durationEstimator.medianDurationsByTaskName(build.getProject().getId());
+        Map<String, Long> criticalPathMillis =
+                CriticalPathCalculator.millis(
+                        tasks,
+                        name ->
+                                medians.getOrDefault(
+                                        name, durationEstimator.defaultEstimateMillis()));
+
         List<TaskRun> created = new ArrayList<>(tasks.size());
         for (TaskDefinitionEntity task : tasks) {
             TaskRun taskRun = new TaskRun(build, task.getTaskName(), task.getCacheKey());
             taskRun.setCriticalPathWeight(criticalPathWeights.getOrDefault(task.getTaskName(), 0));
+            taskRun.setCriticalPathMillis(criticalPathMillis.getOrDefault(task.getTaskName(), 0L));
             created.add(taskRunRepository.save(taskRun));
         }
 

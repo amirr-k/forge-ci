@@ -71,6 +71,11 @@ public class TaskRun {
     @Column(name = "critical_path_weight", nullable = false)
     private int criticalPathWeight;
 
+    // estimated milliseconds remaining on the longest chain out of this task; 0 when no duration
+    // history exists yet, which makes the duration policy degrade to this build's readyAt order
+    @Column(name = "critical_path_millis", nullable = false)
+    private long criticalPathMillis;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -205,5 +210,13 @@ public class TaskRun {
 
     public void setCriticalPathWeight(int criticalPathWeight) {
         this.criticalPathWeight = criticalPathWeight;
+    }
+
+    public long getCriticalPathMillis() {
+        return criticalPathMillis;
+    }
+
+    public void setCriticalPathMillis(long criticalPathMillis) {
+        this.criticalPathMillis = criticalPathMillis;
     }
 }

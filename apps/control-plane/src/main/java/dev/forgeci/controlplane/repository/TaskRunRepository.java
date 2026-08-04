@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
 
@@ -28,6 +29,42 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
                     + "and t.build.state = dev.forgeci.controlplane.domain.BuildState.RUNNING "
                     + "order by t.criticalPathWeight desc, t.readyAt asc, t.id asc")
     List<TaskRun> findClaimCandidates(Pageable pageable);
+
+    /**
+     * The scheduling baseline: same eligibility rule, ordered only by the time each task became
+     * ready. Selected by {@code forge.scheduler.policy=fifo}. Exists so the critical-path policy
+     * can be measured against something rather than asserted — see benchmarks.md.
+     */
+    @Query(
+            "select t from TaskRun t where t.state = dev.forgeci.controlplane.domain.TaskRunState.READY "
+                    + "and t.build.state = dev.forgeci.controlplane.domain.BuildState.RUNNING "
+                    + "order by t.readyAt asc, t.id asc")
+    List<TaskRun> findClaimCandidatesFifo(Pageable pageable);
+
+    /**
+     * Duration-aware critical path: orders by estimated remaining milliseconds on the longest chain
+     * out of this task rather than by hop count, so a long chain of cheap tasks stops outranking a
+     * short chain of expensive ones. Selected by {@code
+     * forge.scheduler.policy=critical-path-duration}.
+     */
+    @Query(
+            "select t from TaskRun t where t.state = dev.forgeci.controlplane.domain.TaskRunState.READY "
+                    + "and t.build.state = dev.forgeci.controlplane.domain.BuildState.RUNNING "
+                    + "order by t.criticalPathMillis desc, t.readyAt asc, t.id asc")
+    List<TaskRun> findClaimCandidatesByDuration(Pageable pageable);
+
+    /**
+     * Observed durations of previously completed runs of a task within one project — the history
+     * the duration-aware policy estimates from. Ordered newest first so a caller can bound how far
+     * back it looks.
+     */
+    @Query(
+            "select t.taskName, t.startedAt, t.completedAt from TaskRun t "
+                    + "where t.build.project.id = :projectId "
+                    + "and t.state = dev.forgeci.controlplane.domain.TaskRunState.SUCCEEDED "
+                    + "and t.startedAt is not null and t.completedAt is not null "
+                    + "order by t.completedAt desc")
+    List<Object[]> findRecentDurations(@Param("projectId") Long projectId, Pageable pageable);
 
     List<TaskRun> findByStateAndRetryAtBefore(TaskRunState state, Instant cutoff);
 
