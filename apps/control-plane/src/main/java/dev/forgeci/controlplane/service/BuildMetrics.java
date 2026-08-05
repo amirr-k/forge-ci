@@ -50,25 +50,36 @@ public class BuildMetrics {
                         .register(registry);
         this.buildDuration = Timer.builder("forge.builds.duration").register(registry);
         this.taskDuration = Timer.builder("forge.tasks.duration").register(registry);
-        this.taskAttempts = Counter.builder("forge.tasks.attempts").register(registry);
+        // every series sharing a metric name carries the *same* tag key, just a different value
+        // (matching the buildsSucceeded/Failed/Canceled pattern above) — Prometheus requires a
+        // consistent label schema per metric name, so mixing an untagged series with a tagged one
+        // under the same name is invalid and the mismatched series silently never appears in a
+        // scrape, rather than erroring loudly.
+        this.taskAttempts =
+                Counter.builder("forge.tasks.attempts")
+                        .tag("speculative", "false")
+                        .register(registry);
         this.taskRetries = Counter.builder("forge.tasks.retries").register(registry);
         this.leaseExpirations = Counter.builder("forge.tasks.lease_expirations").register(registry);
         this.speculativeAttempts =
                 Counter.builder("forge.tasks.attempts")
-                        .tag("kind", "speculative")
+                        .tag("speculative", "true")
                         .register(registry);
         // submitted vs accepted is the pair that shows duplicate execution being tolerated rather
         // than prevented: submitted counts every result a worker sent, accepted counts the ones
         // that won their task run. The difference is exactly the wasted-but-harmless work.
         this.resultsSubmitted = Counter.builder("forge.results.submitted").register(registry);
-        this.resultsAccepted = Counter.builder("forge.results.accepted").register(registry);
+        this.resultsAccepted =
+                Counter.builder("forge.results.accepted")
+                        .tag("speculative", "false")
+                        .register(registry);
         this.duplicateResultsRejected =
                 Counter.builder("forge.results.rejected")
                         .tag("reason", "duplicate")
                         .register(registry);
         this.speculativeWins =
                 Counter.builder("forge.results.accepted")
-                        .tag("kind", "speculative")
+                        .tag("speculative", "true")
                         .register(registry);
         registry.gauge(
                 "forge.scheduler.ready_queue_depth",
@@ -123,10 +134,16 @@ public class BuildMetrics {
         resultsSubmitted.increment();
     }
 
+    /**
+     * Exactly one of the two accepted-results series is incremented — never both, or a speculative
+     * win would double-count into the overall accepted total once the two series are (correctly)
+     * distinguishable by the {@code speculative} tag.
+     */
     public void resultAccepted(boolean speculative) {
-        resultsAccepted.increment();
         if (speculative) {
             speculativeWins.increment();
+        } else {
+            resultsAccepted.increment();
         }
     }
 
