@@ -16,6 +16,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # job-scoped, not step-scoped: worker-1 depends_on control-plane, so every later "compose up"
+    # re-resolves the control-plane service definition too. If this were set on the deploy step
+    # alone the next one would resolve it to "unknown", change the config hash, and silently
+    # recreate the control plane without the commit it was released at.
+    env:
+      FORGE_GIT_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -66,8 +72,6 @@ jobs:
 
       # step 5: deploy control plane (applies migrations per the note above on startup)
       - name: deploy control plane
-        env:
-          FORGE_GIT_COMMIT: ${{ github.sha }}
         run: docker compose -f deploy/compose.yaml up --build -d control-plane
 
       - name: wait for the control plane to become ready
