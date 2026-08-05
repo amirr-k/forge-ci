@@ -95,6 +95,13 @@ jobs:
   # multi-service stack (deploy/compose.yaml) — not a mock, not a static screenshot
   browser-smoke-test:
     runs-on: ubuntu-latest
+    # The startup warm-up build holds the single guest-build slot for as long as it runs, so a
+    # browser test that clicks "Begin" while it is still going has its demo request rejected and
+    # never sees the log panels. The warm-up exists only to keep the *first real visitor* off a
+    # cold cache, which is not what this test checks — turning it off removes the race rather than
+    # trying to out-wait it. Job-scoped so every compose call in the job resolves it the same way.
+    env:
+      FORGE_DEMO_WARMUP_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
