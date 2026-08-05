@@ -197,6 +197,17 @@
           "results_submitted": 153.0,
           "results_accepted": 153.0,
           "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-4",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 93242.6,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 150.0,
+          "results_accepted": 150.0,
+          "duplicates_rejected": 0.0
         }
       ]
     }

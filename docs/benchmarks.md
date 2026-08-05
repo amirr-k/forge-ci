@@ -116,17 +116,32 @@ arms and a unique cache-key revision per trial so every trial genuinely executes
 | `fifo-w4` | fifo | 10 | 71.3 s | [48.4 s, 118.5 s] |
 | `critical-path-duration-w4` | critical-path-duration | 4 | 60.2 s | [54.7 s, 101.0 s] |
 
-| Figure | Value | Calculation |
-|---|---|---|
-| duration-aware critical-path vs FIFO | **−15.6%** | (71.3 s − 60.2 s) / 71.3 s, medians |
+Per-trial wall clock, in run order:
 
-**Read this one cautiously.** The arms have unequal trial counts (10 vs 4) and both ranges are
-wide — 48–119 s and 55–101 s overlap substantially. The medians differ in the direction the
-critical-path policy predicts, but on this hardware, at these sample sizes, the difference is not
-separated from run-to-run variance. It is reported as directional evidence, not a proven speedup.
-The unequal counts are themselves an artifact: the stack intermittently wedged on this
-resource-constrained laptop after repeated full teardown/recreate cycles, and the duration-aware
-arm lost six trials to that before the harness was made to bring the stack up once per arm.
+- `fifo-w4` — 108.4, 118.5, 79.8, 62.8, 94.4, 61.8, 60.5, 62.2, 48.4, 80.1 s
+- `critical-path-duration-w4` — 101.0, 61.5, 58.9, 54.7 s
+
+| Comparison | FIFO | Duration-aware | Median delta | One-sided exact p |
+|---|---|---|---|---|
+| All measured trials | 71.3 s (n=10) | 60.2 s (n=4) | −15.6% | 0.152 |
+| Excluding each arm's first trial | 62.8 s (n=9) | 58.9 s (n=3) | **−6.2%** | 0.050 |
+
+p-values are an exact one-sided Mann-Whitney U test (full permutation enumeration, appropriate at
+these sample sizes) of the hypothesis that the duration-aware arm is faster.
+
+**The honest reading is roughly −6%, not −15.6%.** Both arms' first measured trial is a large
+outlier (108 s and 101 s) even though a warm-up build was already run and discarded — residual
+Docker layer, JIT, and MinIO-bucket warming that one warm-up does not fully absorb. Excluding those,
+the effect *shrinks* to −6.2% while becoming *more* statistically detectable (p 0.152 → 0.050),
+because dropping them removes far more variance than signal. So most of the headline −15.6% is
+FIFO's two slow early trials rather than a scheduling effect.
+
+At n=3 vs n=9, p = 0.050 sits exactly on the conventional threshold: this is suggestive, in the
+direction the policy predicts, and **not** a settled result. Treat it as directional evidence. The
+unequal trial counts are an artifact of the harness, not a choice — the stack intermittently wedged
+on this resource-constrained laptop during repeated teardown/recreate cycles and the duration-aware
+arm lost six trials to it before the harness was changed to bring the stack up once per arm.
+Settling this properly needs the duration-aware arm re-run to n=10 with a longer warm-up.
 
 ## Worker-failure trials
 
@@ -160,6 +175,52 @@ suppress. A `SIGKILL`ed worker never reports at all, so only one result per task
 submitted. The path where two attempts really do race (a stalled worker resuming after its task was
 already completed elsewhere) is exercised by `SpeculativeExecutionIntegrationTest`, which asserts
 the second reporter is rejected with `403` and the accepted result is unchanged.
+
+## Straggler mitigation: speculation off vs on
+
+Run `20260805T071155Z` · commit `27934e7` · profile `local-benchmark`
+
+30 trials per arm, 4 workers. Each trial submits a single real task (unique cache key, so it always
+genuinely executes), waits until a worker is running it, then `docker pause`s that worker for a
+fixed **9 s** — frozen, not killed, so its lease stays valid and the only question is whether
+anything else finishes the work sooner. The pause is identical in both arms; the only difference is
+`forge.scheduler.speculation.enabled`.
+
+The 9 s pause is calibrated between two thresholds so the mechanism under test is unambiguous:
+above the speculation threshold (so speculation has time to fire), and well below the
+worker-death threshold (heartbeat interval raised to 6 s for this run, so 3 missed beats = 18 s) —
+a paused worker is never mistaken for a crashed one. This measures speculation, not crash recovery.
+
+| Arm | Trials | p50 | p95 | Range | Speculative attempts |
+|---|---|---|---|---|---|
+| `speculation-off` | 30 | 11.99 s | 12.11 s | [11.91 s, 12.15 s] | 0 |
+| `speculation-on` | 30 | 6.31 s | 6.67 s | [5.78 s, 6.86 s] | 30 |
+
+| Figure | Value | Calculation |
+|---|---|---|
+| p95 build latency reduction | **−44.9%** | (12.11 s − 6.67 s) / 12.11 s |
+| p50 build latency reduction | **−47.3%** | (11.99 s − 6.31 s) / 11.99 s |
+| Additional compute | **1 duplicate task execution per trial** | 30 speculative attempts / 30 trials |
+
+The two distributions do not overlap at all (11.91–12.15 s vs 5.78–6.86 s), so no significance test
+is needed here. The mechanism is direct: with speculation off, the task cannot finish until the
+paused worker resumes at 9 s and then completes its work. With speculation on, a second worker
+starts a duplicate once the original is overdue and finishes it before the original even unpauses.
+
+**The trade is explicit:** speculation doubled the compute spent on the straggling task to roughly
+halve the latency. It is off by default (`forge.scheduler.speculation.enabled=false`) because that
+trade is only worth making on a cluster with genuinely idle capacity — and by construction it can
+only ever consume idle capacity, since a worker asks for a speculative duplicate only after finding
+no unstarted work it could run instead.
+
+**On the zero duplicate rejections.** Both arms report 30 results submitted and 30 accepted, with
+zero duplicates rejected — which is a *measurement-window* artifact, not evidence that no duplicate
+occurred. The build completes at ~6.3 s via the speculative attempt; the harness then unpauses the
+original and reads counters 2 s later, but the original worker still has to finish its own
+compilation before reporting, which lands after that window closes. If both attempts had reported
+inside the window the submitted count would be 60, not 30. The rejection path itself is proven by
+`SpeculativeExecutionIntegrationTest`, which drives both reports to completion and asserts the
+loser is rejected with `403` while the accepted result is left unchanged.
 
 ## Reproducing the distributed benchmarks
 
