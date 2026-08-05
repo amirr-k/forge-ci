@@ -252,16 +252,72 @@ after lease expiration, delayed artifact commit, Redis flush mid-build,
 Kafka redelivery — the last already proven by
 `KafkaTaskResultsIntegrationTest` from phase 5) against the real
 Testcontainers-backed stack, and records recovery time with
-`libs/test-support`'s `RecoveryTimer`. A manual demo against the full
-Compose stack (two workers, `docker kill` on the one holding an in-progress
-task's lease) confirmed the same behavior end to end: the crash was
-detected via the Redis-accelerated path within seconds of the missed
-heartbeat, the lease was reclaimed once it passed `lease_expiration`, the
-task was reassigned to and completed by the surviving worker, and exactly
-one artifact was committed — no duplicate `cache_entries`/`artifacts` row.
-Total wall-clock recovery time in that run was dominated by the demo's
-deliberately generous task timeout and lease grace period, not by the
-recovery mechanism itself.
+`libs/test-support`'s `RecoveryTimer`.
+
+Detection no longer waits on the task's own lease deadline.
+`WorkerService.markStaleWorkersUnhealthy` and its Redis-accelerated
+counterpart now call `SchedulerService.reclaimLeasesOfWorker` the moment a
+worker is declared dead, which fails every attempt that worker was
+holding immediately rather than leaving them to `reclaimExpiredLeases`'s
+sweep on `lease_expiration` — a deadline derived from the task's declared
+timeout, which for a slow task could otherwise dominate recovery time by
+itself. A reclaimed attempt also skips the exponential retry backoff
+(`SchedulerService.backoff`) that a genuinely failing task still gets:
+backoff exists to stop hammering work that keeps failing on its own, and
+a reclaimed lease is evidence the *worker* disappeared, not that the work
+was bad. Together these cut measured recovery time on a 60-second-timeout
+task from over a minute to single-digit seconds — see
+`FailureRecoveryIntegrationTest.recoveryFromACrashDoesNotWaitOutTheTasksOwnTimeout`
+and `docs/benchmarks.md` for the measured figures. Every interval this
+depends on (`forge.worker.heartbeat-interval-ms`,
+`forge.scheduler.lease-grace-seconds`, `-lease-sweep-interval-ms`,
+`-retry-sweep-interval-ms`, `-reclaim-retry-delay-ms`) is an
+`application.yml` default behind a `FORGE_*` env override, so a deployment
+can tune detection speed against heartbeat-traffic cost without a code
+change.
+
+**Speculative execution** extends the same lease design to slowdowns, not
+just crashes: `TaskRun` no longer owns the lease directly (`worker_id`/
+`lease_token`/`lease_expiration` on the row are now a denormalised mirror
+of the newest live attempt, updated by
+`SchedulerService.mirrorLeaseOntoRun`) — each `TaskAttempt` carries its
+own (`db/migrations/V5__speculative_execution.sql`). When a worker finds
+no claimable work, `SchedulerService.speculateFor` looks for a running
+attempt with no live sibling that has been running past
+`forge.scheduler.speculation.multiplier` times its
+`TaskDurationEstimator` median (floored at
+`speculation.min-elapsed-ms`, capped at `speculation.max-per-build` per
+build) and starts a second, independent attempt for it on that otherwise-
+idle worker. A task with no duration history is never treated as a
+straggler — there is nothing to be slow relative to. Because this only
+fires once a worker has already found no unstarted work, speculation can
+never take a slot an unstarted task would otherwise have used; the
+tradeoff it makes is bounded duplicate compute for tail latency, not
+throughput for tail latency.
+
+`TaskRun.winningAttemptNumber` is the atomicity point for whichever
+attempt reports first:
+`TaskRunRepository.claimWinningAttempt` is a single conditional
+`UPDATE ... WHERE winning_attempt_number IS NULL`, so of several
+concurrent reports exactly one sees an updated row and may apply its
+result; every other attempt — including one whose worker later resumes
+from a stall and reports independently — is rejected outright
+(`SchedulerService.supersedeLiveSiblings`,
+`SpeculativeExecutionIntegrationTest`). This is still not exactly-once
+execution: both attempts genuinely ran the command. What is guaranteed is
+idempotent acceptance — exactly one result is ever accepted per task run,
+whether the system ran that task once, twice, or (after a retry) more.
+
+A manual demo against the full Compose stack (two workers, `docker kill`
+on the one holding an in-progress task's lease) confirmed the crash path
+end to end: the crash was detected via the Redis-accelerated path within
+seconds of the missed heartbeat, the held attempts were reclaimed
+immediately rather than waiting on `lease_expiration`, the task was
+reassigned to and completed by the surviving worker, and exactly one
+artifact was committed — no duplicate `cache_entries`/`artifacts` row.
+See `docs/benchmarks.md` for the measured worker-failure and speculation
+trial results, run against the real Docker stack rather than a single
+manual demo.
 
 ## Public demo
 

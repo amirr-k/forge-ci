@@ -10,4 +10,7 @@ RUN apk add --no-cache openjdk21-jre-headless
 WORKDIR /app
 COPY --from=build /workspace/apps/worker/build/install/worker /app
 COPY --from=build /workspace/demo/sample-monorepo /opt/forge-demo-repo
+# the 150-task scale fixture the Docker-stack benchmarks run against; the sample monorepo
+# above stays the demo's fixed workload
+COPY --from=build /workspace/demo/scale-monorepo /opt/forge-scale-repo
 ENTRYPOINT ["/app/bin/worker"]

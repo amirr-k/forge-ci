@@ -100,6 +100,19 @@ services:
       # the release pipeline sets this on the host before `compose up`; /api/version echoes it
       # back so a deploy can be verified against the commit it was supposed to deploy
       FORGE_GIT_COMMIT: ${FORGE_GIT_COMMIT:-unknown}
+      # scheduler/recovery tuning, defaulted to application.yml's own values. The benchmark
+      # harness overrides these per arm so one stack definition covers every measured
+      # configuration instead of a fork of this file per experiment.
+      FORGE_SCHEDULER_POLICY: ${FORGE_SCHEDULER_POLICY:-critical-path}
+      FORGE_SCHEDULER_SPECULATION_ENABLED: ${FORGE_SCHEDULER_SPECULATION_ENABLED:-false}
+      FORGE_SCHEDULER_SPECULATION_MULTIPLIER: ${FORGE_SCHEDULER_SPECULATION_MULTIPLIER:-1.5}
+      FORGE_SCHEDULER_SPECULATION_MIN_ELAPSED_MS: ${FORGE_SCHEDULER_SPECULATION_MIN_ELAPSED_MS:-5000}
+      FORGE_SCHEDULER_SPECULATION_MAX_PER_BUILD: ${FORGE_SCHEDULER_SPECULATION_MAX_PER_BUILD:-4}
+      FORGE_WORKER_HEARTBEAT_INTERVAL_MS: ${FORGE_WORKER_HEARTBEAT_INTERVAL_MS:-2000}
+      FORGE_SCHEDULER_LEASE_GRACE_SECONDS: ${FORGE_SCHEDULER_LEASE_GRACE_SECONDS:-30}
+      FORGE_SCHEDULER_LEASE_SWEEP_INTERVAL_MS: ${FORGE_SCHEDULER_LEASE_SWEEP_INTERVAL_MS:-2000}
+      FORGE_SCHEDULER_RETRY_SWEEP_INTERVAL_MS: ${FORGE_SCHEDULER_RETRY_SWEEP_INTERVAL_MS:-1000}
+      FORGE_SCHEDULER_RECLAIM_RETRY_DELAY_MS: ${FORGE_SCHEDULER_RECLAIM_RETRY_DELAY_MS:-1000}
     ports:
       - "8080:8080"
     healthcheck:
@@ -121,9 +134,11 @@ services:
     environment: &worker-environment
       FORGE_CONTROL_PLANE_URL: http://control-plane:8080
       FORGE_WORKER_ID: worker-1
-      FORGE_WORKER_MAX_CONCURRENCY: "2"
+      FORGE_WORKER_MAX_CONCURRENCY: ${FORGE_WORKER_MAX_CONCURRENCY:-2}
       FORGE_WORKSPACE_ROOT: /workspace
-      FORGE_SEED_WORKSPACE_FROM: /opt/forge-demo-repo
+      # /opt/forge-scale-repo (the 150-task benchmark fixture) is also baked into the image; the
+      # benchmark harness points this at it to measure the large graph instead of the demo one
+      FORGE_SEED_WORKSPACE_FROM: ${FORGE_SEED_WORKSPACE_FROM:-/opt/forge-demo-repo}
       FORGE_WORKER_DOCKER_VOLUME: forgeci_worker-workspace
       # the bundled demo's tasks run real javac/java/jar, so the task sandbox needs a JDK
       FORGE_WORKER_DOCKER_IMAGE: eclipse-temurin:21-jdk-alpine
@@ -136,6 +151,22 @@ services:
     environment:
       <<: *worker-environment
       FORGE_WORKER_ID: worker-2
+
+  # Behind a profile so the default stack stays two workers — the four-worker benchmark arm
+  # activates "scale-4" to bring these up, and nothing else ever starts them.
+  worker-3:
+    <<: *worker
+    profiles: ["scale-4"]
+    environment:
+      <<: *worker-environment
+      FORGE_WORKER_ID: worker-3
+
+  worker-4:
+    <<: *worker
+    profiles: ["scale-4"]
+    environment:
+      <<: *worker-environment
+      FORGE_WORKER_ID: worker-4
 
 volumes:
   minio-data:
