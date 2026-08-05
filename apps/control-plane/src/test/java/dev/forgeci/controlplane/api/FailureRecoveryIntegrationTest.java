@@ -92,6 +92,47 @@ class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
         assertThat(recovery).isLessThan(Duration.ofSeconds(30));
     }
 
+    /**
+     * Recovery latency must come from noticing the worker is gone, not from the task's own declared
+     * timeout. The task here declares a 60s timeout, so its lease alone would hold the work hostage
+     * for over a minute; a crashed worker's attempts are instead reclaimed as soon as it misses
+     * enough heartbeats, which is the only thing that makes crash recovery scale to slow tasks.
+     */
+    @Test
+    void recoveryFromACrashDoesNotWaitOutTheTasksOwnTimeout() {
+        long projectId = registerProject();
+        String cacheKey = "sha256:long-timeout-" + UUID.randomUUID();
+        PlanSubmissionResponse plan =
+                rest.postForObject(
+                        "/api/projects/" + projectId + "/plans",
+                        TestFixtures.singleTaskPlan(
+                                "rev-long-" + UUID.randomUUID(),
+                                "rev-0",
+                                "long-timeout:build",
+                                cacheKey),
+                        PlanSubmissionResponse.class);
+        BuildResponse build = createBuild(projectId, plan.id());
+
+        long deadWorker = registerWorker("worker-long-dead-" + UUID.randomUUID());
+        long survivor = registerWorker("worker-long-survivor-" + UUID.randomUUID());
+
+        ClaimedTaskResponse firstAttempt = claimMine(deadWorker, "long-timeout:build");
+        assertThat(firstAttempt.timeoutSeconds()).isGreaterThanOrEqualTo(60);
+        RecoveryTimer timer = RecoveryTimer.startingNow();
+        // and now the worker simply stops: no heartbeat, no report, no logs
+
+        ClaimedTaskResponse secondAttempt = claimMine(survivor, "long-timeout:build");
+        assertThat(secondAttempt.taskRunId()).isEqualTo(firstAttempt.taskRunId());
+        assertThat(secondAttempt.workerId()).isNotEqualTo(firstAttempt.workerId());
+
+        reportResult(secondAttempt, true, 0, null, null);
+        awaitBuildState(build.id(), BuildState.SUCCEEDED);
+
+        Duration recovery = timer.elapsed();
+        log.info("recovery time with a 60s task timeout: {} ms", recovery.toMillis());
+        assertThat(recovery).isLessThan(Duration.ofSeconds(30));
+    }
+
     @Test
     void aBuildCompletesAfterItsWorkerCrashesMidExecution() {
         long projectId = registerProject();

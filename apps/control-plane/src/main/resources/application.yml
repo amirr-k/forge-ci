@@ -52,6 +52,31 @@ forge:
   # set by the release pipeline's image build/deploy step (docs/architecture.md), read back by
   # /api/version — never derived from a .git directory, which a deployed jar doesn't have
   git-commit: ${FORGE_GIT_COMMIT:unknown}
+  worker:
+    # a worker is declared dead after 3 missed heartbeats, and declaring it dead is what reclaims
+    # its in-flight attempts — so this, not the task's own timeout, sets crash-recovery latency
+    heartbeat-interval-ms: ${FORGE_WORKER_HEARTBEAT_INTERVAL_MS:2000}
+  scheduler:
+    policy: ${FORGE_SCHEDULER_POLICY:critical-path}
+    # the lease deadline is the task's declared timeout plus this grace. It is the backstop for a
+    # worker that is unreachable but still heartbeating; the heartbeat path above is what normally
+    # detects a crash, so this stays generous rather than racing legitimate long tasks.
+    lease-grace-seconds: ${FORGE_SCHEDULER_LEASE_GRACE_SECONDS:30}
+    lease-sweep-interval-ms: ${FORGE_SCHEDULER_LEASE_SWEEP_INTERVAL_MS:2000}
+    # reclaimed leases skip the exponential failure backoff — see SchedulerService
+    reclaim-retry-delay-ms: ${FORGE_SCHEDULER_RECLAIM_RETRY_DELAY_MS:1000}
+    retry-sweep-interval-ms: ${FORGE_SCHEDULER_RETRY_SWEEP_INTERVAL_MS:1000}
+    duration-history-limit: ${FORGE_SCHEDULER_DURATION_HISTORY_LIMIT:2000}
+    default-task-estimate-ms: ${FORGE_SCHEDULER_DEFAULT_TASK_ESTIMATE_MS:1000}
+    speculation:
+      # off by default: it trades duplicated work for tail latency, which is only worth it on a
+      # cluster with idle capacity and a real straggler problem. Benchmarked both ways.
+      enabled: ${FORGE_SCHEDULER_SPECULATION_ENABLED:false}
+      multiplier: ${FORGE_SCHEDULER_SPECULATION_MULTIPLIER:1.5}
+      min-elapsed-ms: ${FORGE_SCHEDULER_SPECULATION_MIN_ELAPSED_MS:5000}
+      max-per-build: ${FORGE_SCHEDULER_SPECULATION_MAX_PER_BUILD:4}
+  redis:
+    reconcile-interval-ms: ${FORGE_REDIS_RECONCILE_INTERVAL_MS:15000}
   demo:
     # local dev/tests run with the working directory at the repo root, where the bundled repo
     # lives at its normal path; deploy/compose.yaml points these at the paths baked into the

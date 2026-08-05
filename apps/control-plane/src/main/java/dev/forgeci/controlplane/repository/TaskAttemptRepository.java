@@ -23,6 +23,17 @@ public interface TaskAttemptRepository extends JpaRepository<TaskAttempt, Long> 
                     + "order by a.attemptNumber desc")
     List<TaskAttempt> findLiveByTaskRunId(@Param("taskRunId") Long taskRunId);
 
+    /**
+     * Live attempts held by one worker. Lets a worker being declared dead reclaim its work at once
+     * instead of waiting for each attempt's lease deadline, which is derived from the task's own
+     * timeout and so is far longer than the time it takes to know the worker is gone.
+     */
+    @Query(
+            "select a from TaskAttempt a where a.workerId = :workerId "
+                    + "and a.state in (dev.forgeci.controlplane.domain.TaskRunState.LEASED, "
+                    + "dev.forgeci.controlplane.domain.TaskRunState.RUNNING)")
+    List<TaskAttempt> findLiveByWorkerId(@Param("workerId") Long workerId);
+
     /** The unconditional expiry safety net, run against each attempt's own lease deadline. */
     @Query(
             "select a from TaskAttempt a where a.state in "

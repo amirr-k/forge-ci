@@ -63,6 +63,7 @@ public class SchedulerService {
     private final BuildMetrics metrics;
     private final StringRedisTemplate redis;
     private final Duration leaseGrace;
+    private final Duration reclaimRetryDelay;
     private final SchedulingPolicy policy;
     private final boolean speculationEnabled;
     private final double speculationMultiplier;
@@ -82,6 +83,7 @@ public class SchedulerService {
             BuildMetrics metrics,
             StringRedisTemplate redis,
             @Value("${forge.scheduler.lease-grace-seconds:30}") long leaseGraceSeconds,
+            @Value("${forge.scheduler.reclaim-retry-delay-ms:1000}") long reclaimRetryDelayMs,
             @Value("${forge.scheduler.policy:critical-path}") String policy,
             @Value("${forge.scheduler.speculation.enabled:false}") boolean speculationEnabled,
             @Value("${forge.scheduler.speculation.multiplier:1.5}") double speculationMultiplier,
@@ -100,6 +102,7 @@ public class SchedulerService {
         this.metrics = metrics;
         this.redis = redis;
         this.leaseGrace = Duration.ofSeconds(leaseGraceSeconds);
+        this.reclaimRetryDelay = Duration.ofMillis(reclaimRetryDelayMs);
         this.policy = SchedulingPolicy.from(policy);
         this.speculationEnabled = speculationEnabled;
         this.speculationMultiplier = speculationMultiplier;
@@ -578,6 +581,20 @@ public class SchedulerService {
      * running is not a reason to retry the task, it is exactly the case speculation exists to
      * absorb.
      */
+    /**
+     * Reclaims every attempt a worker was holding the moment that worker is declared dead. Without
+     * this, recovery would wait out each attempt's lease, which is the task's own declared timeout
+     * plus the grace period — so a crash during a two-minute task would cost two minutes to notice
+     * even though the worker stopped heartbeating seconds in. Detection cost becomes one heartbeat
+     * window instead, independent of how long the task itself was going to take.
+     */
+    @Transactional
+    public void reclaimLeasesOfWorker(Long workerId) {
+        for (TaskAttempt attempt : taskAttemptRepository.findLiveByWorkerId(workerId)) {
+            reclaimAttempt(attempt, "worker " + workerId + " stopped heartbeating");
+        }
+    }
+
     private void reclaimIfStillExpired(TaskAttempt attempt) {
         boolean stillExpired =
                 attempt.getLeaseExpiration() != null
@@ -585,8 +602,15 @@ public class SchedulerService {
         if (!attempt.isLive() || !stillExpired) {
             return;
         }
+        reclaimAttempt(attempt, "lease expired");
+    }
+
+    private void reclaimAttempt(TaskAttempt attempt, String reason) {
+        if (!attempt.isLive()) {
+            return;
+        }
         TaskRun taskRun = attempt.getTaskRun();
-        finishAttempt(attempt, TaskRunState.FAILED, null, "lease expired");
+        finishAttempt(attempt, TaskRunState.FAILED, null, reason);
         releaseWorkerLease(attempt.getWorkerId());
         clearLeaseInRedis(taskRun.getId(), attempt.getAttemptNumber());
         metrics.leaseExpired();
@@ -612,8 +636,12 @@ public class SchedulerService {
                                 taskRun.getId(),
                                 taskRun.getVersion(),
                                 TaskRunState.RETRY_WAIT,
-                                new TaskRunOutcome(null, "lease expired", null));
-                result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
+                                new TaskRunOutcome(null, reason, null));
+                // no exponential backoff here. Backoff exists to stop hammering a task that keeps
+                // failing on its own; a reclaimed lease means the worker disappeared, and the work
+                // itself was never shown to be bad — so making crash recovery wait out a doubling
+                // delay would just add dead time to the one case that most needs to be fast.
+                result.setRetryAt(Instant.now().plus(reclaimRetryDelay));
                 result.setLeaseToken(null);
                 taskRunRepository.save(result);
                 metrics.taskRetried();
@@ -623,7 +651,7 @@ public class SchedulerService {
                                 taskRun.getId(),
                                 taskRun.getVersion(),
                                 TaskRunState.FAILED,
-                                new TaskRunOutcome(null, "lease expired", null));
+                                new TaskRunOutcome(null, reason, null));
                 result.setLeaseToken(null);
                 taskRunRepository.save(result);
                 failBuild(result.getBuild().getId());

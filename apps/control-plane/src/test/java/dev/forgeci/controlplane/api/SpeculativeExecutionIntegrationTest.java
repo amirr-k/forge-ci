@@ -148,10 +148,15 @@ class SpeculativeExecutionIntegrationTest extends ControlPlaneIntegrationTest {
         long secondWorker = registerWorker("worker-second-" + UUID.randomUUID());
 
         ClaimedTaskResponse straggler = claimMine(stragglerWorker, "alpha:build");
-        sleepQuietly(1500); // past the speculation threshold, had there been nothing else to do
+        // past the speculation threshold, had there been nothing else to do
+        for (int i = 0; i < 15; i++) {
+            heartbeat(stragglerWorker);
+            sleepQuietly(100);
+        }
 
         // the second worker has real, never-started work available, so that is what it must get
         ClaimedTaskResponse next = claimMine(secondWorker, "beta:build");
+        heartbeat(stragglerWorker);
         assertThat(next.taskRunId()).isNotEqualTo(straggler.taskRunId());
         assertThat(taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(straggler.taskRunId()))
                 .hasSize(1);
@@ -176,9 +181,11 @@ class SpeculativeExecutionIntegrationTest extends ControlPlaneIntegrationTest {
         long idleWorker = registerWorker("worker-waiting-" + UUID.randomUUID());
 
         ClaimedTaskResponse original = claimMine(stragglerWorker, taskName);
-        sleepQuietly(2000); // well past the 1s floor
 
-        for (int i = 0; i < 10; i++) {
+        // well past the 1s floor, heartbeating throughout so this stays a slowdown — a straggler
+        // that went silent would be declared dead and have its lease reclaimed instead
+        for (int i = 0; i < 30; i++) {
+            heartbeat(stragglerWorker);
             heartbeat(idleWorker);
             assertThat(claim(idleWorker)).isEmpty();
             sleepQuietly(100);

@@ -37,15 +37,18 @@ public class WorkerService {
     private static final Logger log = LoggerFactory.getLogger(WorkerService.class);
 
     private final WorkerRepository workerRepository;
+    private final SchedulerService schedulerService;
     private final StringRedisTemplate redis;
     private final Duration heartbeatInterval;
     private final Duration unhealthyAfter;
 
     public WorkerService(
             WorkerRepository workerRepository,
+            SchedulerService schedulerService,
             StringRedisTemplate redis,
             @Value("${forge.worker.heartbeat-interval-ms:5000}") long heartbeatIntervalMs) {
         this.workerRepository = workerRepository;
+        this.schedulerService = schedulerService;
         this.redis = redis;
         this.heartbeatInterval = Duration.ofMillis(heartbeatIntervalMs);
         this.unhealthyAfter = heartbeatInterval.multipliedBy(MISSED_HEARTBEATS_BEFORE_UNHEALTHY);
@@ -131,6 +134,7 @@ public class WorkerService {
                     worker.getExternalId(),
                     worker.getId(),
                     worker.getLastHeartbeatAt());
+            schedulerService.reclaimLeasesOfWorker(worker.getId());
         }
     }
 
@@ -158,6 +162,7 @@ public class WorkerService {
                                     worker.getExternalId(),
                                     workerId,
                                     worker.getLastHeartbeatAt());
+                            schedulerService.reclaimLeasesOfWorker(workerId);
                         });
     }
 
