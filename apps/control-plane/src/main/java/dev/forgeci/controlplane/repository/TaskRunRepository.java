@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -65,6 +66,20 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
                     + "and t.startedAt is not null and t.completedAt is not null "
                     + "order by t.completedAt desc")
     List<Object[]> findRecentDurations(@Param("projectId") Long projectId, Pageable pageable);
+
+    /**
+     * The atomicity point for accepting one result out of several concurrent attempts. Conditional
+     * on the winner still being unset, so of N simultaneous reporters exactly one sees a return
+     * value of 1 and may apply its result; the rest see 0 and are rejected as duplicates.
+     * Deliberately a single statement rather than a read-then-write: the database's own row lock
+     * decides the winner, which is what makes duplicate execution safe without ever claiming
+     * exactly-once execution.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            "update TaskRun t set t.winningAttemptNumber = :attemptNumber "
+                    + "where t.id = :id and t.winningAttemptNumber is null")
+    int claimWinningAttempt(@Param("id") Long id, @Param("attemptNumber") int attemptNumber);
 
     List<TaskRun> findByStateAndRetryAtBefore(TaskRunState state, Instant cutoff);
 

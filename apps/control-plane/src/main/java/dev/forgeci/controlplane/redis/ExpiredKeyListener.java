@@ -36,7 +36,11 @@ public class ExpiredKeyListener implements MessageListener {
             if (key.startsWith(RedisKeys.HEARTBEAT_PREFIX)) {
                 workerService.onHeartbeatKeyExpired(RedisKeys.workerIdFromHeartbeatKey(key));
             } else if (key.startsWith(RedisKeys.LEASE_PREFIX)) {
-                schedulerService.reclaimExpiredLease(RedisKeys.taskRunIdFromLeaseKey(key));
+                RedisKeys.leaseKey(key)
+                        .ifPresent(
+                                lease ->
+                                        schedulerService.reclaimExpiredLease(
+                                                lease.taskRunId(), lease.attemptNumber()));
             }
         } catch (RuntimeException e) {
             log.warn("failed to handle Redis expiry for key {}: {}", key, e.getMessage());

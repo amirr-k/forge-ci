@@ -1,5 +1,6 @@
 package dev.forgeci.controlplane.api;
 
+import dev.forgeci.controlplane.domain.TaskAttempt;
 import dev.forgeci.controlplane.domain.TaskDefinitionEntity;
 import dev.forgeci.controlplane.domain.TaskRun;
 import dev.forgeci.controlplane.domain.Worker;
@@ -71,8 +72,8 @@ public class WorkerController {
      */
     @PostMapping("/api/workers/{id}/claim")
     public ResponseEntity<ClaimedTaskResponse> claim(@PathVariable("id") Long workerId) {
-        Optional<TaskRun> leased = schedulerService.claim(workerId);
-        return leased.map(taskRun -> ResponseEntity.ok(toResponse(taskRun)))
+        Optional<TaskAttempt> leased = schedulerService.claim(workerId);
+        return leased.map(attempt -> ResponseEntity.ok(toResponse(attempt)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
@@ -103,7 +104,13 @@ public class WorkerController {
         return ResponseEntity.noContent().build();
     }
 
-    private static ClaimedTaskResponse toResponse(TaskRun taskRun) {
+    /**
+     * The wire shape is unchanged: {@code attemptId} and {@code leaseToken} now come from the
+     * attempt rather than the task run, so a worker running a speculative duplicate reports under
+     * its own identity without knowing that is what it is doing.
+     */
+    private static ClaimedTaskResponse toResponse(TaskAttempt attempt) {
+        TaskRun taskRun = attempt.getTaskRun();
         TaskDefinitionEntity definition = SchedulerService.definitionOf(taskRun);
         return new ClaimedTaskResponse(
                 taskRun.getId(),
@@ -115,8 +122,8 @@ public class WorkerController {
                 definition.getOutputs(),
                 definition.getEnvironment(),
                 definition.getTimeoutSeconds(),
-                taskRun.getAttemptCount(),
-                taskRun.getWorkerId(),
-                taskRun.getLeaseToken());
+                attempt.getAttemptNumber(),
+                attempt.getWorkerId(),
+                attempt.getLeaseToken());
     }
 }

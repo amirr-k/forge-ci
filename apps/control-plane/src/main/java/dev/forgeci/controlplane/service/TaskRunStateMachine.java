@@ -2,18 +2,15 @@ package dev.forgeci.controlplane.service;
 
 import dev.forgeci.controlplane.domain.Build;
 import dev.forgeci.controlplane.domain.BuildEventType;
-import dev.forgeci.controlplane.domain.TaskAttempt;
 import dev.forgeci.controlplane.domain.TaskRun;
 import dev.forgeci.controlplane.domain.TaskRunState;
 import dev.forgeci.controlplane.kafka.KafkaTopics;
 import dev.forgeci.controlplane.kafka.TaskReadyEvent;
 import dev.forgeci.controlplane.repository.BuildRepository;
-import dev.forgeci.controlplane.repository.TaskAttemptRepository;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -66,7 +63,6 @@ public class TaskRunStateMachine {
     private static final Logger log = LoggerFactory.getLogger(TaskRunStateMachine.class);
 
     private final TaskRunRepository taskRunRepository;
-    private final TaskAttemptRepository taskAttemptRepository;
     private final BuildRepository buildRepository;
     private final BuildEventPublisher events;
     private final EntityManager entityManager;
@@ -74,13 +70,11 @@ public class TaskRunStateMachine {
 
     public TaskRunStateMachine(
             TaskRunRepository taskRunRepository,
-            TaskAttemptRepository taskAttemptRepository,
             BuildRepository buildRepository,
             BuildEventPublisher events,
             EntityManager entityManager,
             KafkaTemplate<String, Object> kafkaTemplate) {
         this.taskRunRepository = taskRunRepository;
-        this.taskAttemptRepository = taskAttemptRepository;
         this.buildRepository = buildRepository;
         this.events = events;
         this.entityManager = entityManager;
@@ -136,27 +130,23 @@ public class TaskRunStateMachine {
         Instant now = Instant.now();
         if (target == TaskRunState.READY) {
             taskRun.setReadyAt(now);
-        } else if (target == TaskRunState.LEASED) {
-            int attemptNumber = taskRun.getAttemptCount() + 1;
-            taskRun.setAttemptCount(attemptNumber);
-            taskAttemptRepository.save(new TaskAttempt(taskRun, attemptNumber, target));
         } else if (target == TaskRunState.RUNNING) {
-            taskRun.setStartedAt(now);
-            updateLatestAttempt(taskRun, TaskRunState.RUNNING, null, null);
+            // only the first attempt to start moves the run itself to RUNNING, so this is the
+            // moment the run began, not the moment any particular attempt did
+            if (taskRun.getStartedAt() == null) {
+                taskRun.setStartedAt(now);
+            }
         } else if (target == TaskRunState.SUCCEEDED || target == TaskRunState.FAILED) {
             taskRun.setCompletedAt(now);
             taskRun.setExitCode(outcome == null ? null : outcome.exitCode());
             taskRun.setFailureReason(outcome == null ? null : outcome.failureReason());
             taskRun.setArtifactDigest(outcome == null ? null : outcome.artifactDigest());
-            updateLatestAttempt(
-                    taskRun,
-                    target,
-                    outcome == null ? null : outcome.exitCode(),
-                    outcome == null ? null : outcome.failureReason());
         } else if (target == TaskRunState.RETRY_WAIT) {
             taskRun.setFailureReason(outcome == null ? null : outcome.failureReason());
-            updateLatestAttempt(
-                    taskRun, target, null, outcome == null ? null : outcome.failureReason());
+            // a new generation of attempts begins, so the previous generation's winner must not
+            // keep blocking the next one from being accepted
+            taskRun.setWinningAttemptNumber(null);
+            taskRun.setStartedAt(null);
         } else if (target == TaskRunState.CACHED) {
             taskRun.setCompletedAt(now);
             taskRun.setArtifactDigest(outcome == null ? null : outcome.artifactDigest());
@@ -212,22 +202,5 @@ public class TaskRunStateMachine {
                     taskRun.getId(),
                     kafkaUnavailable.getMessage());
         }
-    }
-
-    private void updateLatestAttempt(
-            TaskRun taskRun, TaskRunState state, Integer exitCode, String failureReason) {
-        List<TaskAttempt> attempts =
-                taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId());
-        if (attempts.isEmpty()) {
-            return;
-        }
-        TaskAttempt latest = attempts.get(attempts.size() - 1);
-        latest.setState(state);
-        if (state.isTerminal()) {
-            latest.setCompletedAt(Instant.now());
-            latest.setExitCode(exitCode);
-            latest.setFailureReason(failureReason);
-        }
-        taskAttemptRepository.save(latest);
     }
 }

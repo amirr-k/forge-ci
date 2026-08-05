@@ -43,13 +43,36 @@ public class TaskAttempt {
     @Column(name = "failure_reason")
     private String failureReason;
 
+    // the lease lives here rather than on task_runs: a straggler and its speculative duplicate are
+    // both in flight against the same run, so each needs its own token to be told apart on report
+    @Column(name = "lease_token", length = 64)
+    private String leaseToken;
+
+    @Column(name = "worker_id")
+    private Long workerId;
+
+    @Column(name = "lease_expiration")
+    private Instant leaseExpiration;
+
+    @Column(nullable = false)
+    private boolean speculative;
+
     protected TaskAttempt() {}
 
-    public TaskAttempt(TaskRun taskRun, int attemptNumber, TaskRunState state) {
+    public TaskAttempt(
+            TaskRun taskRun, int attemptNumber, TaskRunState state, boolean speculative) {
         this.taskRun = taskRun;
         this.attemptNumber = attemptNumber;
         this.state = state;
+        this.speculative = speculative;
         this.startedAt = Instant.now();
+    }
+
+    /**
+     * Holds a lease that has not yet been resolved, expired, or superseded by a winning sibling.
+     */
+    public boolean isLive() {
+        return state == TaskRunState.LEASED || state == TaskRunState.RUNNING;
     }
 
     public Long getId() {
@@ -94,5 +117,37 @@ public class TaskAttempt {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public void setLeaseToken(String leaseToken) {
+        this.leaseToken = leaseToken;
+    }
+
+    public Long getWorkerId() {
+        return workerId;
+    }
+
+    public void setWorkerId(Long workerId) {
+        this.workerId = workerId;
+    }
+
+    public Instant getLeaseExpiration() {
+        return leaseExpiration;
+    }
+
+    public void setLeaseExpiration(Instant leaseExpiration) {
+        this.leaseExpiration = leaseExpiration;
+    }
+
+    public boolean isSpeculative() {
+        return speculative;
     }
 }

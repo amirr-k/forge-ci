@@ -76,6 +76,12 @@ public class TaskRun {
     @Column(name = "critical_path_millis", nullable = false)
     private long criticalPathMillis;
 
+    // the attempt whose result was accepted for the current generation of attempts. Set by a
+    // conditional update so exactly one concurrent reporter can win; cleared on RETRY_WAIT, which
+    // starts a fresh generation that must be able to win again.
+    @Column(name = "winning_attempt_number")
+    private Integer winningAttemptNumber;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -218,5 +224,13 @@ public class TaskRun {
 
     public void setCriticalPathMillis(long criticalPathMillis) {
         this.criticalPathMillis = criticalPathMillis;
+    }
+
+    public Integer getWinningAttemptNumber() {
+        return winningAttemptNumber;
+    }
+
+    public void setWinningAttemptNumber(Integer winningAttemptNumber) {
+        this.winningAttemptNumber = winningAttemptNumber;
     }
 }

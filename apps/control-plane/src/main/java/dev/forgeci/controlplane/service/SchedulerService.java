@@ -3,6 +3,7 @@ package dev.forgeci.controlplane.service;
 import dev.forgeci.controlplane.domain.Artifact;
 import dev.forgeci.controlplane.domain.Build;
 import dev.forgeci.controlplane.domain.BuildState;
+import dev.forgeci.controlplane.domain.TaskAttempt;
 import dev.forgeci.controlplane.domain.TaskDefinitionEntity;
 import dev.forgeci.controlplane.domain.TaskRun;
 import dev.forgeci.controlplane.domain.TaskRunState;
@@ -10,6 +11,7 @@ import dev.forgeci.controlplane.domain.Worker;
 import dev.forgeci.controlplane.domain.WorkerState;
 import dev.forgeci.controlplane.redis.RedisKeys;
 import dev.forgeci.controlplane.repository.BuildRepository;
+import dev.forgeci.controlplane.repository.TaskAttemptRepository;
 import dev.forgeci.controlplane.repository.TaskRunRepository;
 import dev.forgeci.controlplane.repository.WorkerRepository;
 import java.time.Duration;
@@ -51,40 +53,59 @@ public class SchedulerService {
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
 
     private final TaskRunRepository taskRunRepository;
+    private final TaskAttemptRepository taskAttemptRepository;
     private final WorkerRepository workerRepository;
     private final BuildRepository buildRepository;
     private final TaskRunStateMachine taskRunStateMachine;
     private final BuildStateMachine buildStateMachine;
     private final RemoteArtifactService remoteArtifactService;
+    private final TaskDurationEstimator durationEstimator;
     private final BuildMetrics metrics;
     private final StringRedisTemplate redis;
     private final Duration leaseGrace;
     private final SchedulingPolicy policy;
+    private final boolean speculationEnabled;
+    private final double speculationMultiplier;
+    private final Duration speculationMinElapsed;
+    private final int speculationMaxPerBuild;
     private final TransactionTemplate leaseTransactionTemplate;
 
     public SchedulerService(
             TaskRunRepository taskRunRepository,
+            TaskAttemptRepository taskAttemptRepository,
             WorkerRepository workerRepository,
             BuildRepository buildRepository,
             TaskRunStateMachine taskRunStateMachine,
             BuildStateMachine buildStateMachine,
             RemoteArtifactService remoteArtifactService,
+            TaskDurationEstimator durationEstimator,
             BuildMetrics metrics,
             StringRedisTemplate redis,
             @Value("${forge.scheduler.lease-grace-seconds:30}") long leaseGraceSeconds,
             @Value("${forge.scheduler.policy:critical-path}") String policy,
+            @Value("${forge.scheduler.speculation.enabled:false}") boolean speculationEnabled,
+            @Value("${forge.scheduler.speculation.multiplier:1.5}") double speculationMultiplier,
+            @Value("${forge.scheduler.speculation.min-elapsed-ms:5000}")
+                    long speculationMinElapsedMs,
+            @Value("${forge.scheduler.speculation.max-per-build:4}") int speculationMaxPerBuild,
             PlatformTransactionManager transactionManager) {
         this.taskRunRepository = taskRunRepository;
+        this.taskAttemptRepository = taskAttemptRepository;
         this.workerRepository = workerRepository;
         this.buildRepository = buildRepository;
         this.taskRunStateMachine = taskRunStateMachine;
         this.buildStateMachine = buildStateMachine;
         this.remoteArtifactService = remoteArtifactService;
+        this.durationEstimator = durationEstimator;
         this.metrics = metrics;
         this.redis = redis;
         this.leaseGrace = Duration.ofSeconds(leaseGraceSeconds);
         this.policy = SchedulingPolicy.from(policy);
-        log.info("scheduler policy: {}", this.policy);
+        this.speculationEnabled = speculationEnabled;
+        this.speculationMultiplier = speculationMultiplier;
+        this.speculationMinElapsed = Duration.ofMillis(speculationMinElapsedMs);
+        this.speculationMaxPerBuild = speculationMaxPerBuild;
+        log.info("scheduler policy: {}, speculation: {}", this.policy, this.speculationEnabled);
         DefaultTransactionDefinition requiresNew = new DefaultTransactionDefinition();
         requiresNew.setPropagationBehavior(DefaultTransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.leaseTransactionTemplate = new TransactionTemplate(transactionManager, requiresNew);
@@ -104,7 +125,7 @@ public class SchedulerService {
      * eventually succeeds.
      */
     @Transactional
-    public Optional<TaskRun> claim(Long workerId) {
+    public Optional<TaskAttempt> claim(Long workerId) {
         Worker worker =
                 workerRepository
                         .findByIdForUpdate(workerId)
@@ -119,7 +140,7 @@ public class SchedulerService {
 
         List<TaskRun> candidates = claimCandidates();
         for (TaskRun candidate : candidates) {
-            Optional<TaskRun> leased = attemptLease(candidate, workerId);
+            Optional<TaskAttempt> leased = attemptLease(candidate, workerId);
             if (leased.isPresent()) {
                 worker.setActiveLeaseCount(worker.getActiveLeaseCount() + 1);
                 metrics.taskAttemptStarted();
@@ -127,7 +148,92 @@ public class SchedulerService {
             }
             log.debug("claim candidate {} no longer available, trying next", candidate.getId());
         }
+
+        // only now, with no real work left to give this worker, is duplicating a straggler worth
+        // it. Speculation therefore costs no throughput by construction: it can never take a slot
+        // that an unstarted task would otherwise have used, which is the bound that matters far
+        // more than the per-build cap below.
+        Optional<TaskAttempt> speculative = speculateFor(worker);
+        if (speculative.isPresent()) {
+            worker.setActiveLeaseCount(worker.getActiveLeaseCount() + 1);
+            metrics.taskAttemptStarted();
+            metrics.speculativeAttemptStarted();
+        }
+        return speculative;
+    }
+
+    /**
+     * Starts a bounded speculative duplicate of the longest-overdue straggler this worker is not
+     * already running, if any task run has been running past {@link #stragglerThreshold} of its
+     * historical duration. Returns empty when speculation is disabled, nothing is overdue, or the
+     * owning build has already spent its speculation budget.
+     */
+    private Optional<TaskAttempt> speculateFor(Worker worker) {
+        if (!speculationEnabled) {
+            return Optional.empty();
+        }
+        Instant now = Instant.now();
+        List<TaskAttempt> candidates =
+                taskAttemptRepository.findStragglerCandidates(
+                        now.minus(speculationMinElapsed),
+                        TaskRunState.RUNNING,
+                        PageRequest.of(0, CLAIM_CANDIDATE_LIMIT));
+
+        Map<Long, Map<String, Long>> estimatesByProject = new HashMap<>();
+        for (TaskAttempt straggler : candidates) {
+            TaskRun taskRun = straggler.getTaskRun();
+            if (worker.getId().equals(straggler.getWorkerId())) {
+                continue; // a second copy on the same worker duplicates the slowdown too
+            }
+            if (taskAttemptRepository.findLiveByTaskRunId(taskRun.getId()).size() != 1) {
+                continue; // already speculated, or nothing live left to race
+            }
+            Long buildId = taskRun.getBuild().getId();
+            if (taskAttemptRepository.countByTaskRunBuildIdAndSpeculativeTrue(buildId)
+                    >= speculationMaxPerBuild) {
+                continue;
+            }
+            Long projectId = taskRun.getBuild().getProject().getId();
+            Map<String, Long> estimates =
+                    estimatesByProject.computeIfAbsent(
+                            projectId, durationEstimator::medianDurationsByTaskName);
+            if (!isStraggling(straggler, estimates, now)) {
+                continue;
+            }
+            Optional<TaskAttempt> started = attemptSpeculativeLease(taskRun, worker.getId());
+            if (started.isPresent()) {
+                log.info(
+                        "speculating on task run {} ({}): attempt {} on worker {} duplicates"
+                                + " attempt {} on worker {}",
+                        taskRun.getId(),
+                        taskRun.getTaskName(),
+                        started.get().getAttemptNumber(),
+                        worker.getId(),
+                        straggler.getAttemptNumber(),
+                        straggler.getWorkerId());
+                return started;
+            }
+        }
         return Optional.empty();
+    }
+
+    /**
+     * A task with no duration history is never treated as a straggler: without an estimate there is
+     * nothing to be slow relative to, and speculating on every long task would just duplicate the
+     * genuinely expensive ones.
+     */
+    private boolean isStraggling(TaskAttempt attempt, Map<String, Long> estimates, Instant now) {
+        Long estimate = estimates.get(attempt.getTaskRun().getTaskName());
+        if (estimate == null || estimate <= 0 || attempt.getStartedAt() == null) {
+            return false;
+        }
+        long elapsed = Duration.between(attempt.getStartedAt(), now).toMillis();
+        return elapsed >= stragglerThreshold(estimate);
+    }
+
+    long stragglerThreshold(long estimateMillis) {
+        return Math.max(
+                speculationMinElapsed.toMillis(), (long) (estimateMillis * speculationMultiplier));
     }
 
     /**
@@ -144,7 +250,7 @@ public class SchedulerService {
         };
     }
 
-    private Optional<TaskRun> attemptLease(TaskRun candidate, Long workerId) {
+    private Optional<TaskAttempt> attemptLease(TaskRun candidate, Long workerId) {
         try {
             return Optional.of(
                     leaseTransactionTemplate.execute(status -> leaseAndStart(candidate, workerId)));
@@ -155,28 +261,86 @@ public class SchedulerService {
         }
     }
 
-    private TaskRun leaseAndStart(TaskRun candidate, Long workerId) {
+    private Optional<TaskAttempt> attemptSpeculativeLease(TaskRun straggler, Long workerId) {
+        try {
+            return Optional.ofNullable(
+                    leaseTransactionTemplate.execute(status -> speculateOn(straggler, workerId)));
+        } catch (ObjectOptimisticLockingFailureException lostRace) {
+            return Optional.empty();
+        }
+    }
+
+    private TaskAttempt leaseAndStart(TaskRun candidate, Long workerId) {
         TaskRun leased =
                 taskRunStateMachine.transition(
                         candidate.getId(),
                         candidate.getVersion(),
                         TaskRunState.LEASED,
                         TaskRunOutcome.NONE);
-        TaskDefinitionEntity definition = definitionOf(leased);
-        leased.setLeaseToken(UUID.randomUUID().toString());
-        leased.setWorkerId(workerId);
-        Instant leaseExpiration =
-                Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(leaseGrace);
-        leased.setLeaseExpiration(leaseExpiration);
+        // attempt_count is the retry budget, so only a real (non-speculative) attempt spends it
+        leased.setAttemptCount(leased.getAttemptCount() + 1);
         leased = taskRunRepository.saveAndFlush(leased);
-        markLeaseInRedis(leased.getId(), leased.getLeaseToken(), leaseExpiration);
+        TaskAttempt attempt = openAttempt(leased, workerId, false);
 
         // there is no separate "start" call in the fixed worker endpoint list (contracts.md) —
         // claiming a task run means the worker is about to execute it immediately, so this moves
-        // it straight on to RUNNING in the same transaction. The re-fetch inside transition()
-        // already picks up the lease fields just flushed above.
-        return taskRunStateMachine.transition(
+        // it straight on to RUNNING in the same transaction.
+        taskRunStateMachine.transition(
                 leased.getId(), leased.getVersion(), TaskRunState.RUNNING, TaskRunOutcome.NONE);
+        attempt.setState(TaskRunState.RUNNING);
+        return taskAttemptRepository.saveAndFlush(attempt);
+    }
+
+    /**
+     * Adds a second live attempt to an already-RUNNING task run. Deliberately performs no task-run
+     * state transition: the run is already RUNNING and stays that way, so a speculative attempt is
+     * invisible to the run's own state machine and to every consumer of build events except as an
+     * extra attempt row.
+     */
+    private TaskAttempt speculateOn(TaskRun straggler, Long workerId) {
+        TaskRun current = taskRunRepository.findById(straggler.getId()).orElse(null);
+        if (current == null
+                || current.getState() != TaskRunState.RUNNING
+                || current.getWinningAttemptNumber() != null) {
+            return null;
+        }
+        TaskAttempt attempt = openAttempt(current, workerId, true);
+        attempt.setState(TaskRunState.RUNNING);
+        return taskAttemptRepository.saveAndFlush(attempt);
+    }
+
+    /** Creates an attempt row holding its own lease, numbered after every attempt so far. */
+    private TaskAttempt openAttempt(TaskRun taskRun, Long workerId, boolean speculative) {
+        TaskDefinitionEntity definition = definitionOf(taskRun);
+        int attemptNumber =
+                taskAttemptRepository.findByTaskRunIdOrderByAttemptNumber(taskRun.getId()).stream()
+                                .mapToInt(TaskAttempt::getAttemptNumber)
+                                .max()
+                                .orElse(0)
+                        + 1;
+        TaskAttempt attempt =
+                new TaskAttempt(taskRun, attemptNumber, TaskRunState.LEASED, speculative);
+        Instant leaseExpiration =
+                Instant.now().plusSeconds(definition.getTimeoutSeconds()).plus(leaseGrace);
+        attempt.setLeaseToken(UUID.randomUUID().toString());
+        attempt.setWorkerId(workerId);
+        attempt.setLeaseExpiration(leaseExpiration);
+        attempt = taskAttemptRepository.saveAndFlush(attempt);
+        markLeaseInRedis(taskRun.getId(), attemptNumber, attempt.getLeaseToken(), leaseExpiration);
+        mirrorLeaseOntoRun(taskRun, attempt);
+        return attempt;
+    }
+
+    /**
+     * Keeps the task_runs lease columns pointing at the newest live attempt. Nothing reads them to
+     * decide anything — every lease check goes through task_attempts — they exist so the API and
+     * operator queries can still see "who is running this" without joining.
+     */
+    private void mirrorLeaseOntoRun(TaskRun taskRun, TaskAttempt attempt) {
+        taskRun.setWorkerId(attempt.getWorkerId());
+        taskRun.setLeaseToken(attempt.getLeaseToken());
+        taskRun.setLeaseExpiration(attempt.getLeaseExpiration());
+        taskRunRepository.saveAndFlush(taskRun);
     }
 
     /**
@@ -203,29 +367,65 @@ public class SchedulerService {
                                 () ->
                                         new NotFoundException(
                                                 "task run " + taskRunId + " not found"));
-
-        if (taskRun.getState().isTerminal()) {
-            if (matchesLease(taskRun, workerId, leaseToken, attemptId)) {
-                return taskRun; // duplicate of an already-accepted result — no-op
-            }
-            throw new LeaseRejectedException(
-                    "task run " + taskRunId + " already resolved by a different attempt");
-        }
-        if (!matchesLease(taskRun, workerId, leaseToken, attemptId)) {
+        TaskAttempt attempt =
+                taskAttemptRepository
+                        .findByTaskRunIdAndAttemptNumber(taskRunId, attemptId)
+                        .orElseThrow(
+                                () ->
+                                        new LeaseRejectedException(
+                                                "task run "
+                                                        + taskRunId
+                                                        + " has no attempt "
+                                                        + attemptId));
+        if (!workerId.equals(attempt.getWorkerId())
+                || !leaseToken.equals(attempt.getLeaseToken())) {
             throw new LeaseRejectedException(
                     "task run " + taskRunId + " lease token/worker/attempt mismatch");
         }
+        if (!attempt.isLive()) {
+            // this attempt is already resolved: either a redelivered copy of the report that won
+            // (idempotent no-op, which is what makes Kafka redelivery safe) or one whose lease was
+            // expired or superseded while the worker was still running it
+            if (Integer.valueOf(attemptId).equals(taskRun.getWinningAttemptNumber())) {
+                return taskRun;
+            }
+            throw new LeaseRejectedException(
+                    "task run " + taskRunId + " attempt " + attemptId + " is no longer live");
+        }
 
+        metrics.resultSubmitted();
         releaseWorkerLease(workerId);
-        clearLeaseInRedis(taskRunId);
+        clearLeaseInRedis(taskRunId, attemptId);
 
         if (success) {
+            if (!winRace(taskRunId, attemptId)) {
+                // a sibling attempt's result was accepted first. This one is discarded whole: no
+                // state change, no artifact promotion, no dependents released. Discarding it is
+                // sound because both attempts ran the same task at the same cache key, so the
+                // accepted artifact is interchangeable with this one.
+                finishAttempt(attempt, TaskRunState.SUCCEEDED, exitCode, null);
+                metrics.duplicateResultRejected();
+                // re-read rather than trusting the copy loaded above: claiming the winner clears
+                // the persistence context, so the in-memory task run still shows no winner at all
+                log.info(
+                        "task run {} attempt {} lost the result race to attempt {}",
+                        taskRunId,
+                        attemptId,
+                        taskRunRepository
+                                .findById(taskRunId)
+                                .map(TaskRun::getWinningAttemptNumber)
+                                .orElse(null));
+                return taskRunRepository.findById(taskRunId).orElse(taskRun);
+            }
+            finishAttempt(attempt, TaskRunState.SUCCEEDED, exitCode, null);
+            supersedeLiveSiblings(taskRunId, attemptId);
             TaskRun result =
                     taskRunStateMachine.transition(
                             taskRunId,
                             taskRun.getVersion(),
                             TaskRunState.SUCCEEDED,
                             new TaskRunOutcome(exitCode, null, artifactDigest));
+            metrics.resultAccepted(attempt.isSpeculative());
             if (result.getStartedAt() != null && result.getCompletedAt() != null) {
                 metrics.taskCompleted(
                         Duration.between(result.getStartedAt(), result.getCompletedAt()));
@@ -234,6 +434,24 @@ public class SchedulerService {
             maybeCompleteBuild(result.getBuild().getId());
             return result;
         }
+
+        finishAttempt(attempt, TaskRunState.FAILED, exitCode, failureReason);
+
+        // a failure only decides the run's fate once nothing else is still racing for it —
+        // otherwise a speculative copy that is about to succeed would be thrown away in favour of
+        // a retry, which is strictly worse than just letting the sibling finish
+        if (!taskAttemptRepository.findLiveByTaskRunId(taskRunId).isEmpty()) {
+            log.debug(
+                    "task run {} attempt {} failed but a sibling attempt is still live",
+                    taskRunId,
+                    attemptId);
+            return taskRun;
+        }
+        if (!winRace(taskRunId, attemptId)) {
+            metrics.duplicateResultRejected();
+            return taskRun;
+        }
+        metrics.resultAccepted(attempt.isSpeculative());
 
         if (taskRun.getAttemptCount() < MAX_ATTEMPTS) {
             TaskRun result =
@@ -256,6 +474,52 @@ public class SchedulerService {
                         new TaskRunOutcome(exitCode, failureReason, null));
         failBuild(result.getBuild().getId());
         return result;
+    }
+
+    /**
+     * The single point at which concurrent attempts are resolved. Returns true for exactly one
+     * caller per generation of attempts — the database decides, not the application, so two reports
+     * landing in the same millisecond on different control-plane threads still produce one accepted
+     * result. This is idempotent-acceptance, not exactly-once execution: both attempts really did
+     * run.
+     */
+    private boolean winRace(Long taskRunId, int attemptId) {
+        return taskRunRepository.claimWinningAttempt(taskRunId, attemptId) == 1;
+    }
+
+    /**
+     * The lease token is deliberately left in place. It still identifies who this attempt belonged
+     * to, which is what lets a redelivered report from the winner be recognised as a duplicate of
+     * an accepted result (a no-op) rather than an unrecognised caller — the attempt's state, not
+     * the presence of its token, is what decides whether a report may still be applied.
+     */
+    private void finishAttempt(
+            TaskAttempt attempt, TaskRunState state, Integer exitCode, String failureReason) {
+        attempt.setState(state);
+        attempt.setCompletedAt(Instant.now());
+        attempt.setExitCode(exitCode);
+        attempt.setFailureReason(failureReason);
+        taskAttemptRepository.saveAndFlush(attempt);
+    }
+
+    /**
+     * Retires the losing attempts once a winner exists. Their workers keep running the duplicated
+     * command to completion — nothing cancels them remotely — but their eventual reports now fail
+     * the liveness check and are rejected instead of applied.
+     */
+    private void supersedeLiveSiblings(Long taskRunId, int winningAttemptNumber) {
+        for (TaskAttempt sibling : taskAttemptRepository.findLiveByTaskRunId(taskRunId)) {
+            if (sibling.getAttemptNumber() == winningAttemptNumber) {
+                continue;
+            }
+            finishAttempt(
+                    sibling,
+                    TaskRunState.SKIPPED,
+                    null,
+                    "superseded by attempt " + winningAttemptNumber);
+            releaseWorkerLease(sibling.getWorkerId());
+            clearLeaseInRedis(taskRunId, sibling.getAttemptNumber());
+        }
     }
 
     /** RETRY_WAIT task runs whose backoff has elapsed become claimable again. */
@@ -289,10 +553,8 @@ public class SchedulerService {
     @Scheduled(fixedDelayString = "${forge.scheduler.lease-sweep-interval-ms:5000}")
     @Transactional
     public void reclaimExpiredLeases() {
-        for (TaskRun taskRun :
-                taskRunRepository.findByStateInAndLeaseExpirationBefore(
-                        List.of(TaskRunState.LEASED, TaskRunState.RUNNING), Instant.now())) {
-            reclaimIfStillExpired(taskRun);
+        for (TaskAttempt attempt : taskAttemptRepository.findExpired(Instant.now())) {
+            reclaimIfStillExpired(attempt);
         }
     }
 
@@ -304,23 +566,45 @@ public class SchedulerService {
      * itself the authority for whether a lease has actually expired.
      */
     @Transactional
-    public void reclaimExpiredLease(Long taskRunId) {
-        taskRunRepository.findById(taskRunId).ifPresent(this::reclaimIfStillExpired);
+    public void reclaimExpiredLease(Long taskRunId, int attemptNumber) {
+        taskAttemptRepository
+                .findByTaskRunIdAndAttemptNumber(taskRunId, attemptNumber)
+                .ifPresent(this::reclaimIfStillExpired);
     }
 
-    private void reclaimIfStillExpired(TaskRun taskRun) {
-        boolean stillLeased =
-                taskRun.getState() == TaskRunState.LEASED
-                        || taskRun.getState() == TaskRunState.RUNNING;
+    /**
+     * Expires one attempt's lease. The owning task run is only reclaimed once this was its last
+     * live attempt — with speculation, one attempt's worker dying while its duplicate is still
+     * running is not a reason to retry the task, it is exactly the case speculation exists to
+     * absorb.
+     */
+    private void reclaimIfStillExpired(TaskAttempt attempt) {
         boolean stillExpired =
-                taskRun.getLeaseExpiration() != null
-                        && taskRun.getLeaseExpiration().isBefore(Instant.now());
-        if (!stillLeased || !stillExpired) {
+                attempt.getLeaseExpiration() != null
+                        && attempt.getLeaseExpiration().isBefore(Instant.now());
+        if (!attempt.isLive() || !stillExpired) {
             return;
         }
-        releaseWorkerLease(taskRun.getWorkerId());
-        clearLeaseInRedis(taskRun.getId());
+        TaskRun taskRun = attempt.getTaskRun();
+        finishAttempt(attempt, TaskRunState.FAILED, null, "lease expired");
+        releaseWorkerLease(attempt.getWorkerId());
+        clearLeaseInRedis(taskRun.getId(), attempt.getAttemptNumber());
         metrics.leaseExpired();
+
+        if (!taskAttemptRepository.findLiveByTaskRunId(taskRun.getId()).isEmpty()) {
+            log.debug(
+                    "task run {} attempt {} expired but a sibling attempt is still live",
+                    taskRun.getId(),
+                    attempt.getAttemptNumber());
+            return;
+        }
+        if (taskRun.getState() != TaskRunState.LEASED
+                && taskRun.getState() != TaskRunState.RUNNING) {
+            return;
+        }
+        if (!winRace(taskRun.getId(), attempt.getAttemptNumber())) {
+            return; // a sibling's result was already accepted for this generation
+        }
         try {
             if (taskRun.getAttemptCount() < MAX_ATTEMPTS) {
                 TaskRun result =
@@ -330,12 +614,6 @@ public class SchedulerService {
                                 TaskRunState.RETRY_WAIT,
                                 new TaskRunOutcome(null, "lease expired", null));
                 result.setRetryAt(Instant.now().plus(backoff(taskRun.getAttemptCount())));
-                // the state machine only ever moves state fields for RETRY_WAIT — clearing the
-                // lease
-                // token here too is what makes the reclaimed worker's late report fail the lease
-                // check (403) instead of coincidentally still matching and only then hitting an
-                // invalid-transition error (409) once it tries to move a RETRY_WAIT run to
-                // SUCCEEDED
                 result.setLeaseToken(null);
                 taskRunRepository.save(result);
                 metrics.taskRetried();
@@ -364,17 +642,24 @@ public class SchedulerService {
      * will pick it up on its own next pass rather than this method re-deriving that decision.
      */
     @Scheduled(fixedDelayString = "${forge.redis.reconcile-interval-ms:15000}")
+    @Transactional(readOnly = true)
     public void reconcileRedisLeases() {
         try {
             Instant now = Instant.now();
             for (TaskRun taskRun :
                     taskRunRepository.findByStateIn(
                             List.of(TaskRunState.LEASED, TaskRunState.RUNNING))) {
-                if (taskRun.getLeaseExpiration() != null
-                        && taskRun.getLeaseExpiration().isAfter(now)
-                        && taskRun.getLeaseToken() != null) {
-                    markLeaseInRedis(
-                            taskRun.getId(), taskRun.getLeaseToken(), taskRun.getLeaseExpiration());
+                for (TaskAttempt attempt :
+                        taskAttemptRepository.findLiveByTaskRunId(taskRun.getId())) {
+                    if (attempt.getLeaseExpiration() != null
+                            && attempt.getLeaseExpiration().isAfter(now)
+                            && attempt.getLeaseToken() != null) {
+                        markLeaseInRedis(
+                                taskRun.getId(),
+                                attempt.getAttemptNumber(),
+                                attempt.getLeaseToken(),
+                                attempt.getLeaseExpiration());
+                    }
                 }
             }
         } catch (RuntimeException redisUnavailable) {
@@ -384,36 +669,33 @@ public class SchedulerService {
         }
     }
 
-    private void markLeaseInRedis(Long taskRunId, String leaseToken, Instant leaseExpiration) {
+    private void markLeaseInRedis(
+            Long taskRunId, int attemptNumber, String leaseToken, Instant leaseExpiration) {
         Duration ttl = Duration.between(Instant.now(), leaseExpiration);
         if (ttl.isNegative() || ttl.isZero()) {
             return;
         }
         try {
-            redis.opsForValue().set(RedisKeys.lease(taskRunId), leaseToken, ttl);
+            redis.opsForValue().set(RedisKeys.lease(taskRunId, attemptNumber), leaseToken, ttl);
         } catch (RuntimeException redisUnavailable) {
             log.debug(
-                    "could not mark lease for task run {} in Redis: {}",
+                    "could not mark lease for task run {} attempt {} in Redis: {}",
                     taskRunId,
+                    attemptNumber,
                     redisUnavailable.getMessage());
         }
     }
 
-    private void clearLeaseInRedis(Long taskRunId) {
+    private void clearLeaseInRedis(Long taskRunId, int attemptNumber) {
         try {
-            redis.delete(RedisKeys.lease(taskRunId));
+            redis.delete(RedisKeys.lease(taskRunId, attemptNumber));
         } catch (RuntimeException redisUnavailable) {
             log.debug(
-                    "could not clear lease for task run {} in Redis: {}",
+                    "could not clear lease for task run {} attempt {} in Redis: {}",
                     taskRunId,
+                    attemptNumber,
                     redisUnavailable.getMessage());
         }
-    }
-
-    private boolean matchesLease(TaskRun taskRun, Long workerId, String leaseToken, int attemptId) {
-        return workerId.equals(taskRun.getWorkerId())
-                && leaseToken.equals(taskRun.getLeaseToken())
-                && attemptId == taskRun.getAttemptCount();
     }
 
     private void releaseWorkerLease(Long workerId) {
@@ -570,7 +852,18 @@ public class SchedulerService {
                                 () ->
                                         new NotFoundException(
                                                 "task run " + taskRunId + " not found"));
-        if (!matchesLease(taskRun, workerId, leaseToken, attemptId)) {
+        TaskAttempt attempt =
+                taskAttemptRepository
+                        .findByTaskRunIdAndAttemptNumber(taskRunId, attemptId)
+                        .orElseThrow(
+                                () ->
+                                        new LeaseRejectedException(
+                                                "task run "
+                                                        + taskRunId
+                                                        + " has no attempt "
+                                                        + attemptId));
+        if (!workerId.equals(attempt.getWorkerId())
+                || !leaseToken.equals(attempt.getLeaseToken())) {
             throw new LeaseRejectedException(
                     "task run " + taskRunId + " lease token/worker/attempt mismatch");
         }
