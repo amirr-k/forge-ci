@@ -1,6 +1,6 @@
 # ForgeCI benchmark results
 
-Run `20260803T184236Z` · commit `2a2f0d6` · profile `local-benchmark`
+Run `20260805T042748Z` · commit `aab36f6` · profile `local-benchmark`
 
 ## How this was measured
 
@@ -18,13 +18,13 @@ Run `20260803T184236Z` · commit `2a2f0d6` · profile `local-benchmark`
 
 | Scenario | Jobs | Cache | Ran | Reused | Mean ms | Median ms | p95 ms | Stddev ms | Trials |
 |---|---|---|---|---|---|---|---|---|---|
-| `cold-full-build-j1` | 1 | cold | 25 | 0 | 7695 | 7601 | 8508 | 302 | 10 |
-| `cold-full-build-j2` | 2 | cold | 25 | 0 | 4862 | 4867 | 4932 | 45 | 10 |
-| `cold-full-build-j4` | 4 | cold | 25 | 0 | 3788 | 3769 | 4007 | 104 | 10 |
-| `warm-no-change` | 4 | warm | 0 | 25 | 264 | 260 | 301 | 20 | 10 |
-| `leaf-module` | 4 | warm | 2 | 23 | 996 | 972 | 1156 | 64 | 10 |
-| `shared-library` | 4 | warm | 22 | 3 | 3862 | 3738 | 5033 | 434 | 10 |
-| `config-change` | 4 | warm | 25 | 0 | 3943 | 3931 | 4043 | 59 | 10 |
+| `cold-full-build-j1` | 1 | cold | 25 | 0 | 7503 | 7496 | 7560 | 38 | 10 |
+| `cold-full-build-j2` | 2 | cold | 25 | 0 | 4933 | 4928 | 5020 | 52 | 10 |
+| `cold-full-build-j4` | 4 | cold | 25 | 0 | 4332 | 4356 | 4526 | 134 | 10 |
+| `warm-no-change` | 4 | warm | 0 | 25 | 269 | 270 | 275 | 5 | 10 |
+| `leaf-module` | 4 | warm | 2 | 23 | 1013 | 1010 | 1084 | 28 | 10 |
+| `shared-library` | 4 | warm | 22 | 3 | 4428 | 4401 | 4616 | 77 | 10 |
+| `config-change` | 4 | warm | 25 | 0 | 4854 | 4834 | 4922 | 42 | 10 |
 
 ## Derived figures
 
@@ -32,26 +32,26 @@ All computed from the medians above.
 
 | Figure | Value | Calculation |
 |---|---|---|
-| Incremental build reduction (leaf-module) | **74.2%** | (cold-j4 3769 ms − leaf 972 ms) / 3769 ms |
-| Incremental speedup (leaf-module) | **3.88×** | 3769 ms / 972 ms |
-| 1 → 2 executor speedup (cold build) | **1.56×** | 7601 ms / 4867 ms |
-| 1 → 4 executor speedup (cold build) | **2.02×** | 7601 ms / 3769 ms |
+| Incremental build reduction (leaf-module) | **76.8%** | (cold-j4 4356 ms − leaf 1010 ms) / 4356 ms |
+| Incremental speedup (leaf-module) | **4.31×** | 4356 ms / 1010 ms |
+| 1 → 2 executor speedup (cold build) | **1.52×** | 7496 ms / 4928 ms |
+| 1 → 4 executor speedup (cold build) | **1.72×** | 7496 ms / 4356 ms |
 | Tasks executed vs reused (leaf-module) | **2 ran, 23 reused** | of 25 total |
-| Warm cache, no changes | **260 ms** | all 25 tasks restored |
+| Warm cache, no changes | **270 ms** | all 25 tasks restored |
 
 ## Where ForgeCI does not help — and where it costs
 
 Reported because omitting them would misrepresent the system:
 
-- **Shared-library change** — median 3738 ms against a
-  3769 ms cold build, i.e. -32 ms. With a
-  stddev of 434 ms that difference is inside the noise: a change to
+- **Shared-library change** — median 4401 ms against a
+  4356 ms cold build, i.e. +45 ms. With a
+  stddev of 77 ms that difference is inside the noise: a change to
   the module most others depend on invalidates most of the graph, so incremental selection buys
   nothing measurable. It is not slower, it is simply no better.
 - **Toolchain/config change — genuinely slower than a plain full build**, by
-  +161 ms
-  (+4.3%): median
-  3931 ms vs 3769 ms. `toolchain.lock` is a declared input
+  +478 ms
+  (+11.0%): median
+  4834 ms vs 4356 ms. `toolchain.lock` is a declared input
   to every task, so every cache key changes. ForgeCI then hashes 25 sets of
   inputs, looks up 25 keys, misses all of them, runs the full build anyway,
   and writes 25 new entries into an already-populated store — bookkeeping
@@ -61,17 +61,17 @@ Reported because omitting them would misrepresent the system:
 
   This is the standard trade every caching build system makes, and it is bounded: a few percent on
   the change that invalidates everything, against
-  3.9× on the ordinary single-module change. It is also amplified by this
-  workload's small tasks (~151 ms each) — the overhead is
+  4.3× on the ordinary single-module change. It is also amplified by this
+  workload's small tasks (~174 ms each) — the overhead is
   roughly fixed per task, so it shrinks as a share of longer real-world tasks.
-- Adding executors past the graph's critical path stops helping: 1 → 2 gives 1.56× but
-  2 → 4 only gives a further 1.29×,
+- Adding executors past the graph's critical path stops helping: 1 → 2 gives 1.52× but
+  2 → 4 only gives a further 1.13×,
   because the dependency chain, not CPU, is the limit.
 
 ## Raw evidence
 
 - `benchmarks/results/latest.json` — this run, every trial retained.
-- `benchmarks/results/raw/20260803T184236Z.json` — same payload, archived by run id.
+- `benchmarks/results/raw/20260805T042748Z.json` — same payload, archived by run id.
 - Per-trial durations are in each scenario's `stats.samples_ms`.
 
 ## Honest limitations

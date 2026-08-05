@@ -1,0 +1,150 @@
+{
+  "kind": "docker-stack-scheduling",
+  "started_at": "2026-08-05T03:22:38.424351Z",
+  "environment": {
+    "profile": "local-benchmark",
+    "note": "single developer machine, Docker Desktop; not a dedicated benchmark host",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "cpu_count": 10,
+    "commit": "ac454c991ea92ea76ca5159f75c3f01f7c6ac92d"
+  },
+  "arms": [
+    {
+      "arm": "fifo-w4",
+      "policy": "fifo",
+      "workers": 4,
+      "warmup": {
+        "label": "warmup",
+        "task_count": 150,
+        "state": "SUCCEEDED",
+        "wall_ms": 54014.7,
+        "tasks_succeeded": 150,
+        "tasks_failed": 0,
+        "results_submitted": 153.0,
+        "results_accepted": 153.0,
+        "duplicates_rejected": 0.0
+      },
+      "trials": [
+        {
+          "label": "trial-0",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 108380.5,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 303.0,
+          "results_accepted": 303.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-1",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 118487.3,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-2",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 79842.1,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-3",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 62782.0,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-4",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 94410.7,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-5",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 61840.7,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-6",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 60531.4,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 153.0,
+          "results_accepted": 153.0,
+          "duplicates_rejected": 0.0
+        },
+        {
+          "label": "trial-7",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 62168.3,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 303.0,
+          "results_accepted": 303.0,
+          "duplicates_rejected": 0.0
+        }
+      ],
+      "error": "build 4 never reached a terminal state"
+    },
+    {
+      "arm": "critical-path-duration-w4",
+      "policy": "critical-path-duration",
+      "workers": 4,
+      "warmup": {
+        "label": "warmup",
+        "task_count": 150,
+        "state": "SUCCEEDED",
+        "wall_ms": 48206.6,
+        "tasks_succeeded": 150,
+        "tasks_failed": 0,
+        "results_submitted": 153.0,
+        "results_accepted": 153.0,
+        "duplicates_rejected": 0.0
+      },
+      "trials": [
+        {
+          "label": "trial-0",
+          "task_count": 150,
+          "state": "SUCCEEDED",
+          "wall_ms": 101018.5,
+          "tasks_succeeded": 150,
+          "tasks_failed": 0,
+          "results_submitted": 303.0,
+          "results_accepted": 303.0,
+          "duplicates_rejected": 0.0
+        }
+      ],
+      "error": "build 4 never reached a terminal state"
+    }
+  ]
+}

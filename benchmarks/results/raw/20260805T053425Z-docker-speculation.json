@@ -1,0 +1,703 @@
+{
+  "kind": "docker-stack-speculation",
+  "started_at": "2026-08-05T05:21:38.013132Z",
+  "environment": {
+    "profile": "local-benchmark",
+    "workers": 4,
+    "stall_seconds": 9,
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "commit": "aab36f636c08b9b76917ec2f6a9c004a7396ec65"
+  },
+  "arms": {
+    "speculation-off": {
+      "trials": [
+        {
+          "index": 0,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12041.8,
+          "results_submitted": 2.0,
+          "results_accepted": 2.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 1,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12055.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 2,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12028.1,
+          "results_submitted": 2.0,
+          "results_accepted": 2.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 3,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12043.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 4,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12021.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 5,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12027.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 6,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12026.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 7,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12051.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 8,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12021.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 9,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12020.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 10,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12006.7,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 11,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11979.9,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 12,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11960.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 13,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12031.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 14,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11994.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 15,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12042.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 16,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12047.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 17,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12002.5,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 18,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12015.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 19,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12046.9,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 20,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12009.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 21,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12002.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 22,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12034.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 23,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12071.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 24,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12176.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 25,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11958.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 26,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11996.9,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 27,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11971.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 28,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11992.7,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 29,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11947.8,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        }
+      ],
+      "summary": {
+        "trials": 30,
+        "skipped": 0,
+        "recovered": 30,
+        "build_latency_p50_ms": 12021.4,
+        "build_latency_p95_ms": 12064.0,
+        "speculative_attempts_started": 0.0,
+        "results_submitted": 32.0,
+        "results_accepted": 32.0,
+        "duplicates_rejected": 0.0
+      }
+    },
+    "speculation-on": {
+      "trials": [
+        {
+          "index": 0,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 6330.5,
+          "results_submitted": 2.0,
+          "results_accepted": 2.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 1,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 6331.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 2,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 6357.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 3,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 8868.2,
+          "results_submitted": 2.0,
+          "results_accepted": 2.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 4,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 9410.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 5,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 9418.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 6,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 8912.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 7,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 9417.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 8,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 9394.9,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 1.0
+        },
+        {
+          "index": 9,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12030.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 10,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12017.7,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 11,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12053.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 12,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11989.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 13,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11965.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 14,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12127.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 15,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11982.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 16,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12019.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 17,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12018.7,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 18,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12044.1,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 19,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12010.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 20,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12004.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 21,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12011.0,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 22,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12117.2,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 23,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12004.8,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 24,
+          "victim": "worker-4",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11994.7,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 25,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11974.4,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 26,
+          "victim": "worker-3",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11964.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 27,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 12008.6,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 28,
+          "victim": "worker-1",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11969.3,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        },
+        {
+          "index": 29,
+          "victim": "worker-2",
+          "recovered": true,
+          "state": "SUCCEEDED",
+          "wall_ms": 11920.9,
+          "results_submitted": 1.0,
+          "results_accepted": 1.0,
+          "duplicates_rejected": 0.0,
+          "speculative_started": 0.0
+        }
+      ],
+      "summary": {
+        "trials": 30,
+        "skipped": 0,
+        "recovered": 30,
+        "build_latency_p50_ms": 11985.8,
+        "build_latency_p95_ms": 12088.5,
+        "speculative_attempts_started": 9.0,
+        "results_submitted": 32.0,
+        "results_accepted": 32.0,
+        "duplicates_rejected": 0.0
+      }
+    }
+  }
+}
