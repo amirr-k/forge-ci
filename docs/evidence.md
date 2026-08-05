@@ -76,11 +76,14 @@ genuinely empty. Two Docker workers.
 18:28:02.376  TASK_RUN_SUCCEEDED
 ```
 
-- **Requeue to completion on another worker: 13.31 s.** This is the figure the resume cites.
+- **Requeue to completion on another worker: 13.31 s.**
 - **Detection latency: 150.1 s**, and it is *not* a constant. A lease runs for the task's own
   configured timeout plus a grace period; the bundled demo declares `timeout: 2m`, which is where
   150 s comes from. A workload with tighter timeouts detects faster. Quoting 13.31 s as
-  "detected and recovered in 13 s" would be wrong, so the resume says "recovered", not "detected".
+  "detected and recovered in 13 s" would be wrong: the 13.31 s covers requeue to completion, not
+  detection. This run predates the heartbeat-driven lease reclamation described in
+  docs/architecture.md, which removes the dependence on the task's own timeout — see
+  docs/benchmarks.md for the current measured recovery latency across 50 trials.
 - Duplicate accepted results: 0. Inconsistent artifacts: 0. `search:build` was leased twice and
   succeeded once.
 
