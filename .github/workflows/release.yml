@@ -104,11 +104,13 @@ jobs:
       - name: run the fixed public demo scenario
         id: demo
         run: |
-          # the demo serves one build at a time, and the startup warm-up build holds that slot for
-          # its first ~20s — the control plane reports healthy well before it finishes, so a single
-          # attempt here races the warm-up and gets a legitimate 429. Retry rather than treat the
-          # demo's own back-pressure as a deploy failure.
-          for attempt in $(seq 1 30); do
+          # Two different things return 429 here and both are correct behaviour, not deploy
+          # failures: the single guest-build slot (held by the startup warm-up build, which on a
+          # cold runner takes ~90s) and the per-IP rate limiter (one request per 30s). The retry
+          # interval must therefore exceed the rate-limit window — polling faster just guarantees
+          # the limiter rejects every attempt and the slot never gets a real chance. The server's
+          # own message is echoed so the two causes stay distinguishable in the log.
+          for attempt in $(seq 1 12); do
             response=$(curl -s -w '\n%{http_code}' -X POST http://localhost:8080/api/demo/builds \
               -H "Content-Type: application/json" \
               -d '{"scenario":"no-change","workerCount":2}')
@@ -121,11 +123,11 @@ jobs:
               echo "demo request failed with HTTP $http_status: $response" >&2
               exit 1
             fi
-            echo "demo busy (warm-up still holds the build slot), retrying in 5s"
-            sleep 5
+            echo "attempt $attempt: demo returned 429 — $response; retrying in 35s"
+            sleep 35
           done
           if [ "$http_status" != "201" ]; then
-            echo "demo stayed busy for 150s" >&2
+            echo "demo never accepted a build after 12 attempts over ~7 minutes" >&2
             exit 1
           fi
           echo "$response"

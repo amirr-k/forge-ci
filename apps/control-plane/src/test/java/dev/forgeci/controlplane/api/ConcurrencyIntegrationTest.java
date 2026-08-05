@@ -83,6 +83,58 @@ class ConcurrencyIntegrationTest extends ControlPlaneIntegrationTest {
         }
     }
 
+    /**
+     * The last two tasks of a build finishing at the same instant on two workers, which is the
+     * moment a build's completion check is most exposed: each report commits in its own READ
+     * COMMITTED transaction, and a check that missed the other's task would leave every task
+     * SUCCEEDED and the build stuck RUNNING. The invariant is simply that the build still
+     * completes, whichever report commits first.
+     */
+    @Test
+    void aBuildWhoseLastTwoTasksFinishSimultaneouslyStillCompletes() throws Exception {
+        long projectId = client.registerProject();
+
+        // repeated because this is a commit-interleaving race: one pass can win by luck
+        for (int round = 0; round < 8; round++) {
+            String suffix = UUID.randomUUID().toString();
+            Long planId =
+                    client.submitPlan(
+                                    projectId,
+                                    TestFixtures.twoIndependentTaskPlan(
+                                            "rev-simultaneous-" + suffix, "rev-0"))
+                            .id();
+            BuildResponse build = client.createBuild(projectId, planId);
+
+            long worker1 = client.registerWorker("worker-sim-1-" + suffix);
+            long worker2 = client.registerWorker("worker-sim-2-" + suffix);
+            Set<String> mine = Set.of("alpha:build", "beta:build");
+            ClaimedTaskResponse a = client.claimOneOf(worker1, mine);
+            ClaimedTaskResponse b = client.claimOneOf(worker2, mine);
+            assertThat(a.taskRunId()).isNotEqualTo(b.taskRunId());
+
+            CountDownLatch bothReady = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                var f1 = pool.submit(() -> reportOnRelease(bothReady, a));
+                var f2 = pool.submit(() -> reportOnRelease(bothReady, b));
+                bothReady.countDown();
+                f1.get(60, TimeUnit.SECONDS);
+                f2.get(60, TimeUnit.SECONDS);
+            } finally {
+                pool.shutdownNow();
+            }
+
+            client.awaitBuildState(build.id(), BuildState.SUCCEEDED);
+        }
+    }
+
+    private Void reportOnRelease(CountDownLatch releaseAllAtOnce, ClaimedTaskResponse task)
+            throws Exception {
+        releaseAllAtOnce.await();
+        client.reportResult(task, true, 0, null, null);
+        return null;
+    }
+
     @Test
     void severalClientsCommittingTheSameBytesAtOnceProduceExactlyOneArtifact() throws Exception {
         long projectId = client.registerProject();
