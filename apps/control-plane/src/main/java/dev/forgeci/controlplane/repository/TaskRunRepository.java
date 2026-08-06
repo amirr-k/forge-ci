@@ -81,6 +81,23 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
                     + "where t.id = :id and t.winningAttemptNumber is null")
     int claimWinningAttempt(@Param("id") Long id, @Param("attemptNumber") int attemptNumber);
 
+    /**
+     * How many of a build's task runs are not yet finished, as a scalar straight from the database.
+     *
+     * <p>Deliberately a count and not {@code findByBuildId(...).allMatch(...)}: loading entities
+     * returns whatever instance is already in the persistence context, and Hibernate does not
+     * refresh a managed entity's fields for a repeat query. A completion check that had already
+     * touched a sibling task run earlier in the same transaction would therefore keep seeing that
+     * sibling's stale state even after another transaction committed it as SUCCEEDED — leaving
+     * every task finished and the build stuck RUNNING. An aggregate has no managed instance to be
+     * stale, so it always reflects the latest committed rows.
+     */
+    @Query(
+            "select count(t) from TaskRun t where t.build.id = :buildId "
+                    + "and t.state not in (dev.forgeci.controlplane.domain.TaskRunState.SUCCEEDED, "
+                    + "dev.forgeci.controlplane.domain.TaskRunState.CACHED)")
+    long countUnfinished(@Param("buildId") Long buildId);
+
     List<TaskRun> findByStateAndRetryAtBefore(TaskRunState state, Instant cutoff);
 
     List<TaskRun> findByStateInAndLeaseExpirationBefore(List<TaskRunState> states, Instant cutoff);

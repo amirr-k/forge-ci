@@ -830,14 +830,10 @@ public class SchedulerService {
      */
     @Transactional
     public void maybeCompleteBuild(Long buildId) {
-        List<TaskRun> runs = taskRunRepository.findByBuildId(buildId);
-        boolean allDone =
-                runs.stream()
-                        .allMatch(
-                                r ->
-                                        r.getState() == TaskRunState.SUCCEEDED
-                                                || r.getState() == TaskRunState.CACHED);
-        if (!allDone) {
+        // counted in the database rather than by scanning loaded entities — see
+        // TaskRunRepository.countUnfinished for why a managed entity can report a stale state here
+        // and leave a fully-succeeded build stuck RUNNING
+        if (taskRunRepository.countUnfinished(buildId) > 0) {
             return;
         }
         try {
