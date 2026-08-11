@@ -67,9 +67,24 @@ export interface CrashWorkerResponse {
   workerId: number;
 }
 
+export interface BenchmarkScenario {
+  id: string;
+  jobs: number;
+  cacheState: string;
+  stats: {
+    trials: number;
+    median_ms: number;
+    p95_ms: number;
+    stddev_ms: number;
+  };
+}
+
 export interface BenchmarksResponse {
   available: boolean;
   message: string;
+  benchmarkRunId?: string;
+  commit?: string;
+  scenarios?: BenchmarkScenario[];
 }
 
 class DemoApiError extends Error {

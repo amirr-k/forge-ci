@@ -10,6 +10,14 @@ sourceSets {
     }
 }
 
+// /api/benchmarks/latest serves the committed report; a deployed jar has no working tree to read
+// it from, so it travels on the classpath.
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("benchmarks/results/latest.json")) {
+        into("benchmarks")
+    }
+}
+
 dependencies {
     implementation(project(":libs:core"))
     implementation(project(":libs:config"))
