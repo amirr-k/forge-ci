@@ -4,9 +4,7 @@ Stands up the full ForgeCI stack on one EC2 host against **real Amazon S3**, run
 benchmark, pulls the evidence back, and destroys everything. It is built to be torn down: nothing
 here is retained, and recurring cost after `destroy` is `$0`.
 
-This is disposable benchmark scaffolding. It is not production hosting, and Terraform is not
-claimed as a project skill — see the scope limit in
-`spec/phases/phase-10-deployment.md`.
+This is disposable benchmark scaffolding, not production hosting.
 
 ## Before you start
 
@@ -58,7 +56,7 @@ Estimated cost for a 2-hour window: **~$0.10**.
 
 ## Why the audit is the real deliverable
 
-Phase 11 treats an inconclusive cleanup audit as a **failed run**. `audit` re-queries EC2
+An inconclusive cleanup audit counts as a **failed run**. `audit` re-queries EC2
 instances, EBS volumes, Elastic IPs, security groups, S3 buckets, IAM roles, and key pairs by tag,
 and exits non-zero if anything remains. `provision` refuses to start on an account that already
 has tagged ForgeCI resources, because then a leak could not be distinguished from something that
