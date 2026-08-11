@@ -100,7 +100,7 @@ public class S3Properties {
 
     /**
      * {@code artifacts/<first two digest chars>/<digest>} — the one bucket-key convention workers
-     * reuse in phase 5.
+     * reuse by workers.
      */
     public String objectKey(String digest) {
         return objectPrefix + digest.substring(0, 2) + "/" + digest;

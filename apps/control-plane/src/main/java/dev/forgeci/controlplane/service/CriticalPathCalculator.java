@@ -11,7 +11,7 @@ import java.util.function.ToLongFunction;
  * Per-task "remaining critical path" within one build's selected task set: the longest chain of
  * still-to-run tasks from this task to a sink (a task nothing else in the selected set depends on).
  * The scheduler releases the highest-weight ready task first so work feeding the longest remaining
- * chain starts as early as possible — see spec/reference/architecture.md#scheduler.
+ * chain starts as early as possible.
  *
  * <p>Two measures, because they disagree and the disagreement is the point. {@link #weights} counts
  * hops, which costs nothing but treats a long chain of trivial tasks as more urgent than a short

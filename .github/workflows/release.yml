@@ -1,10 +1,8 @@
 name: release
 
-# The default-branch release sequence from spec/reference/quality-and-testing.md#cicd-requirements,
-# steps 1-9. Phase 9 wires the pipeline mechanics against the one deployment target available right
-# now — the same deploy/compose.yaml stack the PR workflow's browser-smoke-test job already
-# exercises, torn down at the end of this same job. Phase 10 swaps that target for a real,
-# persistent production host; nothing about steps 1-9 themselves changes when it does.
+# The default-branch release sequence, steps 1-9. The deployment target here is the same
+# deploy/compose.yaml stack the PR workflow's browser-smoke-test job exercises, torn down at the
+# end of this job. Pointing it at a persistent host changes nothing about steps 1-9 themselves.
 
 on:
   push:
@@ -65,8 +63,8 @@ jobs:
       # step 4: apply migrations through the release process. There is no separate migration-only
       # step here because this stack's migrations are Spring Boot/Flyway's startup-time
       # auto-migration against the target MySQL — step 5 (deploying the control plane) is the act
-      # of applying them; a persistent production target (phase 10) would run this same
-      # auto-migration against its own long-lived database instead of the ephemeral one below.
+      # of applying them; a persistent target would run the same auto-migration against its own
+      # long-lived database instead of the ephemeral one below.
       - name: start the release target's dependencies (mysql, minio, kafka, redis)
         run: docker compose -f deploy/compose.yaml up -d mysql minio kafka redis
 

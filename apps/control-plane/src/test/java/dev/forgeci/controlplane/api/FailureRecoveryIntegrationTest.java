@@ -42,16 +42,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * The seven required failure-recovery scenarios from
- * spec/reference/quality-and-testing.md#test-taxonomy-phase-9--applies-across-all-layers, also
- * required by phase 6. Every scenario here simulates the crashed worker by simply going silent (no
- * more heartbeat/report calls) — exactly what a real crash looks like from the control plane's
- * side, and how {@code WorkerSchedulingIntegrationTest} already proves the direct HTTP protocol
- * without a real Docker-executing worker process.
+ * The failure-recovery scenarios. Every scenario here simulates the crashed worker by simply going
+ * silent (no more heartbeat/report calls) — exactly what a real crash looks like from the control
+ * plane's side, and how {@code WorkerSchedulingIntegrationTest} already proves the direct HTTP
+ * protocol without a real Docker-executing worker process.
  *
- * <p>Kafka redelivery of a task-result message (the seventh required test) is already covered by
- * {@code KafkaTaskResultsIntegrationTest#aRedeliveredTaskResultMessageDoesNotReapplyItsEffect} —
- * not duplicated here.
+ * <p>Kafka redelivery of a task-result message is already covered by {@code
+ * KafkaTaskResultsIntegrationTest#aRedeliveredTaskResultMessageDoesNotReapplyItsEffect} — not
+ * duplicated here.
  */
 class FailureRecoveryIntegrationTest extends ControlPlaneIntegrationTest {
 

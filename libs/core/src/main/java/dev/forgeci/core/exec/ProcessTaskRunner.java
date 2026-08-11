@@ -86,7 +86,7 @@ public final class ProcessTaskRunner implements TaskRunner {
 
     /**
      * Starts from an empty environment so a task's result depends only on what it declares — the
-     * same reason cache keys will only ever see the allowlist (phase 2).
+     * same reason cache keys will only ever see the allowlist.
      */
     private static void applyEnvironment(ProcessBuilder builder, List<String> allowlist) {
         Map<String, String> parent = Map.copyOf(builder.environment());

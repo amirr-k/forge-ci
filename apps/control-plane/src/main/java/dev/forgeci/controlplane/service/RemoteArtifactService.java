@@ -27,8 +27,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 /**
  * The content-addressed artifact protocol from architecture.md#content-addressed-artifacts, against
  * S3: temp upload, control-plane metadata verification, commit to the final digest key,
- * transactional manifest association, temp cleanup. This becomes the permanent protocol phase 5's
- * workers reuse unchanged, so the S3 key layout ({@link S3Properties#objectKey}) is fixed here.
+ * transactional manifest association, temp cleanup. This is the permanent protocol the workers
+ * reuse unchanged, so the S3 key layout ({@link S3Properties#objectKey}) is fixed here.
  *
  * <p>A cache hit is never reported merely because a manifest row or an object-store key exists —
  * {@link #download} always re-verifies the fetched bytes against the digest and size the manifest

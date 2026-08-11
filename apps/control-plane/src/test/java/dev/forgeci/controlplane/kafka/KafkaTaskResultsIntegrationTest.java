@@ -36,9 +36,9 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 /**
  * Kafka is an alternate, durable ingress for {@code forge.task-results} alongside the direct HTTP
- * report — proves the two required properties from phase 5's acceptance criteria: redelivery of the
- * same message never re-applies its effect, and a message that can never be parsed ends up on the
- * dead-letter topic instead of blocking the consumer.
+ * report — proves the two properties that matter: redelivery of the same message never re-applies
+ * its effect, and a message that can never be parsed ends up on the dead-letter topic instead of
+ * blocking the consumer.
  */
 class KafkaTaskResultsIntegrationTest extends ControlPlaneIntegrationTest {
 

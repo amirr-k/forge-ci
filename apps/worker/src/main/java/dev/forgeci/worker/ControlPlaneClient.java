@@ -17,10 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 
-/**
- * The worker side of the REST worker protocol fixed in
- * spec/reference/architecture.md#worker-protocol.
- */
+/** The worker side of the REST worker protocol. */
 public final class ControlPlaneClient {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

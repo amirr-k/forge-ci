@@ -176,7 +176,7 @@ public class BuildService {
 
     /**
      * Only artifacts that a real, verified upload has produced — this build's task runs' recorded
-     * digests. Empty until phase 4/5 wire actual artifact upload.
+     * digests.
      */
     @Transactional(readOnly = true)
     public List<Artifact> artifacts(Long buildId) {

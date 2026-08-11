@@ -21,10 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * REST implementation of the worker protocol fixed in
- * spec/reference/architecture.md#worker-protocol.
- */
+/** REST implementation of the worker protocol. */
 @RestController
 public class WorkerController {
 
@@ -56,9 +53,9 @@ public class WorkerController {
     }
 
     /**
-     * Admin/test crash-injection trigger — the mechanism phase 7's public "Crash a Worker" demo
-     * button drives. The worker consumes and clears the flag on its next heartbeat and halts
-     * immediately, so the effect is only visible once that heartbeat lands.
+     * Admin/test crash-injection trigger — the mechanism the public "Crash a Worker" demo button
+     * drives. The worker consumes and clears the flag on its next heartbeat and halts immediately,
+     * so the effect is only visible once that heartbeat lands.
      */
     @PostMapping("/api/workers/{id}/crash")
     public ResponseEntity<Void> crash(@PathVariable("id") Long workerId) {

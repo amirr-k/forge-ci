@@ -14,8 +14,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Stamps every request with a correlation id (from the caller if it sent one, otherwise generated)
- * and, where the URL carries them, the project/build id — required structured log fields per
- * spec/reference/architecture.md#observability.
+ * and, where the URL carries them, the project/build id, so every structured log line traces back
+ * to the request that produced it.
  */
 @Component
 public class CorrelationIdFilter extends OncePerRequestFilter {

@@ -25,10 +25,10 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
- * Kafka is durable event delivery only — MySQL stays authoritative for accepted task/build state
- * (spec/reference/contracts.md#kafka-responsibilities). A malformed message (fails to deserialize)
- * or one whose processing keeps failing after a bounded number of retries is routed to a {@code
- * <topic>.DLT} dead-letter topic instead of blocking the partition or crashing the consumer thread.
+ * Kafka is durable event delivery only — MySQL stays authoritative for accepted task/build state A
+ * malformed message (fails to deserialize) or one whose processing keeps failing after a bounded
+ * number of retries is routed to a {@code <topic>.DLT} dead-letter topic instead of blocking the
+ * partition or crashing the consumer thread.
  */
 @Configuration
 public class KafkaConfig {

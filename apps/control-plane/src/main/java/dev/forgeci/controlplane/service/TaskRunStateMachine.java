@@ -21,8 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Valid {@link TaskRun} transitions and their side effects, per
- * spec/reference/architecture.md#state-machines. Every accepted transition emits exactly one
+ * Valid {@link TaskRun} transitions and their side effects. Every accepted transition emits one
  * ordered {@code BuildEvent}, keyed by the owning build's sequence — so callers must go through
  * this class rather than mutating {@code TaskRun} state directly.
  */

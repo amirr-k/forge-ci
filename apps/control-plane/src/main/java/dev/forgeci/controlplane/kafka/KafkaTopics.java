@@ -1,6 +1,6 @@
 package dev.forgeci.controlplane.kafka;
 
-/** Topic names fixed by spec/reference/contracts.md#kafka-responsibilities. */
+/** Fixed topic names, shared by the producer, the consumers, and the tests. */
 public final class KafkaTopics {
 
     public static final String TASK_READY = "forge.task-ready";

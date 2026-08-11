@@ -37,15 +37,14 @@ import org.springframework.http.ResponseEntity;
  * Simulates the worker side of the protocol with plain HTTP calls — proving the control plane's
  * scheduling, dependency, and cache-reuse logic end to end without needing a real Docker-executing
  * worker process for every scenario (that's what {@code apps/worker}'s own tests and the Compose
- * demo are for). No Kafka is involved anywhere here, matching phase 5's "prove the direct path
- * first" ordering.
+ * demo are for). No Kafka is involved anywhere here — this proves the direct HTTP path on its own.
  *
  * <p>{@code claim} is deliberately a single global priority queue across every build in the system
- * (see spec/reference/architecture.md#scheduler) — it is not scoped to "this test's" build, so
- * every claim here goes through {@link ProtocolTestClient#claimOneOf}, which heartbeats like a live
- * worker and draws down foreign backlog instead of assuming the next claim is ours. Each test also
- * finishes the build it started: a task left leased here is re-queued on lease expiry a minute
- * later, into whichever unrelated test class happens to be running by then.
+ * — it is not scoped to "this test's" build, so every claim here goes through {@link
+ * ProtocolTestClient#claimOneOf}, which heartbeats like a live worker and draws down foreign
+ * backlog instead of assuming the next claim is ours. Each test also finishes the build it started:
+ * a task left leased here is re-queued on lease expiry a minute later, into whichever unrelated
+ * test class happens to be running by then.
  */
 class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
@@ -260,7 +259,7 @@ class WorkerSchedulingIntegrationTest extends ControlPlaneIntegrationTest {
 
         // "trunk:build" feeds a further downstream task and so has a longer remaining critical path
         // than the standalone "leaf:build" — the scheduler must release it first regardless of
-        // creation order, per spec/reference/architecture.md#scheduler.
+        // creation order.
         ClaimedTaskResponse first = client.claimOneOf(workerId, mine);
         assertThat(first.taskName()).isEqualTo("trunk:build");
 

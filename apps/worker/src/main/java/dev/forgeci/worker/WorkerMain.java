@@ -24,8 +24,8 @@ import java.util.stream.Stream;
 
 /**
  * The worker process entry point: registers, heartbeats on a fixed interval, and loops
- * claim-execute-report against the control plane with no Kafka involved — the direct HTTP path
- * phase 5 proves before Kafka is layered on top.
+ * claim-execute-report against the control plane with no Kafka involved — the direct HTTP path the
+ * direct HTTP path proves on its own, before Kafka is layered on top.
  */
 public final class WorkerMain {
 

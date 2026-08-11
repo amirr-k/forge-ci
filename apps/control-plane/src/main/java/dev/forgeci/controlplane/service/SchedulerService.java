@@ -38,8 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Owns the parts of the worker protocol that aren't a single state transition: matching a claiming
  * worker against the highest-priority ready task run, promoting a task run's dependents once it
  * completes, retry backoff and attempt capping, lease expiry reclamation, and rolling a task run's
- * terminal result up into the owning build's state. See spec/reference/architecture.md#scheduler
- * for the tie-break rule this implements.
+ * terminal result up into the owning build's state.
  */
 @Service
 public class SchedulerService {
@@ -772,9 +771,8 @@ public class SchedulerService {
     /**
      * A dependency-complete task run goes {@code READY} first (always — this is what timestamps
      * {@code readyAt} for the FIFO tie-break) and then immediately on to {@code CACHED} if a
-     * verified artifact already exists for its cache key, per
-     * spec/reference/architecture.md#affected-task-analysis ("convert valid hits to CACHED").
-     * Reused directly by {@link BuildService} for a build's initially-ready task runs.
+     * verified artifact already exists for its cache key. Reused directly by {@link BuildService}
+     * for a build's initially-ready task runs.
      *
      * <p>A {@code CACHED} outcome must cascade to dependents exactly like a worker-reported {@code
      * SUCCEEDED} does ({@link #isSatisfied} already treats them identically) — nothing else will

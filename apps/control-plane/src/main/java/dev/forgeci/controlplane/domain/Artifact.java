@@ -8,7 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
-/** A content-addressed build output. Uploaded by workers starting in phase 4/5. */
+/** A content-addressed build output, uploaded by a worker or the CLI. */
 @Entity
 @Table(name = "artifacts")
 public class Artifact {

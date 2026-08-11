@@ -6,8 +6,9 @@ import java.util.Optional;
  * Client-side half of the remote artifact protocol: register the project once to get a stable id,
  * look an already-computed cache key up against the shared store, and upload a freshly stored
  * archive so another workspace pointed at the same control plane can reuse it. Local mode from
- * phase 1/2 never constructs one of these — {@link TaskCache}'s single-argument constructor keeps
- * working with zero infrastructure regardless of whether this interface has an implementation.
+ * Local-only mode never constructs one of these — {@link TaskCache}'s single-argument constructor
+ * keeps working with zero infrastructure regardless of whether this interface has an
+ * implementation.
  */
 public interface RemoteArtifactClient {
 

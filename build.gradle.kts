@@ -57,7 +57,7 @@ subprojects {
             showStackTraces = true
         }
 
-        // a per-test-method safety net: phase 9 found a test whose own HTTP client timeout didn't
+        // a per-test-method safety net for a test whose own HTTP client timeout doesn't
         // reliably fire against a streaming response, hanging for 10+ minutes instead of failing in
         // seconds — every legitimate test in this repo (including the longest polling loops) finishes
         // well under two minutes, so this only ever turns a silent CI stall into a fast, actionable
