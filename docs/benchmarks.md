@@ -41,29 +41,26 @@ All computed from the medians above.
 
 ## Where ForgeCI does not help — and where it costs
 
-Reported because omitting them would misrepresent the system:
-
 - **Shared-library change** — median 4401 ms against a
-  4356 ms cold build, i.e. +45 ms. With a
-  stddev of 77 ms that difference is inside the noise: a change to
-  the module most others depend on invalidates most of the graph, so incremental selection buys
-  nothing measurable. It is not slower, it is simply no better.
-- **Toolchain/config change — genuinely slower than a plain full build**, by
+  4356 ms cold build, i.e. +45 ms against a
+  stddev of 77 ms. A change to the module most others depend on
+  invalidates most of the graph, so incremental selection buys nothing measurable here. It is not
+  slower, it is simply no better.
+- **Toolchain/config change — slower than a plain full build**, by
   +478 ms
   (+11.0%): median
   4834 ms vs 4356 ms. `toolchain.lock` is a declared input
-  to every task, so every cache key changes. ForgeCI then hashes 25 sets of
-  inputs, looks up 25 keys, misses all of them, runs the full build anyway,
-  and writes 25 new entries into an already-populated store — bookkeeping
-  with zero reuse to amortize it. Isolating the starting state shows the cost comes from the
-  populated cache store (+1.4% with the cache primed and outputs cleared), not from stale build
-  outputs (−2.6% with outputs primed and the cache cleared).
+  to every task, so every cache key changes: ForgeCI hashes 25 sets of inputs,
+  misses 25 keys, runs the full build anyway, and writes
+  25 new entries into an already-populated store. Isolating the starting state
+  puts the cost in the populated cache store (+1.4% with the cache primed and outputs cleared),
+  not in stale build outputs (−2.6% with outputs primed and the cache cleared).
 
-  This is the standard trade every caching build system makes, and it is bounded: a few percent on
-  the change that invalidates everything, against
-  4.3× on the ordinary single-module change. It is also amplified by this
-  workload's small tasks (~174 ms each) — the overhead is
-  roughly fixed per task, so it shrinks as a share of longer real-world tasks.
+  This is the trade every caching build system makes, and it is bounded: a few percent on the
+  change that invalidates everything, against 4.3× on the ordinary
+  single-module change. It is amplified by this workload's small tasks
+  (~174 ms each) — the overhead is roughly fixed per task, so it
+  shrinks as a share of longer real-world tasks.
 - Adding executors past the graph's critical path stops helping: 1 → 2 gives 1.52× but
   2 → 4 only gives a further 1.13×,
   because the dependency chain, not CPU, is the limit.
@@ -73,12 +70,8 @@ Reported because omitting them would misrepresent the system:
 - `benchmarks/results/latest.json` — this run, every trial retained.
 - `benchmarks/results/raw/20260805T042748Z.json` — same payload, archived by run id.
 - Per-trial durations are in each scenario's `stats.samples_ms`.
-
-## Honest limitations
-
-- These are `local-benchmark` profile results on one developer machine under normal desktop load,
-  not an isolated benchmark host. Variance is visible in the stddev column.
-- The AWS reference profile was not exercised for this run, so no result here is an AWS result.
+- Measured on one developer machine under normal desktop load rather than an isolated benchmark
+  host; the variance that implies is visible in the stddev column.
 
 ## Reproducing
 
@@ -99,12 +92,12 @@ below measures the real `deploy/compose.yaml` stack: MySQL, Kafka, Redis, MinIO,
 control plane, and Docker worker containers that claim tasks over HTTP and execute each one in its
 own sandbox container. The two sets of numbers are not comparable and are never combined.
 
-## Docker-worker scheduler comparison
+## Scheduler comparison: FIFO vs duration-aware critical path
 
 Run `20260805T062402Z` · commit `ac454c9` · profile `local-benchmark`
 
-FIFO vs duration-aware critical-path, both at 4 Docker workers, same graph, caches cleared between
-arms and a unique cache-key revision per trial so every trial genuinely executes.
+Both arms at 4 Docker workers, same graph, caches cleared between arms and a unique cache-key
+revision per trial so every trial genuinely executes.
 
 - Workload: `demo/scale-monorepo` — 50 modules, 5 dependency layers, **150 tasks**, 410 Java sources.
 - `FORGE_WORKER_MAX_CONCURRENCY=1`, so *N workers* means exactly N tasks may run at once.
@@ -127,21 +120,18 @@ Per-trial wall clock, in run order:
 | Excluding each arm's first trial | 62.8 s (n=9) | 58.9 s (n=3) | **−6.2%** | 0.050 |
 
 p-values are an exact one-sided Mann-Whitney U test (full permutation enumeration, appropriate at
-these sample sizes) of the hypothesis that the duration-aware arm is faster.
+these sample sizes).
 
-**The honest reading is roughly −6%, not −15.6%.** Both arms' first measured trial is a large
-outlier (108 s and 101 s) even though a warm-up build was already run and discarded — residual
-Docker layer, JIT, and MinIO-bucket warming that one warm-up does not fully absorb. Excluding those,
-the effect *shrinks* to −6.2% while becoming *more* statistically detectable (p 0.152 → 0.050),
-because dropping them removes far more variance than signal. So most of the headline −15.6% is
-FIFO's two slow early trials rather than a scheduling effect.
+**Read this as roughly −6%, not −15.6%.** Both arms' first measured trial is a large outlier (108 s
+and 101 s) despite a discarded warm-up — residual Docker layer, JIT, and MinIO-bucket warming.
+Excluding them, the effect *shrinks* to −6.2% while becoming *more* detectable (p 0.152 → 0.050),
+because dropping them removes far more variance than signal. Most of the headline −15.6% is FIFO's
+two slow early trials rather than a scheduling effect.
 
-At n=3 vs n=9, p = 0.050 sits exactly on the conventional threshold: this is suggestive, in the
-direction the policy predicts, and **not** a settled result. Treat it as directional evidence. The
-unequal trial counts are an artifact of the harness, not a choice — the stack intermittently wedged
-on this resource-constrained laptop during repeated teardown/recreate cycles and the duration-aware
-arm lost six trials to it before the harness was changed to bring the stack up once per arm.
-Settling this properly needs the duration-aware arm re-run to n=10 with a longer warm-up.
+At n=3 vs n=9 and p = 0.050, this is directional evidence in the direction the policy predicts,
+not a settled result. The unequal trial counts are a harness artifact: the stack intermittently
+wedged during repeated teardown/recreate cycles on this laptop, and the duration-aware arm lost
+trials to it before the harness was changed to bring the stack up once per arm.
 
 ## Worker-failure trials
 
@@ -164,17 +154,14 @@ the attempt on its own. A trial counts as recovered only if the build still reac
 | Recovery latency max | 12.5 s |
 | Results submitted by workers | 602 |
 | Results accepted | 602 |
-| Duplicate results rejected | 0 |
 
 Recovery latency is measured from the instant the `SIGKILL` lands to the instant the build reaches
-`SUCCEEDED`, so it includes detection, reclamation, reassignment, and re-execution of the lost task.
+`SUCCEEDED`, so it covers detection, reclamation, reassignment, and re-execution of the lost task.
 
-**On the zero duplicates.** `submitted == accepted` and zero rejections here is not evidence that
-duplicate suppression works — it is evidence that *this* fault never produces a duplicate to
-suppress. A `SIGKILL`ed worker never reports at all, so only one result per task run is ever
-submitted. The path where two attempts really do race (a stalled worker resuming after its task was
-already completed elsewhere) is exercised by `SpeculativeExecutionIntegrationTest`, which asserts
-the second reporter is rejected with `403` and the accepted result is unchanged.
+A `SIGKILL`ed worker never reports at all, so this fault produces no duplicate results to reject.
+The path where two attempts really do race — a stalled worker resuming after its task completed
+elsewhere — is covered by `SpeculativeExecutionIntegrationTest`, which asserts the second reporter
+is rejected with `403` and the accepted result is unchanged.
 
 ## Straggler mitigation: speculation off vs on
 
@@ -186,10 +173,10 @@ fixed **9 s** — frozen, not killed, so its lease stays valid and the only ques
 anything else finishes the work sooner. The pause is identical in both arms; the only difference is
 `forge.scheduler.speculation.enabled`.
 
-The 9 s pause is calibrated between two thresholds so the mechanism under test is unambiguous:
-above the speculation threshold (so speculation has time to fire), and well below the
-worker-death threshold (heartbeat interval raised to 6 s for this run, so 3 missed beats = 18 s) —
-a paused worker is never mistaken for a crashed one. This measures speculation, not crash recovery.
+The 9 s pause sits deliberately between two thresholds: above the speculation threshold, and well
+below the worker-death threshold (heartbeat interval raised to 6 s here, so 3 missed beats = 18 s).
+A paused worker is never mistaken for a crashed one, so this measures speculation, not crash
+recovery.
 
 | Arm | Trials | p50 | p95 | Range | Speculative attempts |
 |---|---|---|---|---|---|
@@ -202,25 +189,15 @@ a paused worker is never mistaken for a crashed one. This measures speculation, 
 | p50 build latency reduction | **−47.3%** | (11.99 s − 6.31 s) / 11.99 s |
 | Additional compute | **1 duplicate task execution per trial** | 30 speculative attempts / 30 trials |
 
-The two distributions do not overlap at all (11.91–12.15 s vs 5.78–6.86 s), so no significance test
-is needed here. The mechanism is direct: with speculation off, the task cannot finish until the
-paused worker resumes at 9 s and then completes its work. With speculation on, a second worker
-starts a duplicate once the original is overdue and finishes it before the original even unpauses.
+The two distributions do not overlap (11.91–12.15 s vs 5.78–6.86 s), so no significance test is
+needed. The mechanism is direct: with speculation off, the task cannot finish until the paused
+worker resumes at 9 s and completes its work; with it on, a second worker starts a duplicate once
+the original is overdue and finishes before the original unpauses.
 
 **The trade is explicit:** speculation doubled the compute spent on the straggling task to roughly
-halve the latency. It is off by default (`forge.scheduler.speculation.enabled=false`) because that
-trade is only worth making on a cluster with genuinely idle capacity — and by construction it can
-only ever consume idle capacity, since a worker asks for a speculative duplicate only after finding
-no unstarted work it could run instead.
-
-**On the zero duplicate rejections.** Both arms report 30 results submitted and 30 accepted, with
-zero duplicates rejected — which is a *measurement-window* artifact, not evidence that no duplicate
-occurred. The build completes at ~6.3 s via the speculative attempt; the harness then unpauses the
-original and reads counters 2 s later, but the original worker still has to finish its own
-compilation before reporting, which lands after that window closes. If both attempts had reported
-inside the window the submitted count would be 60, not 30. The rejection path itself is proven by
-`SpeculativeExecutionIntegrationTest`, which drives both reports to completion and asserts the
-loser is rejected with `403` while the accepted result is left unchanged.
+halve the latency. It is off by default, because that trade is only worth making on a cluster with
+genuinely idle capacity — and by construction it can only consume idle capacity, since a worker
+asks for a speculative duplicate only after finding no unstarted work it could run instead.
 
 ## Reproducing the distributed benchmarks
 

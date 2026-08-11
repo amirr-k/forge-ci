@@ -41,29 +41,26 @@ All computed from the medians above.
 
 ## Where ForgeCI does not help — and where it costs
 
-Reported because omitting them would misrepresent the system:
-
 - **Shared-library change** — median 4401 ms against a
-  4356 ms cold build, i.e. +45 ms. With a
-  stddev of 77 ms that difference is inside the noise: a change to
-  the module most others depend on invalidates most of the graph, so incremental selection buys
-  nothing measurable. It is not slower, it is simply no better.
-- **Toolchain/config change — genuinely slower than a plain full build**, by
+  4356 ms cold build, i.e. +45 ms against a
+  stddev of 77 ms. A change to the module most others depend on
+  invalidates most of the graph, so incremental selection buys nothing measurable here. It is not
+  slower, it is simply no better.
+- **Toolchain/config change — slower than a plain full build**, by
   +478 ms
   (+11.0%): median
   4834 ms vs 4356 ms. `toolchain.lock` is a declared input
-  to every task, so every cache key changes. ForgeCI then hashes 25 sets of
-  inputs, looks up 25 keys, misses all of them, runs the full build anyway,
-  and writes 25 new entries into an already-populated store — bookkeeping
-  with zero reuse to amortize it. Isolating the starting state shows the cost comes from the
-  populated cache store (+1.4% with the cache primed and outputs cleared), not from stale build
-  outputs (−2.6% with outputs primed and the cache cleared).
+  to every task, so every cache key changes: ForgeCI hashes 25 sets of inputs,
+  misses 25 keys, runs the full build anyway, and writes
+  25 new entries into an already-populated store. Isolating the starting state
+  puts the cost in the populated cache store (+1.4% with the cache primed and outputs cleared),
+  not in stale build outputs (−2.6% with outputs primed and the cache cleared).
 
-  This is the standard trade every caching build system makes, and it is bounded: a few percent on
-  the change that invalidates everything, against
-  4.3× on the ordinary single-module change. It is also amplified by this
-  workload's small tasks (~174 ms each) — the overhead is
-  roughly fixed per task, so it shrinks as a share of longer real-world tasks.
+  This is the trade every caching build system makes, and it is bounded: a few percent on the
+  change that invalidates everything, against 4.3× on the ordinary
+  single-module change. It is amplified by this workload's small tasks
+  (~174 ms each) — the overhead is roughly fixed per task, so it
+  shrinks as a share of longer real-world tasks.
 - Adding executors past the graph's critical path stops helping: 1 → 2 gives 1.52× but
   2 → 4 only gives a further 1.13×,
   because the dependency chain, not CPU, is the limit.
@@ -73,9 +70,5 @@ Reported because omitting them would misrepresent the system:
 - `benchmarks/results/latest.json` — this run, every trial retained.
 - `benchmarks/results/raw/20260805T042748Z.json` — same payload, archived by run id.
 - Per-trial durations are in each scenario's `stats.samples_ms`.
-
-## Honest limitations
-
-- These are `local-benchmark` profile results on one developer machine under normal desktop load,
-  not an isolated benchmark host. Variance is visible in the stddev column.
-- The AWS reference profile was not exercised for this run, so no result here is an AWS result.
+- Measured on one developer machine under normal desktop load rather than an isolated benchmark
+  host; the variance that implies is visible in the stddev column.
