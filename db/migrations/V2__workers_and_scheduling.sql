@@ -1,4 +1,4 @@
--- Phase 5: distributed workers. Extends task_definitions with the execution details a worker
+-- Distributed workers. Extends task_definitions with the execution details a worker
 -- needs (command/outputs/environment/timeout) and task_runs with the fields the worker protocol
 -- and scheduler require (lease token, readiness/retry timestamps, critical-path priority).
 

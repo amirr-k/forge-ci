@@ -1,5 +1,5 @@
 -- ForgeCI control-plane schema v1.
--- MySQL is authoritative for accepted build/task state (see spec/reference/contracts.md).
+-- MySQL is authoritative for accepted build/task state.
 
 create table projects (
     id                bigint auto_increment primary key,

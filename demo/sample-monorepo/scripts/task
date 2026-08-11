@@ -2,7 +2,7 @@
 # Real compile/test/package work for the bundled sample monorepo: javac against the modules this one
 # depends on, a real class-loading verification run, a real jar, and a real content hash. Benchmark
 # evidence has to measure actual compilation — a sleep stand-in here would make every published
-# number a synthetic-sleep result (spec/reference/benchmarks.md forbidden reporting patterns).
+# number a synthetic-sleep result.
 # Kept to POSIX sh so the bundled demo runs the same on a laptop and inside a worker container.
 set -eu
 

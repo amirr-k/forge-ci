@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 EVIDENCE_DIR="$REPO/benchmarks/results/raw"
 
-# hard ceiling from spec/phases/phase-11: no more than $1.00 of one-time spend
+# hard ceiling: no more than $1.00 of one-time spend
 MAX_SPEND_USD="1.00"
 
 # on-demand us-east-1 list prices, USD/hour. Deliberately conservative and easy to re-check.
@@ -115,7 +115,7 @@ cmd_provision() {
     cmd_inventory "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"
     if grep -qE '^i-|^vol-|^eipalloc-' "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"; then
         warn "pre-existing tagged ForgeCI resources found — a post-run audit could not distinguish"
-        warn "them from leaks. Clean them up first, or accept an inconclusive audit (phase 11 fails)."
+        warn "them from leaks. Clean them up first."
         die "refusing to provision onto a dirty account"
     fi
 
@@ -180,7 +180,7 @@ cmd_destroy() {
     rm -f "$HERE/run.auto.tfvars"
 }
 
-# The audit is the real deliverable of teardown: an inconclusive result means phase 11 failed.
+# The audit is the real deliverable of teardown: an inconclusive result is a failed run.
 cmd_audit() {
     require_creds
     local after="$EVIDENCE_DIR/aws-inventory-after-$(run_id).txt"

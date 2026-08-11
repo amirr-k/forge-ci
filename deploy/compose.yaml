@@ -56,8 +56,7 @@ services:
       timeout: 5s
       retries: 20
 
-  # Ephemeral only — heartbeat/lease acceleration cache, per
-  # spec/reference/contracts.md#redis-responsibilities. The control plane reconciles this from
+  # Ephemeral only — a heartbeat/lease acceleration cache. The control plane reconciles it from
   # MySQL (the state of truth) on a schedule, so a flush or restart here never loses build state.
   redis:
     image: redis:7-alpine

@@ -1,7 +1,6 @@
 // Temporary AWS environment for one benchmark run. It exists to be destroyed: every resource here
 // is either free or billed by the hour, nothing is retained, and `terraform destroy` is the single
-// teardown path. This is disposable benchmark scaffolding, not production infrastructure — see
-// spec/phases/phase-10-deployment.md for the scope limit that keeps it that way.
+// teardown path. This is disposable benchmark scaffolding, not production infrastructure.
 //
 // Deliberately absent, because each would add recurring cost or complexity for no benchmark value:
 // RDS, MSK, ElastiCache, ECS, EKS, NAT Gateway, load balancer, Route 53, allocated Elastic IP,
