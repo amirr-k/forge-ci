@@ -6,8 +6,8 @@ out/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 
-# ForgeCI local cache
-.forge/
+# CNBA local cache
+.cnba/
 
 # Node / frontend (ui/)
 node_modules/
