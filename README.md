@@ -1,4 +1,4 @@
-# ForgeCI
+# CNBA
 
 A distributed incremental build system. It reads a repository's task
 dependency graph, works out which tasks a change can actually affect, reuses
@@ -9,7 +9,7 @@ control plane.
 Change one file, rebuild only what that change affects.
 
 ```
-$ forge plan                       # after editing one service
+$ cnba plan                       # after editing one service
 
 Changed files
   services/catalog/src/main/java/CatalogService.java
@@ -36,7 +36,7 @@ different questions precisely:
 2. **Did anything actually change?** A content question — exact, expensive,
    and unsafe to guess at.
 
-ForgeCI keeps these separate. Affected-task selection walks reverse
+CNBA keeps these separate. Affected-task selection walks reverse
 dependencies and deliberately over-selects; cache keys then decide, per
 task, whether the work is genuinely new. A task can be selected and *still*
 be reused — which is what happens when an upstream task reran but produced
@@ -51,15 +51,15 @@ database.
 ./gradlew test
 
 cd demo/sample-monorepo
-../../forge doctor        # check Java, Git, repository, configuration
-../../forge plan          # what would run, and why
-../../forge run           # run it
+../../cnba doctor        # check Java, Git, repository, configuration
+../../cnba plan          # what would run, and why
+../../cnba run           # run it
 ```
 
-`./forge` is a launcher script: it resolves a Java 21+ runtime, builds the
+`./cnba` is a launcher script: it resolves a Java 21+ runtime, builds the
 CLI with `./gradlew :apps:cli:installDist` on first use, then runs it in your
-current directory. Put the repository root on your `PATH` to type `forge`
-instead of `../../forge`.
+current directory. Put the repository root on your `PATH` to type `cnba`
+instead of `../../cnba`.
 
 ## The bundled demo
 
@@ -71,11 +71,11 @@ measurement, not a simulation.
 ```bash
 cd demo/sample-monorepo
 
-../../forge plan                  # clean tree: 0 run, 25 unaffected
+../../cnba plan                  # clean tree: 0 run, 25 unaffected
 
-../../forge run --all             # cold build, nothing to reuse
-../../forge run --all             # again: 25 succeeded, all restored, 0.1s
-../../forge explain shared:build  # the cache key and every contributor to it
+../../cnba run --all             # cold build, nothing to reuse
+../../cnba run --all             # again: 25 succeeded, all restored, 0.1s
+../../cnba explain shared:build  # the cache key and every contributor to it
 ```
 
 Three changes with visibly different blast radii:
@@ -83,22 +83,22 @@ Three changes with visibly different blast radii:
 ```bash
 # a leaf module: 3 tasks
 echo "// tweak" >> services/accounts/src/main/java/AccountService.java
-../../forge plan          # 3 run, 22 unaffected
+../../cnba plan          # 3 run, 22 unaffected
 
 # a mid-graph module: 12 tasks, and orders/search/storefront come with it
 echo "// tweak" >> services/catalog/src/main/java/CatalogService.java
-../../forge plan          # 12 run, 13 unaffected
+../../cnba plan          # 12 run, 13 unaffected
 
 # the shared core: everything
 echo "// tweak" >> services/shared/src/main/java/Money.java
-../../forge plan          # 25 run, 0 unaffected
+../../cnba plan          # 25 run, 0 unaffected
 ```
 
 And a failure stops only what depends on it:
 
 ```bash
 echo "// BROKEN" >> services/pricing/src/main/java/PriceCalculator.java
-../../forge run
+../../cnba run
 #   pricing:test             FAILED         exit code 1
 #   pricing:build            SKIPPED        dependency pricing:test failed
 #   checkout:integration     SKIPPED        dependency pricing:build was skipped
@@ -131,7 +131,7 @@ manifest alone is not enough; a corrupted object is rejected and rebuilt.
 Restoring an archive rejects any entry whose path would resolve outside the
 project directory.
 
-**Tasks are argv, never shell strings.** `forgeci.yml` commands are argument
+**Tasks are argv, never shell strings.** `cnba.yml` commands are argument
 lists handed straight to `ProcessBuilder` or to `docker run`, so nothing in
 a config file can be reinterpreted as shell syntax. Tasks start from an
 empty environment and receive only `PATH`, `HOME`, `TMPDIR`, `LANG`, and
@@ -153,7 +153,7 @@ event delivery, never a source of truth.
 
 **Local mode never depends on the rest.** `libs/core` has no framework
 dependency at all. The CLI's full local mode works with no network. Remote
-caching activates only when `FORGE_CONTROL_PLANE_URL` is set, and a
+caching activates only when `CNBA_CONTROL_PLANE_URL` is set, and a
 configured-but-unreachable control plane degrades to local-only rather than
 failing the command.
 
@@ -208,7 +208,7 @@ capacity.
 
 ## Measured results
 
-Full methodology, per-trial data, and the cases where ForgeCI *doesn't*
+Full methodology, per-trial data, and the cases where CNBA *doesn't*
 help are in [docs/benchmarks.md](docs/benchmarks.md). Every published figure
 is regenerated from committed raw trial data by
 `benchmarks/scripts/write-report.py`.
@@ -221,10 +221,10 @@ is regenerated from committed raw trial data by
 | Straggler mitigation, speculation on vs off | **p95 −44.9%**, at one duplicate execution |
 | Duration-aware vs FIFO scheduling, 150-task graph | ~6% median improvement (directional) |
 
-ForgeCI also builds itself. Its own `forgeci.yml` describes the Gradle
-multi-module graph, and `.github/workflows/forgeci.yml` runs
-`forge plan`/`forge run` against every pull request's merge-base, persisting
-`.forge/cache` across runs. On one PR: a cold run executed all 17 tasks in
+CNBA also builds itself. Its own `cnba.yml` describes the Gradle
+multi-module graph, and `.github/workflows/cnba.yml` runs
+`cnba plan`/`cnba run` against every pull request's merge-base, persisting
+`.cnba/cache` across runs. On one PR: a cold run executed all 17 tasks in
 **1m25s**; the next push changed only `ui/src/main.tsx`, reused 15 of 17
 tasks from the previous run's cache, and finished in **4.4s** — different
 runner VM, different checkout, same artifacts.
@@ -236,7 +236,7 @@ cannot affect compiled output.
 
 ## Configuration
 
-`forgeci.yml` at the project root declares each task's inputs, outputs,
+`cnba.yml` at the project root declares each task's inputs, outputs,
 dependencies, command, environment allowlist, and timeout:
 
 ```yaml
@@ -256,23 +256,23 @@ tasks:
 ```
 
 Unknown fields are rejected with a file location rather than ignored, and
-cycles are detected before anything runs. `forge init` writes a commented
+cycles are detected before anything runs. `cnba init` writes a commented
 starting point and never overwrites an existing file. A change to
-`forgeci.yml` itself selects every task — the file can alter any command,
+`cnba.yml` itself selects every task — the file can alter any command,
 input, or edge, so over-invalidating is the only safe answer.
 
 ## Commands
 
 | | |
 |---|---|
-| `forge init` | write a starting `forgeci.yml` |
-| `forge doctor` | check Java, Git, repository, and configuration |
-| `forge plan` | show which tasks the current changes affect, and why |
-| `forge run` | run them, with `-j N` concurrency and `--all` to force everything |
-| `forge explain <task>` | show a task's cache key, every contributor, and what changed |
+| `cnba init` | write a starting `cnba.yml` |
+| `cnba doctor` | check Java, Git, repository, and configuration |
+| `cnba plan` | show which tasks the current changes affect, and why |
+| `cnba run` | run them, with `-j N` concurrency and `--all` to force everything |
+| `cnba explain <task>` | show a task's cache key, every contributor, and what changed |
 
 Exit codes: `0` success; `1` the build ran and a task failed, timed out, or
-was skipped behind a failure; `2` ForgeCI could not run at all — invalid
+was skipped behind a failure; `2` CNBA could not run at all — invalid
 config, cyclic graph, no repository, bad usage. Expected failures print one
 actionable message and no stack trace.
 
@@ -283,7 +283,7 @@ apps/cli            picocli entry point; complete local mode
 apps/control-plane  Spring Boot: state machines, scheduler, S3, Kafka, Redis
 apps/worker         Docker-executing worker: register, heartbeat, claim, run, report
 libs/core           graph, change analysis, planning, local execution — no Spring
-libs/config         forgeci.yml parsing and strict validation
+libs/config         cnba.yml parsing and strict validation
 libs/cache          cache keys, deterministic archives, content-addressed storage
 libs/protocol       worker <-> control-plane records, shared verbatim by both
 demo/               bundled sample monorepo, a 150-task scale fixture, traces

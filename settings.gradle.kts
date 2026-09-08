@@ -1,4 +1,4 @@
-rootProject.name = "forge-ci"
+rootProject.name = "cnba-ci"
 
 include(
     ":apps:cli",

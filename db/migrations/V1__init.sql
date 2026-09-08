@@ -1,4 +1,4 @@
--- ForgeCI control-plane schema v1.
+-- CNBA control-plane schema v1.
 -- MySQL is authoritative for accepted build/task state.
 
 create table projects (
@@ -11,7 +11,7 @@ create table projects (
     constraint uq_projects_name unique (name)
 ) engine=innodb;
 
--- one row per accepted `forge plan` submission; task_definitions below hang off this version
+-- one row per accepted `cnba plan` submission; task_definitions below hang off this version
 create table plan_submissions (
     id                  bigint auto_increment primary key,
     project_id          bigint not null,

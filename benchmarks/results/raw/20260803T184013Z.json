@@ -9,7 +9,7 @@
     "cpuCores": 10,
     "memoryGb": 16.0,
     "javaVersion": "21.0.12",
-    "buildToolVersion": "forge 0.1.0-SNAPSHOT"
+    "buildToolVersion": "cnba 0.1.0-SNAPSHOT"
   },
   "workload": {
     "repository": "demo/sample-monorepo",

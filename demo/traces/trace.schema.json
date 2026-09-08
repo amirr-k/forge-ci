@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/amirr-k/forge-ci/demo/traces/trace.schema.json",
-  "title": "ForgeCI execution trace",
-  "description": "One recorded ForgeCI build. Benchmark evidence and the static demo both consume this exact shape; neither may carry numbers that are not in a trace.",
+  "$id": "https://github.com/amirr-k/cnba-ci/demo/traces/trace.schema.json",
+  "title": "CNBA execution trace",
+  "description": "One recorded CNBA build. Benchmark evidence and the static demo both consume this exact shape; neither may carry numbers that are not in a trace.",
   "type": "object",
   "additionalProperties": false,
   "required": [

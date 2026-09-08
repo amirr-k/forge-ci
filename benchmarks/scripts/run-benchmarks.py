@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Runs the ForgeCI benchmark suite and writes raw per-trial evidence.
+"""Runs the CNBA benchmark suite and writes raw per-trial evidence.
 
-Every number this produces comes from a real `forge run` over the bundled sample monorepo, whose
+Every number this produces comes from a real `cnba run` over the bundled sample monorepo, whose
 tasks do actual javac compilation, class-loading verification, jar packaging, and content hashing.
 No scenario sleeps, and no trial is discarded after the fact.
 
@@ -66,7 +66,7 @@ def parse_run(text):
 
 
 def reset_cache():
-    shutil.rmtree(WORKLOAD / ".forge", ignore_errors=True)
+    shutil.rmtree(WORKLOAD / ".cnba", ignore_errors=True)
     shutil.rmtree(WORKLOAD / "build", ignore_errors=True)
 
 
@@ -94,8 +94,8 @@ def restore(saved):
             target.write_bytes(original)
 
 
-def forge_run(jobs, env):
-    return sh([str(REPO / "forge"), "run", "--all", "-j", str(jobs)], cwd=WORKLOAD, env=env)
+def cnba_run(jobs, env):
+    return sh([str(REPO / "cnba"), "run", "--all", "-j", str(jobs)], cwd=WORKLOAD, env=env)
 
 
 def stats(samples):
@@ -130,7 +130,7 @@ def environment_record(profile):
         "cpuCores": os.cpu_count() or 1,
         "memoryGb": round(mem_bytes / (1024**3), 1) if mem_bytes else 0,
         "javaVersion": java[0].split('"')[1] if java and '"' in java[0] else "unknown",
-        "buildToolVersion": "forge 0.1.0-SNAPSHOT",
+        "buildToolVersion": "cnba 0.1.0-SNAPSHOT",
     }
 
 
@@ -144,14 +144,14 @@ def snapshot_cache(dest):
     """Copies the primed cache aside so every incremental trial starts from the same warm state."""
     shutil.rmtree(dest, ignore_errors=True)
     dest.mkdir(parents=True)
-    for name in (".forge", "build"):
+    for name in (".cnba", "build"):
         src = WORKLOAD / name
         if src.exists():
             shutil.copytree(src, dest / name)
 
 
 def restore_cache(src):
-    for name in (".forge", "build"):
+    for name in (".cnba", "build"):
         shutil.rmtree(WORKLOAD / name, ignore_errors=True)
         if (src / name).exists():
             shutil.copytree(src / name, WORKLOAD / name)
@@ -176,9 +176,9 @@ def measure(label, jobs, cache, scenario, warmups, trials, env, primed=None):
                 restore_cache(primed)
             if scenario and not saved:
                 saved = apply_scenario(scenario)
-            proc, elapsed = forge_run(jobs, env)
+            proc, elapsed = cnba_run(jobs, env)
             if proc.returncode != 0:
-                sys.stderr.write(f"\n{label}: forge run failed\n{proc.stdout[-3000:]}\n{proc.stderr[-2000:]}\n")
+                sys.stderr.write(f"\n{label}: cnba run failed\n{proc.stdout[-3000:]}\n{proc.stderr[-2000:]}\n")
                 raise SystemExit(1)
             parsed = parse_run(proc.stdout)
             last = parsed
@@ -224,7 +224,7 @@ def main():
     # warm scenario below so each trial measures the same transition
     primed = REPO / "build" / "benchmark-primed-cache"
     reset_cache()
-    forge_run(4, env)
+    cnba_run(4, env)
     snapshot_cache(primed)
 
     s, last = measure("warm-nochange", 4, "warm", None, args.warmups, args.trials, env, primed)

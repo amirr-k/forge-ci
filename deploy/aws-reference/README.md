@@ -1,6 +1,6 @@
 # Temporary AWS reference environment
 
-Stands up the full ForgeCI stack on one EC2 host against **real Amazon S3**, runs the official
+Stands up the full CNBA stack on one EC2 host against **real Amazon S3**, runs the official
 benchmark, pulls the evidence back, and destroys everything. It is built to be torn down: nothing
 here is retained, and recurring cost after `destroy` is `$0`.
 
@@ -10,11 +10,11 @@ This is disposable benchmark scaffolding, not production hosting.
 
 ```bash
 aws sts get-caller-identity          # must succeed; refresh SSO / keys if it does not
-export FORGE_RUN_ID=bench-$(date -u +%Y%m%d-%H%M)
-export FORGE_OPERATOR_CIDR=$(curl -s https://checkip.amazonaws.com)/32   # optional; auto-detected
+export CNBA_RUN_ID=bench-$(date -u +%Y%m%d-%H%M)
+export CNBA_OPERATOR_CIDR=$(curl -s https://checkip.amazonaws.com)/32   # optional; auto-detected
 ```
 
-`FORGE_OPERATOR_CIDR` is the only address allowed to SSH in. `0.0.0.0/0` is rejected by a variable
+`CNBA_OPERATOR_CIDR` is the only address allowed to SSH in. `0.0.0.0/0` is rejected by a variable
 validation rule, not by convention.
 
 ## The whole run
@@ -32,7 +32,7 @@ main reason this wrapper exists rather than a list of manual steps.
 | Command | What it does |
 |---|---|
 | `estimate` | Prints the maximum one-time cost and **exits non-zero if it exceeds $1.00** |
-| `inventory` | Lists every `project=forgeci` resource in the region |
+| `inventory` | Lists every `project=cnba` resource in the region |
 | `provision` | Records the starting inventory, refuses a dirty account, then `terraform apply` |
 | `deploy` | Ships the repo over SSH and starts the stack pointed at real S3 |
 | `smoke` | Health and readiness checks against the deployed control plane |
@@ -59,7 +59,7 @@ Estimated cost for a 2-hour window: **~$0.10**.
 An inconclusive cleanup audit counts as a **failed run**. `audit` re-queries EC2
 instances, EBS volumes, Elastic IPs, security groups, S3 buckets, IAM roles, and key pairs by tag,
 and exits non-zero if anything remains. `provision` refuses to start on an account that already
-has tagged ForgeCI resources, because then a leak could not be distinguished from something that
+has tagged CNBA resources, because then a leak could not be distinguished from something that
 was already there.
 
 Both inventories are written to `benchmarks/results/raw/aws-inventory-{before,after}-$RUN_ID.txt`

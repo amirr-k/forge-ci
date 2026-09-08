@@ -53,7 +53,7 @@ def main():
     leaf_ran = sum(1 for t in leaf_tasks if t["status"] == "RUN")
     leaf_cached = sum(1 for t in leaf_tasks if t["status"] == "CACHE_HIT")
 
-    header = f"""# ForgeCI benchmark results
+    header = f"""# CNBA benchmark results
 
 Run `{data['benchmarkRunId']}` · commit `{data['commit']}` · profile `{env['profile']}`
 
@@ -65,7 +65,7 @@ Run `{data['benchmarkRunId']}` · commit `{data['commit']}` · profile `{env['pr
 - Java: {env['javaVersion']}. Build tool: {env['buildToolVersion']}.
 - Method: {method['warmups']} warm-up runs discarded, {method['trials']} measured trials retained per
   scenario. {method['note']}.
-- `jobs` is the CLI's concurrent-task limit (`forge run -j N`) on one machine. These are parallel
+- `jobs` is the CLI's concurrent-task limit (`cnba run -j N`) on one machine. These are parallel
   local executors, **not** distributed Docker workers — the distributed path is validated
   separately and is not the source of these timings.
 
@@ -90,7 +90,7 @@ All computed from the medians above.
 | Tasks executed vs reused (leaf-module) | **{leaf_ran} ran, {leaf_cached} reused** | of {workload['taskCount']} total |
 | Warm cache, no changes | **{warm['stats']['median_ms']:.0f} ms** | all {workload['taskCount']} tasks restored |
 
-## Where ForgeCI does not help — and where it costs
+## Where CNBA does not help — and where it costs
 
 - **Shared-library change** — median {shared['stats']['median_ms']:.0f} ms against a
   {base_ms:.0f} ms cold build, i.e. {(shared['stats']['median_ms'] - base_ms):+.0f} ms against a
@@ -101,7 +101,7 @@ All computed from the medians above.
   {(config['stats']['median_ms'] - base_ms):+.0f} ms
   ({(config['stats']['median_ms'] / base_ms - 1) * 100:+.1f}%): median
   {config['stats']['median_ms']:.0f} ms vs {base_ms:.0f} ms. `toolchain.lock` is a declared input
-  to every task, so every cache key changes: ForgeCI hashes {workload['taskCount']} sets of inputs,
+  to every task, so every cache key changes: CNBA hashes {workload['taskCount']} sets of inputs,
   misses {workload['taskCount']} keys, runs the full build anyway, and writes
   {workload['taskCount']} new entries into an already-populated store. Isolating the starting state
   puts the cost in the populated cache store (+1.4% with the cache primed and outputs cleared),

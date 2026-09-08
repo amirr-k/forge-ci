@@ -1,4 +1,4 @@
-# ForgeCI benchmark results
+# CNBA benchmark results
 
 Run `20260805T042748Z` · commit `aab36f6` · profile `local-benchmark`
 
@@ -7,10 +7,10 @@ Run `20260805T042748Z` · commit `aab36f6` · profile `local-benchmark`
 - Command: `JAVA_HOME=<jdk21> python3 benchmarks/scripts/run-benchmarks.py --warmups 3 --trials 10`
 - Workload: `demo/sample-monorepo` — 11-module Java monorepo; every task runs javac, verifies compiled classes by loading them, packages a jar, and hashes it (11 modules, 25 tasks).
 - Hardware: Darwin 25.5.0 / arm64, 10 cores, 16.0 GB RAM.
-- Java: 21.0.12. Build tool: forge 0.1.0-SNAPSHOT.
+- Java: 21.0.12. Build tool: cnba 0.1.0-SNAPSHOT.
 - Method: 3 warm-up runs discarded, 10 measured trials retained per
   scenario. every measured trial is retained; no cherry-picking.
-- `jobs` is the CLI's concurrent-task limit (`forge run -j N`) on one machine. These are parallel
+- `jobs` is the CLI's concurrent-task limit (`cnba run -j N`) on one machine. These are parallel
   local executors, **not** distributed Docker workers — the distributed path is validated
   separately and is not the source of these timings.
 
@@ -39,7 +39,7 @@ All computed from the medians above.
 | Tasks executed vs reused (leaf-module) | **2 ran, 23 reused** | of 25 total |
 | Warm cache, no changes | **270 ms** | all 25 tasks restored |
 
-## Where ForgeCI does not help — and where it costs
+## Where CNBA does not help — and where it costs
 
 - **Shared-library change** — median 4401 ms against a
   4356 ms cold build, i.e. +45 ms against a
@@ -50,7 +50,7 @@ All computed from the medians above.
   +478 ms
   (+11.0%): median
   4834 ms vs 4356 ms. `toolchain.lock` is a declared input
-  to every task, so every cache key changes: ForgeCI hashes 25 sets of inputs,
+  to every task, so every cache key changes: CNBA hashes 25 sets of inputs,
   misses 25 keys, runs the full build anyway, and writes
   25 new entries into an already-populated store. Isolating the starting state
   puts the cost in the populated cache store (+1.4% with the cache primed and outputs cleared),

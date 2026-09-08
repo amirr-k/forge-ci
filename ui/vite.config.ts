@@ -12,7 +12,7 @@ export default defineConfig({
     fs: { allow: [".."] },
     proxy: {
       "/api": {
-        target: process.env.FORGE_API_PROXY_TARGET ?? "http://localhost:8080",
+        target: process.env.CNBA_API_PROXY_TARGET ?? "http://localhost:8080",
         changeOrigin: true,
       },
     },

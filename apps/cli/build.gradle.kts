@@ -11,11 +11,11 @@ dependencies {
 }
 
 application {
-    applicationName = "forge"
-    mainClass.set("dev.forgeci.cli.Main")
+    applicationName = "cnba"
+    mainClass.set("dev.cnba.cli.Main")
 }
 
 tasks.named<JavaExec>("run") {
-    // ./gradlew :apps:cli:run drives the bundled demo repo; ./forge is the everyday entry point
+    // ./gradlew :apps:cli:run drives the bundled demo repo; ./cnba is the everyday entry point
     workingDir = rootProject.file("demo/sample-monorepo")
 }

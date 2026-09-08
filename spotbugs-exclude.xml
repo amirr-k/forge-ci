@@ -31,38 +31,38 @@
       return type alone.
     -->
     <Match>
-        <Class name="dev.forgeci.cache.ArtifactStore" />
+        <Class name="dev.cnba.cache.ArtifactStore" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
     <Match>
-        <Class name="dev.forgeci.cache.CacheKeyRecordStore" />
+        <Class name="dev.cnba.cache.CacheKeyRecordStore" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
     <Match>
-        <Class name="dev.forgeci.cache.CacheManifestStore" />
+        <Class name="dev.cnba.cache.CacheManifestStore" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
     <Match>
-        <Class name="dev.forgeci.cache.TaskArchive" />
+        <Class name="dev.cnba.cache.TaskArchive" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
     <Match>
-        <Class name="dev.forgeci.testsupport.GitTestRepository" />
+        <Class name="dev.cnba.testsupport.GitTestRepository" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
     <Match>
-        <Class name="dev.forgeci.worker.WorkerMain" />
+        <Class name="dev.cnba.worker.WorkerMain" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
 
     <!--
       VA_FORMAT_STRING_USES_NEWLINE in InitCommand.template(): this format string is the literal
-      byte content of a forgeci.yml file being written to disk, not console output — %n would
+      byte content of a cnba.yml file being written to disk, not console output — %n would
       produce \r\n on Windows and corrupt the file's line endings relative to every other file in
       the repo. \n is the correct choice here, not an oversight.
     -->
     <Match>
-        <Class name="dev.forgeci.cli.InitCommand" />
+        <Class name="dev.cnba.cli.InitCommand" />
         <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
     </Match>
 </FindBugsFilter>

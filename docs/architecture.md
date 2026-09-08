@@ -1,6 +1,6 @@
 # Architecture
 
-How ForgeCI is put together, and why it makes the choices it does.
+How CNBA is put together, and why it makes the choices it does.
 
 ## Modules
 
@@ -9,7 +9,7 @@ apps/cli            picocli entry point; complete local mode
 apps/control-plane  Spring Boot service: build/task state, MySQL, HTTP APIs, scheduler, Kafka
 apps/worker         Docker-executing worker: registers, heartbeats, claims, runs, reports
 libs/core           graph, change analysis, planning, local execution — no Spring
-libs/config         forgeci.yml parsing and strict validation
+libs/config         cnba.yml parsing and strict validation
 libs/cache          cache-key computation, deterministic archives, content-addressed storage
 libs/protocol       worker <-> control-plane JSON request/response records, shared verbatim
 libs/test-support   fixtures shared by other modules' tests
@@ -40,7 +40,7 @@ the two processes cannot drift on field names.
    inputs, then follows reverse dependencies to close over every task whose
    output may change.
 4. `PlanBuilder` orders the selected tasks topologically. A change to
-   `forgeci.yml` itself selects every task: the file can alter any command,
+   `cnba.yml` itself selects every task: the file can alter any command,
    input, or edge, and over-invalidating is the only safe answer.
 5. Each selected task's cache key is computed and checked against the cache;
    a verified hit is reported as reused instead of run.
@@ -70,7 +70,7 @@ identical class files, so nothing downstream of it moves.
 
 Task outputs are archived deterministically (sorted paths, no timestamps,
 only the executable bit preserved) and stored content-addressed under
-`.forge/cache/objects/`, alongside a manifest mapping the cache key to that
+`.cnba/cache/objects/`, alongside a manifest mapping the cache key to that
 artifact's digest and size. A hit requires both a manifest *and* a stored
 object whose bytes still match the recorded digest and size — a manifest on
 its own is never enough, and a corrupted object is rejected and rebuilt.
@@ -80,7 +80,7 @@ the project directory.
 `CacheCoordinator` resolves decisions for one command invocation:
 dependencies inside the selected set feed their real, just-computed artifact
 digest forward; a dependency outside it reuses its last-recorded digest
-without re-hashing anything. `forge explain <task>` prints the key, its
+without re-hashing anything. `cnba explain <task>` prints the key, its
 per-contributor breakdown, and — on a miss — which specific contributor
 changed, by diffing against the last key recorded for that task.
 
@@ -93,7 +93,7 @@ incremental. When a task fails or times out, everything downstream is marked
 skipped rather than run, while independent branches carry on.
 
 `ProcessTaskRunner` starts each task as a direct child process — never
-through a shell, so nothing in `forgeci.yml` can be read as shell syntax. It
+through a shell, so nothing in `cnba.yml` can be read as shell syntax. It
 starts from an empty environment and passes through only `PATH`, `HOME`,
 `TMPDIR`, `LANG`, and the task's declared environment allowlist, so a task's
 result depends on what it declares. Output from both streams is merged,
@@ -101,7 +101,7 @@ bounded, and forwarded line by line with the task name attached.
 
 On timeout or cancellation the runner signals the whole process tree, waits
 a short grace period, then kills whatever is still alive. Ctrl-C reaches a
-JVM as shutdown rather than an exception, so `forge run` installs a shutdown
+JVM as shutdown rather than an exception, so `cnba run` installs a shutdown
 hook that interrupts the run thread — the signal the executor turns into
 terminating tasks.
 
@@ -145,7 +145,7 @@ ready-queue depth.
 
 ### On exactly-once
 
-ForgeCI does not claim exactly-once execution anywhere, and the design is
+CNBA does not claim exactly-once execution anywhere, and the design is
 shaped around not needing it. A task can genuinely run more than once — a
 retry after a crash, or two racing attempts under speculation. What is
 guaranteed is **idempotent acceptance**: exactly one result is ever accepted
@@ -179,15 +179,15 @@ for uploads a client abandoned mid-flight.
 first and only falls back to remote on a local miss, adopting a remote hit
 into the local cache; a fresh store always writes locally first, then
 best-effort mirrors to remote. `apps/cli` wires this in only when
-`FORGE_CONTROL_PLANE_URL` is set. Unset, `forge plan`/`forge run` require no
+`CNBA_CONTROL_PLANE_URL` is set. Unset, `cnba plan`/`cnba run` require no
 infrastructure at all, and a configured-but-unreachable remote degrades to
 local-only rather than failing the command.
 
-AWS configuration: leave `FORGE_S3_ENDPOINT` unset to use real S3 with the
+AWS configuration: leave `CNBA_S3_ENDPOINT` unset to use real S3 with the
 default credentials provider chain (IAM role, environment, or
 `~/.aws/credentials`) and virtual-hosted addressing, with
-`FORGE_S3_BUCKET`/`FORGE_S3_REGION` naming the bucket. Setting
-`FORGE_S3_ENDPOINT` switches to path-style addressing with static
+`CNBA_S3_BUCKET`/`CNBA_S3_REGION` naming the bucket. Setting
+`CNBA_S3_ENDPOINT` switches to path-style addressing with static
 credentials, which is the local development path in `deploy/compose.yaml`.
 The bucket is provisioned out of band in production with an IAM policy
 scoped to the artifact prefix; the control plane only auto-creates it as a
@@ -214,8 +214,8 @@ Every lease and heartbeat decision is made by MySQL.
 schedule and are the sole source of truth.
 
 Redis only accelerates *detecting* the same condition. On lease grant the
-scheduler also sets `forge:lease:<taskRunId>` with a TTL matching the lease
-expiration; on heartbeat, `forge:worker:heartbeat:<workerId>` with a TTL of
+scheduler also sets `cnba:lease:<taskRunId>` with a TTL matching the lease
+expiration; on heartbeat, `cnba:worker:heartbeat:<workerId>` with a TTL of
 three heartbeat intervals. `RedisConfig` enables keyspace expiry
 notifications and `ExpiredKeyListener` subscribes — the moment either key
 lapses, it calls the same reclaim logic the periodic sweep would reach on
@@ -240,10 +240,10 @@ evidence the *worker* disappeared, not that the work was bad. Together these
 cut measured recovery on a 60-second-timeout task from over a minute to
 single-digit seconds.
 
-Every interval this depends on (`forge.worker.heartbeat-interval-ms`,
-`forge.scheduler.lease-grace-seconds`, `-lease-sweep-interval-ms`,
+Every interval this depends on (`cnba.worker.heartbeat-interval-ms`,
+`cnba.scheduler.lease-grace-seconds`, `-lease-sweep-interval-ms`,
 `-retry-sweep-interval-ms`, `-reclaim-retry-delay-ms`) is an
-`application.yml` default behind a `FORGE_*` override, so a deployment can
+`application.yml` default behind a `CNBA_*` override, so a deployment can
 tune detection speed against heartbeat cost without a code change.
 
 Crash injection is a two-step, backend-only mechanism used by tests and the
@@ -273,7 +273,7 @@ making on a cluster with genuinely idle capacity.
 
 ## Public demo
 
-`dev.forgeci.controlplane.demo` wraps the trusted `PlanSubmissionService`/
+`dev.cnba.controlplane.demo` wraps the trusted `PlanSubmissionService`/
 `BuildService` API with a guest-safe surface. It never reimplements
 scheduling — it only builds requests for the existing services to accept.
 
@@ -306,19 +306,19 @@ wired to the crash-injection endpoint.
 
 ## Self-hosting
 
-The repository root carries its own `forgeci.yml` (17 tasks) describing the
+The repository root carries its own `cnba.yml` (17 tasks) describing the
 Gradle multi-module graph one level down: a `<module>:build` /
 `<module>:test` pair per module wired to the real `project(":...")`
 dependencies in each `build.gradle.kts`, plus `ui:build` / `ui:test`.
 
-`.github/workflows/forgeci.yml` runs on every pull request: it resolves the
-merge-base against the base branch, runs `forge plan --base <merge-base>`
-then `forge run --base <merge-base>`, and feeds both outputs to
-`.github/scripts/forgeci-summary.py`, which parses the CLI's fixed-width
-result rows into `forgeci-summary.json`. That uploads as an artifact and
+`.github/workflows/cnba.yml` runs on every pull request: it resolves the
+merge-base against the base branch, runs `cnba plan --base <merge-base>`
+then `cnba run --base <merge-base>`, and feeds both outputs to
+`.github/scripts/cnba-summary.py`, which parses the CLI's fixed-width
+result rows into `cnba-summary.json`. That uploads as an artifact and
 drives a PR comment reporting run/cached/unaffected and
 succeeded/failed/skipped counts, updating in place on later pushes.
-`.forge/cache` is persisted across runs with `actions/cache`, keyed by run
+`.cnba/cache` is persisted across runs with `actions/cache`, keyed by run
 id with a prefix fallback — the mechanism that lets one PR's second CI run
 reuse the first run's outputs.
 
@@ -343,8 +343,8 @@ real design points:
 Every Gradle task declares `environment: ["JAVA_HOME"]`. Because
 `ProcessTaskRunner` starts from an empty environment by design, without that
 allowlist entry `./gradlew` falls back to the system default JVM instead of
-the one `forge` resolved — a gap self-hosting surfaced, fixed in
-`forgeci.yml` rather than in the runner, since the environment-allowlist
+the one `cnba` resolved — a gap self-hosting surfaced, fixed in
+`cnba.yml` rather than in the runner, since the environment-allowlist
 field is exactly what it is for.
 
 ## Testing
@@ -361,7 +361,7 @@ permuting how a graph is declared never changes the selected plan
 always produce the same cache key, and changing any single declared
 contributor always changes it (`CacheKeyPropertyTest`, 150 seeded
 scenarios); no accepted result ever transitions twice, under a generated
-storm of duplicate, forged-lease, and contradictory reports over real HTTP
+storm of duplicate, cnbad-lease, and contradictory reports over real HTTP
 (`ResultIdempotencePropertyTest`).
 
 **Integration** (Testcontainers, real services) — MySQL migrations and
@@ -402,7 +402,7 @@ before the bugs were known:
 
 ## CI/CD
 
-`.github/workflows/forgeci.yml` runs on every pull request against `main`,
+`.github/workflows/cnba.yml` runs on every pull request against `main`,
 alongside the self-hosting `plan-and-run` job:
 
 - **`required-checks`** — `./gradlew check`, which wires Spotless (Google
@@ -454,7 +454,7 @@ benchmark evidence and the public demo: DAG nodes and edges, changed files,
 per-task status/reason/duration/executor, ordered events with millisecond
 offsets, totals, and the baseline the run is compared against.
 
-Traces are recordings of real `forge run` executions produced by
+Traces are recordings of real `cnba run` executions produced by
 `benchmarks/scripts/export-traces.py`. `validate-traces.mjs` enforces the
 schema *and* cross-checks each trace against itself — that totals match the
 task list, that every edge references a real node, that every task is a
@@ -472,9 +472,9 @@ HTTP 200 with the correct title, so `ui/e2e/static-demo.spec.ts` checks the
 rendered DOM at the real base path, including with every external request
 blocked.
 
-## The `./forge` launcher
+## The `./cnba` launcher
 
-`./forge` is a POSIX shell script at the repository root, not a packaged
+`./cnba` is a POSIX shell script at the repository root, not a packaged
 binary. It resolves a Java 21+ runtime (from `JAVA_HOME`, `PATH`,
 `/usr/libexec/java_home`, or conventional install locations), runs
 `./gradlew :apps:cli:installDist` if the CLI has not been built yet, then
@@ -484,6 +484,6 @@ being planned is whatever directory you are standing in.
 ## Exit codes
 
 `0` success; `1` the build ran and a task failed, timed out, or was skipped
-behind a failure; `2` ForgeCI could not run at all — invalid `forgeci.yml`,
+behind a failure; `2` CNBA could not run at all — invalid `cnba.yml`,
 a cyclic graph, no repository, bad usage. Expected failures print one
 actionable message and no stack trace.

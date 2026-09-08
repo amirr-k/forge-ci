@@ -41,19 +41,19 @@ ARMS = [
 
 def arm_env(arm: dict) -> dict:
     return {
-        "FORGE_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
+        "CNBA_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
         # one task per worker, so "N workers" means exactly N tasks may run at once
-        "FORGE_WORKER_MAX_CONCURRENCY": "1",
-        "FORGE_SCHEDULER_POLICY": arm["policy"],
-        "FORGE_SCHEDULER_SPECULATION_ENABLED": "false",
+        "CNBA_WORKER_MAX_CONCURRENCY": "1",
+        "CNBA_SCHEDULER_POLICY": arm["policy"],
+        "CNBA_SCHEDULER_SPECULATION_ENABLED": "false",
     }
 
 
 def task_state_counts(build_id: int) -> dict[str, int]:
     result = ds.compose(
         [
-            "exec", "-T", "mysql", "mysql", "-uforgeci", "-pforgeci", "--skip-column-names", "-e",
-            f"select state, count(*) from forgeci.task_runs where build_id={build_id} group by state",
+            "exec", "-T", "mysql", "mysql", "-ucnba", "-pcnba", "--skip-column-names", "-e",
+            f"select state, count(*) from cnba.task_runs where build_id={build_id} group by state",
         ],
         check=False,
     )
@@ -90,9 +90,9 @@ def run_one_build(arm: dict, label: str) -> dict:
         "wall_ms": round(result["wall_ms"], 1),
         "tasks_succeeded": counts.get("SUCCEEDED", 0),
         "tasks_failed": counts.get("FAILED", 0),
-        "results_submitted": ds.metric(metrics, "forge_results_submitted_total"),
-        "results_accepted": ds.metric(metrics, "forge_results_accepted_total"),
-        "duplicates_rejected": ds.metric(metrics, "forge_results_rejected_total"),
+        "results_submitted": ds.metric(metrics, "cnba_results_submitted_total"),
+        "results_accepted": ds.metric(metrics, "cnba_results_accepted_total"),
+        "duplicates_rejected": ds.metric(metrics, "cnba_results_rejected_total"),
     }
 
 

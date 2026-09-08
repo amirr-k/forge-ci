@@ -4,10 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Serves ui/dist under /forge-ci/ — the exact prefix GitHub Pages uses. A demo built for that
+// Serves ui/dist under /cnba-ci/ — the exact prefix GitHub Pages uses. A demo built for that
 // prefix but routed at "/" renders an empty <main>, which is invisible to a curl of index.html,
 // so this has to be a real browser check against the real base path.
-const BASE = "/forge-ci/";
+const BASE = "/cnba-ci/";
 const dist = join(fileURLToPath(new URL("../dist", import.meta.url)));
 
 const TYPES: Record<string, string> = {
@@ -68,7 +68,7 @@ test("running the comparison reports measured task counts", async ({ page }) => 
     await page.getByRole("button", { name: "Run comparison" }).click();
 
     await expect(page.getByRole("heading", { name: "Traditional CI" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "ForgeCI" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "CNBA" })).toBeVisible();
     await expect(page.getByText(/ran \d+, reused \d+/)).toBeVisible();
 });
 

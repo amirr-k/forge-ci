@@ -11,5 +11,5 @@ dependencies {
 
 application {
     applicationName = "worker"
-    mainClass.set("dev.forgeci.worker.WorkerMain")
+    mainClass.set("dev.cnba.worker.WorkerMain")
 }

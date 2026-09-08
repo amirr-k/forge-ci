@@ -41,7 +41,7 @@ require_creds() {
         "AWS credentials are not valid. Run your SSO login (or refresh ~/.aws/credentials) and retry."
 }
 
-run_id()   { echo "${FORGE_RUN_ID:?run: set FORGE_RUN_ID (e.g. export FORGE_RUN_ID=bench-$(date -u +%Y%m%d-%H%M))}"; }
+run_id()   { echo "${CNBA_RUN_ID:?run: set CNBA_RUN_ID (e.g. export CNBA_RUN_ID=bench-$(date -u +%Y%m%d-%H%M))}"; }
 region()   { echo "${AWS_REGION:-us-east-1}"; }
 
 tfvars() {
@@ -49,7 +49,7 @@ tfvars() {
 run_id        = "$(run_id)"
 commit        = "$(git -C "$REPO" rev-parse --short HEAD)"
 expires_at    = "$(date -u -v+${BUDGET_HOURS}H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "+${BUDGET_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)"
-operator_cidr = "${FORGE_OPERATOR_CIDR:-$(curl -s https://checkip.amazonaws.com | tr -d '\n')/32}"
+operator_cidr = "${CNBA_OPERATOR_CIDR:-$(curl -s https://checkip.amazonaws.com | tr -d '\n')/32}"
 region        = "$(region)"
 EOF
 }
@@ -76,33 +76,33 @@ cmd_estimate() {
     log "estimate is within the authorized ceiling"
 }
 
-# A pre-existing ForgeCI resource would make the post-run audit ambiguous: we could not tell a leak
+# A pre-existing CNBA resource would make the post-run audit ambiguous: we could not tell a leak
 # from something that was already there. So we record the starting inventory and refuse if it is dirty.
 cmd_inventory() {
     require_creds
     local out="${1:-/dev/stdout}"
     {
-        echo "# AWS inventory for project=forgeci at $(date -u +%Y-%m-%dT%H:%M:%SZ) in $(region)"
+        echo "# AWS inventory for project=cnba at $(date -u +%Y-%m-%dT%H:%M:%SZ) in $(region)"
         echo "## ec2 instances"
         aws ec2 describe-instances --region "$(region)" \
-            --filters "Name=tag:project,Values=forgeci" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --filters "Name=tag:project,Values=cnba" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
             --query 'Reservations[].Instances[].[InstanceId,State.Name,Tags[?Key==`run_id`]|[0].Value]' --output text
         echo "## ebs volumes"
         aws ec2 describe-volumes --region "$(region)" \
-            --filters "Name=tag:project,Values=forgeci" --query 'Volumes[].[VolumeId,State]' --output text
+            --filters "Name=tag:project,Values=cnba" --query 'Volumes[].[VolumeId,State]' --output text
         echo "## elastic ips"
         aws ec2 describe-addresses --region "$(region)" \
-            --filters "Name=tag:project,Values=forgeci" --query 'Addresses[].[AllocationId,PublicIp]' --output text
+            --filters "Name=tag:project,Values=cnba" --query 'Addresses[].[AllocationId,PublicIp]' --output text
         echo "## security groups"
         aws ec2 describe-security-groups --region "$(region)" \
-            --filters "Name=tag:project,Values=forgeci" --query 'SecurityGroups[].[GroupId,GroupName]' --output text
+            --filters "Name=tag:project,Values=cnba" --query 'SecurityGroups[].[GroupId,GroupName]' --output text
         echo "## s3 buckets"
-        aws s3api list-buckets --query 'Buckets[?starts_with(Name, `forgeci-bench-`)].Name' --output text
+        aws s3api list-buckets --query 'Buckets[?starts_with(Name, `cnba-bench-`)].Name' --output text
         echo "## iam roles"
-        aws iam list-roles --query 'Roles[?starts_with(RoleName, `forgeci-bench-`)].RoleName' --output text
+        aws iam list-roles --query 'Roles[?starts_with(RoleName, `cnba-bench-`)].RoleName' --output text
         echo "## key pairs"
         aws ec2 describe-key-pairs --region "$(region)" \
-            --query 'KeyPairs[?starts_with(KeyName, `forgeci-bench-`)].KeyName' --output text
+            --query 'KeyPairs[?starts_with(KeyName, `cnba-bench-`)].KeyName' --output text
     } > "$out"
 }
 
@@ -114,7 +114,7 @@ cmd_provision() {
     mkdir -p "$EVIDENCE_DIR"
     cmd_inventory "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"
     if grep -qE '^i-|^vol-|^eipalloc-' "$EVIDENCE_DIR/aws-inventory-before-$(run_id).txt"; then
-        warn "pre-existing tagged ForgeCI resources found — a post-run audit could not distinguish"
+        warn "pre-existing tagged CNBA resources found — a post-run audit could not distinguish"
         warn "them from leaks. Clean them up first."
         die "refusing to provision onto a dirty account"
     fi
@@ -131,21 +131,21 @@ ssh_host() { ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ec2-u
 cmd_deploy() {
     log "waiting for cloud-init to finish"
     for _ in $(seq 1 60); do
-        if ssh_host 'test -f /var/lib/cloud/forge-ready' 2>/dev/null; then break; fi
+        if ssh_host 'test -f /var/lib/cloud/cnba-ready' 2>/dev/null; then break; fi
         sleep 10
     done
-    ssh_host 'test -f /var/lib/cloud/forge-ready' || die "host never became ready"
+    ssh_host 'test -f /var/lib/cloud/cnba-ready' || die "host never became ready"
 
     log "shipping the repository"
-    git -C "$REPO" archive --format=tar HEAD | ssh_host 'rm -rf ~/forge-ci && mkdir -p ~/forge-ci && tar -x -C ~/forge-ci'
+    git -C "$REPO" archive --format=tar HEAD | ssh_host 'rm -rf ~/cnba-ci && mkdir -p ~/cnba-ci && tar -x -C ~/cnba-ci'
 
     log "starting the stack against real S3"
-    ssh_host "cd ~/forge-ci && \
-        FORGE_S3_BUCKET='$(tf output -raw bucket)' \
-        FORGE_S3_REGION='$(tf output -raw region)' \
-        FORGE_S3_ENDPOINT= \
-        FORGE_S3_PATH_STYLE=false \
-        FORGE_GIT_COMMIT='$(git -C "$REPO" rev-parse --short HEAD)' \
+    ssh_host "cd ~/cnba-ci && \
+        CNBA_S3_BUCKET='$(tf output -raw bucket)' \
+        CNBA_S3_REGION='$(tf output -raw region)' \
+        CNBA_S3_ENDPOINT= \
+        CNBA_S3_PATH_STYLE=false \
+        CNBA_GIT_COMMIT='$(git -C "$REPO" rev-parse --short HEAD)' \
         docker compose -f deploy/compose.yaml up --build -d"
 }
 
@@ -159,7 +159,7 @@ cmd_smoke() {
 
 cmd_benchmark() {
     log "running the official benchmark suite on AWS"
-    ssh_host "cd ~/forge-ci && JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto \
+    ssh_host "cd ~/cnba-ci && JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto \
         python3 benchmarks/scripts/run-benchmarks.py --warmups 3 --trials 10 --profile aws-reference"
 }
 
@@ -167,9 +167,9 @@ cmd_evidence() {
     log "pulling evidence back before anything is destroyed"
     mkdir -p "$EVIDENCE_DIR"
     scp -o StrictHostKeyChecking=accept-new -r \
-        "ec2-user@$(host):~/forge-ci/benchmarks/results/raw/*" "$EVIDENCE_DIR/" || \
+        "ec2-user@$(host):~/cnba-ci/benchmarks/results/raw/*" "$EVIDENCE_DIR/" || \
         warn "no raw results to copy"
-    ssh_host "cd ~/forge-ci && cat benchmarks/results/latest.json" \
+    ssh_host "cd ~/cnba-ci && cat benchmarks/results/latest.json" \
         > "$REPO/benchmarks/results/latest.json" || warn "no latest.json to copy"
     log "evidence stored under benchmarks/results/"
 }
@@ -193,7 +193,7 @@ cmd_audit() {
     local leaks=0
     while read -r line; do
         case "$line" in
-            i-*|vol-*|eipalloc-*|sg-*|forgeci-bench-*)
+            i-*|vol-*|eipalloc-*|sg-*|cnba-bench-*)
                 warn "still present: $line"; leaks=$((leaks + 1)) ;;
         esac
     done < <(grep -vE '^#|^##' "$after" | tr '\t' '\n' | grep -v '^$' || true)
@@ -202,7 +202,7 @@ cmd_audit() {
         die "$leaks billable resource(s) survived teardown — audit is FAILED, recurring cost is not \$0"
     fi
     log "audit clean: no EC2 instance, EBS volume, Elastic IP, security group, S3 bucket, IAM role,"
-    log "or key pair tagged project=forgeci remains. Recurring AWS cost is \$0."
+    log "or key pair tagged project=cnba remains. Recurring AWS cost is \$0."
 }
 
 # destroy + audit run no matter how the middle of the run goes

@@ -18,10 +18,10 @@ export default function ResultCard({
 
   return (
     <div className="card" aria-live="polite">
-      <p className="result-headline">Traditional CI rebuilt everything. ForgeCI safely reused most of the work.</p>
+      <p className="result-headline">Traditional CI rebuilt everything. CNBA safely reused most of the work.</p>
       <div className="result-grid">
         <Stat label="Traditional build" value={formatElapsed(baselineMs)} />
-        <Stat label="ForgeCI build" value={formatElapsed(incrementalMs)} />
+        <Stat label="CNBA build" value={formatElapsed(incrementalMs)} />
         <Stat label="Tasks executed" value={String(executed)} />
         <Stat label="Tasks reused" value={String(reused)} />
         <Stat label="Tasks skipped" value={String(skipped)} />

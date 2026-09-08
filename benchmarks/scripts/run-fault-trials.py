@@ -34,10 +34,10 @@ CHECKPOINT = RAW / "fault-trials-checkpoint.json"
 WORKERS = 4
 
 ENV = {
-    "FORGE_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
-    "FORGE_WORKER_MAX_CONCURRENCY": "1",
-    "FORGE_SCHEDULER_POLICY": "critical-path",
-    "FORGE_SCHEDULER_SPECULATION_ENABLED": "false",
+    "CNBA_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
+    "CNBA_WORKER_MAX_CONCURRENCY": "1",
+    "CNBA_SCHEDULER_POLICY": "critical-path",
+    "CNBA_SCHEDULER_SPECULATION_ENABLED": "false",
 }
 
 
@@ -106,10 +106,10 @@ def busy_worker(build_id: int) -> str | None:
     """
     result = ds.compose(
         [
-            "exec", "-T", "mysql", "mysql", "-uforgeci", "-pforgeci", "--skip-column-names", "-e",
-            "select w.external_id from forgeci.task_attempts a "
-            "join forgeci.workers w on w.id = a.worker_id "
-            "join forgeci.task_runs r on r.id = a.task_run_id "
+            "exec", "-T", "mysql", "mysql", "-ucnba", "-pcnba", "--skip-column-names", "-e",
+            "select w.external_id from cnba.task_attempts a "
+            "join cnba.workers w on w.id = a.worker_id "
+            "join cnba.task_runs r on r.id = a.task_run_id "
             f"where r.build_id = {build_id} and a.state in ('LEASED','RUNNING') limit 1",
         ],
         check=False,
@@ -123,8 +123,8 @@ def artifacts_intact(build_id: int, expected: int) -> bool:
     winning attempt produced -- a missing digest would mean a result was accepted without bytes."""
     result = ds.compose(
         [
-            "exec", "-T", "mysql", "mysql", "-uforgeci", "-pforgeci", "--skip-column-names", "-e",
-            "select count(*) from forgeci.task_runs "
+            "exec", "-T", "mysql", "mysql", "-ucnba", "-pcnba", "--skip-column-names", "-e",
+            "select count(*) from cnba.task_runs "
             f"where build_id = {build_id} and state = 'SUCCEEDED' and artifact_digest is not null",
         ],
         check=False,
@@ -136,9 +136,9 @@ def artifacts_intact(build_id: int, expected: int) -> bool:
 def counters() -> dict:
     m = ds.prometheus()
     return {
-        "submitted": ds.metric(m, "forge_results_submitted_total"),
-        "accepted": ds.metric(m, "forge_results_accepted_total"),
-        "rejected": ds.metric(m, "forge_results_rejected_total"),
+        "submitted": ds.metric(m, "cnba_results_submitted_total"),
+        "accepted": ds.metric(m, "cnba_results_accepted_total"),
+        "rejected": ds.metric(m, "cnba_results_rejected_total"),
     }
 
 

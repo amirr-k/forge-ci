@@ -56,7 +56,7 @@ def dependencies(layer: int, index: int) -> list[str]:
 
 
 def java_source(layer: int, index: int, ordinal: int, deps: list[str]) -> str:
-    package = f"forge.{module_name(layer, index)}"
+    package = f"cnba.{module_name(layer, index)}"
     calls = ""
     if deps and ordinal == 0:
         # only the first class of a module reaches across the module boundary; that single edge is
@@ -65,7 +65,7 @@ def java_source(layer: int, index: int, ordinal: int, deps: list[str]) -> str:
         # rather than imported: every module names its classes ApiN, so importing a dependency's
         # Api0 into this file would collide with the Api0 the file itself declares.
         calls = "".join(
-            f'        parts.add("{d}:" + forge.{d}.Api0.describe().length());\n' for d in deps
+            f'        parts.add("{d}:" + cnba.{d}.Api0.describe().length());\n' for d in deps
         )
 
     helper = ""
@@ -139,7 +139,7 @@ def generate(out: Path) -> dict:
             deps = dependencies(layer, index)
             n_sources = WEIGHTS[index] + (LAYERS - layer)
 
-            src = out / "services" / module / "src" / "main" / "java" / "forge" / module
+            src = out / "services" / module / "src" / "main" / "java" / "cnba" / module
             src.mkdir(parents=True)
             for ordinal in range(n_sources):
                 (src / f"Api{ordinal}.java").write_text(
@@ -186,7 +186,7 @@ def generate(out: Path) -> dict:
         "  cacheable: true\n\n"
         "tasks:\n" + "\n".join(blocks)
     )
-    (out / "forgeci.yml").write_text(manifest, encoding="utf-8")
+    (out / "cnba.yml").write_text(manifest, encoding="utf-8")
 
     return {"modules": LAYERS * PER_LAYER, "tasks": task_count, "sources": source_count}
 

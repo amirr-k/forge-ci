@@ -101,7 +101,7 @@ JAVA
   package)
     if [ -n "$(find "$out/classes" -name '*.class' -print -quit 2>/dev/null)" ]; then
         "$jar_bin" --create --file "$out/$module.jar" -C "$out/classes" .
-        # content hash of the packaged artifact — the same property ForgeCI's cache keys rely on
+        # content hash of the packaged artifact — the same property CNBA's cache keys rely on
         if command -v sha256sum >/dev/null 2>&1; then
             sha256sum "$out/$module.jar" > "$out/package.txt"
         else

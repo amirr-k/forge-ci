@@ -1,4 +1,4 @@
-// The committed execution traces the showcase replays. These are recordings of real `forge run`
+// The committed execution traces the showcase replays. These are recordings of real `cnba run`
 // executions produced by benchmarks/scripts/export-traces.py — the showcase never computes or
 // invents a number, it only renders what a trace already measured.
 export type TaskStatus = "RUN" | "CACHE_HIT" | "SKIP" | "FAILED";

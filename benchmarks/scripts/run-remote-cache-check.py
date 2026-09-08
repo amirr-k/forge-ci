@@ -35,8 +35,8 @@ WORKERS = 2
 MODULE_COUNT = 6  # first few modules of layer 0 -- enough to exercise real fan-out, fast to run
 
 ENV = {
-    "FORGE_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
-    "FORGE_WORKER_MAX_CONCURRENCY": "1",
+    "CNBA_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
+    "CNBA_WORKER_MAX_CONCURRENCY": "1",
 }
 
 
@@ -97,9 +97,9 @@ def submit(project_id: int, plan_revision: str, cache_key_revision: str) -> dict
 def task_run_rows(build_id: int) -> list[dict]:
     result = ds.compose(
         [
-            "exec", "-T", "mysql", "mysql", "-uforgeci", "-pforgeci", "--skip-column-names", "-e",
+            "exec", "-T", "mysql", "mysql", "-ucnba", "-pcnba", "--skip-column-names", "-e",
             "select task_name, state, ifnull(artifact_digest,'') , ifnull(worker_id,0) "
-            f"from forgeci.task_runs where build_id = {build_id} order by task_name",
+            f"from cnba.task_runs where build_id = {build_id} order by task_name",
         ],
         check=False,
     )
@@ -155,7 +155,7 @@ def main() -> int:
 
     print("recreating worker containers with a fresh workspace volume", flush=True)
     ds.compose(["rm", "-f", "-s", "worker-1", "worker-2"], env=ENV, check=False)
-    ds.compose(["volume", "rm", "forgeci_worker-workspace"], check=False)
+    ds.compose(["volume", "rm", "cnba_worker-workspace"], check=False)
     ds.compose(["up", "-d", "worker-1", "worker-2"], env=ENV)
     ds.await_workers(WORKERS, timeout=120)
 

@@ -4,7 +4,7 @@ plugins {
 }
 
 allprojects {
-    group = "dev.forgeci"
+    group = "dev.cnba"
     version = "0.1.0-SNAPSHOT"
 
     repositories {
@@ -49,7 +49,7 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
 
-        // a failing test has to name itself even under `gradle -q`, which is how forge runs these
+        // a failing test has to name itself even under `gradle -q`, which is how cnba runs these
         // tasks — otherwise a CI failure reports only "exit code 1" with no way to diagnose it
         testLogging {
             events("failed")

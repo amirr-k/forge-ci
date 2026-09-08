@@ -79,9 +79,9 @@ export default function Home() {
       <div>
         <h1 className="headline">Build only what changed.</h1>
         <p className="subhead">
-          ForgeCI reads a repository's task dependency graph, works out which tasks a change actually
+          CNBA reads a repository's task dependency graph, works out which tasks a change actually
           affects, and reuses everything else. Pick what changes, then watch a real traditional build
-          and a real ForgeCI build run side by side against the same code.
+          and a real CNBA build run side by side against the same code.
         </p>
         {error && <div className="status-banner error">{error}</div>}
         <div className="graph" role="radiogroup" aria-label="demo scenario">
@@ -111,7 +111,7 @@ export default function Home() {
       {build && <DependencyGraph baselineTasks={build.baselineTasks} incrementalTasks={build.incrementalTasks} />}
       <div className="terminals">
         <TerminalPanel title="Traditional build" lines={baseline.lines} />
-        <TerminalPanel title="ForgeCI build" lines={incremental.lines} />
+        <TerminalPanel title="CNBA build" lines={incremental.lines} />
       </div>
       <div className="timers">
         <div className="timer">
@@ -119,7 +119,7 @@ export default function Home() {
           <div className="timer-value">{formatElapsed(baseline.elapsedMs)}</div>
         </div>
         <div className="timer">
-          <div className="timer-label">ForgeCI build</div>
+          <div className="timer-label">CNBA build</div>
           <div className="timer-value">{formatElapsed(incremental.elapsedMs)}</div>
         </div>
       </div>

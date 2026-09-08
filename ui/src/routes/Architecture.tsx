@@ -5,7 +5,7 @@ export default function Architecture() {
         How it works
       </h1>
       <p className="subhead">
-        ForgeCI reads a repository's task dependency graph, works out which tasks a change affects,
+        CNBA reads a repository's task dependency graph, works out which tasks a change affects,
         reuses cached outputs for everything else, and runs independent tasks concurrently across
         build machines.
       </p>

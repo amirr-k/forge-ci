@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Records real `forge run` executions as schema-valid traces for the static demo.
+"""Records real `cnba run` executions as schema-valid traces for the static demo.
 
-Each trace is a recording of an actual build: the DAG comes from the workload's forgeci.yml, and
+Each trace is a recording of an actual build: the DAG comes from the workload's cnba.yml, and
 every task status, reason, lane assignment, and timestamp comes from that run's own output. The
 demo replays these; it never invents numbers.
 """
@@ -23,7 +23,7 @@ from run_benchmarks_support import (  # noqa: E402
     apply_scenario,
     commit,
     environment_record,
-    parse_forgeci_yml,
+    parse_cnba_yml,
     reset_cache,
     restore,
 )
@@ -49,10 +49,10 @@ SCENARIOS = [
 
 
 def run_traced(jobs):
-    """Runs forge and timestamps each output line as it arrives, so event times are measured."""
+    """Runs cnba and timestamps each output line as it arrives, so event times are measured."""
     started = time.perf_counter()
     proc = subprocess.Popen(
-        [str(REPO / "forge"), "run", "--all", "-j", str(jobs)],
+        [str(REPO / "cnba"), "run", "--all", "-j", str(jobs)],
         cwd=WORKLOAD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     lines = []
@@ -155,7 +155,7 @@ def main():
     env = environment_record("local-benchmark")
     sha = commit()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    graph = parse_forgeci_yml(WORKLOAD / "forgeci.yml")
+    graph = parse_cnba_yml(WORKLOAD / "cnba.yml")
     TRACES.mkdir(parents=True, exist_ok=True)
 
     # the cold full build is the baseline every incremental scenario is compared against
@@ -174,12 +174,12 @@ def main():
     primed = REPO / "build" / "trace-primed"
     shutil.rmtree(primed, ignore_errors=True)
     primed.mkdir(parents=True)
-    for name in (".forge", "build"):
+    for name in (".cnba", "build"):
         if (WORKLOAD / name).exists():
             shutil.copytree(WORKLOAD / name, primed / name)
 
     for scenario_id, variant, label, question in SCENARIOS[1:]:
-        for name in (".forge", "build"):
+        for name in (".cnba", "build"):
             shutil.rmtree(WORKLOAD / name, ignore_errors=True)
             if (primed / name).exists():
                 shutil.copytree(primed / name, WORKLOAD / name)

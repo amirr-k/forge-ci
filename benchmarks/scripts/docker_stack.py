@@ -5,7 +5,7 @@ uses -- no in-process shortcut, no mocked worker. A build measured through this 
 by Docker worker containers claiming over HTTP, exactly as in production.
 
 The task graph is imported from generate-scale-fixture rather than parsed back out of the generated
-forgeci.yml, so the benchmark and the fixture can never disagree about what the graph is.
+cnba.yml, so the benchmark and the fixture can never disagree about what the graph is.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ COMPOSE = REPO / "deploy" / "compose.yaml"
 BASE_URL = "http://localhost:8080"
 
 # where the scale fixture is baked inside both images (apps/*/Dockerfile)
-SCALE_REPO_IN_IMAGE = "/opt/forge-scale-repo"
+SCALE_REPO_IN_IMAGE = "/opt/cnba-scale-repo"
 
 
 def _load_generator():
@@ -153,7 +153,7 @@ def up(arm_env: dict, worker_count: int, build_images: bool = False):
     # which makes the control plane's own startup warm-up build fail and retry against the shared
     # worker pool -- unrelated contention right at the start of every measured run. The caller can
     # still override this by setting the key itself in arm_env before calling up().
-    env.setdefault("FORGE_DEMO_WARMUP_ENABLED", "false")
+    env.setdefault("CNBA_DEMO_WARMUP_ENABLED", "false")
     if worker_count > 2:
         env["COMPOSE_PROFILES"] = "scale-4"
     workers = [f"worker-{i}" for i in range(1, worker_count + 1)]
@@ -184,7 +184,7 @@ def await_workers(expected: int, timeout: float = 300.0, exact: bool = True):
     deadline = time.time() + timeout
     active = -1
     while time.time() < deadline:
-        active = metric(prometheus(), "forge_workers_active")
+        active = metric(prometheus(), "cnba_workers_active")
         if (active == expected) if exact else (active >= expected):
             return
         time.sleep(2)
@@ -200,7 +200,7 @@ def register_project(name: str) -> int:
         "/api/projects",
         {
             "name": name,
-            "repositoryIdentity": f"git@example.com:forgeci/{name}.git",
+            "repositoryIdentity": f"git@example.com:cnba/{name}.git",
             "defaultBranch": "main",
             "configVersion": 1,
         },
@@ -268,11 +268,11 @@ def workers() -> dict[str, int]:
             "-T",
             "mysql",
             "mysql",
-            "-uforgeci",
-            "-pforgeci",
+            "-ucnba",
+            "-pcnba",
             "--skip-column-names",
             "-e",
-            "select external_id, id from forgeci.workers",
+            "select external_id, id from cnba.workers",
         ]
     )
     found = {}

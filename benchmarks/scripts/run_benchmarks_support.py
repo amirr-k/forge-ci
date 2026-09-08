@@ -22,7 +22,7 @@ CHANGED_FILES = {
 
 
 def reset_cache():
-    shutil.rmtree(WORKLOAD / ".forge", ignore_errors=True)
+    shutil.rmtree(WORKLOAD / ".cnba", ignore_errors=True)
     shutil.rmtree(WORKLOAD / "build", ignore_errors=True)
 
 
@@ -70,11 +70,11 @@ def environment_record(profile):
         "cpuCores": os.cpu_count() or 1,
         "memoryGb": round(mem / (1024 ** 3), 1) if mem else 0,
         "javaVersion": java[0].split('"')[1] if java and '"' in java[0] else "unknown",
-        "buildToolVersion": "forge 0.1.0-SNAPSHOT",
+        "buildToolVersion": "cnba 0.1.0-SNAPSHOT",
     }
 
 
-def parse_forgeci_yml(path):
+def parse_cnba_yml(path):
     """Reads the workload's task graph. The file is a fixed, flat shape — no YAML dep needed."""
     nodes, edges, deps = [], [], {}
     current, in_deps = None, False

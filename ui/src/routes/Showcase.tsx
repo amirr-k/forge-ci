@@ -122,7 +122,7 @@ export default function Showcase() {
             <section className="showcase-empty">
                 <h1>No traces are committed yet</h1>
                 <p>
-                    The showcase renders recorded <code>forge run</code> executions. Run{" "}
+                    The showcase renders recorded <code>cnba run</code> executions. Run{" "}
                     <code>python3 benchmarks/scripts/export-traces.py</code> to record them.
                 </p>
             </section>
@@ -233,8 +233,8 @@ export default function Showcase() {
                         <p className="compare-metric">{(baselineMs / 1000).toFixed(2)}s</p>
                         <p className="compare-sub">rebuilds all {baselineTasks} tasks</p>
                     </article>
-                    <article className="compare-card forge">
-                        <h2>ForgeCI</h2>
+                    <article className="compare-card cnba">
+                        <h2>CNBA</h2>
                         <p className="compare-metric">{(trace.totals.durationMs / 1000).toFixed(2)}s</p>
                         <p className="compare-sub">
                             ran {trace.totals.tasksExecuted}, reused {trace.totals.tasksCacheHit}
@@ -336,7 +336,7 @@ export default function Showcase() {
 
             {started && clockMs >= totalMs && (
                 <p className="showcase-verdict">
-                    Traditional CI rebuilt {baselineTasks} tasks. ForgeCI executed{" "}
+                    Traditional CI rebuilt {baselineTasks} tasks. CNBA executed{" "}
                     {trace.totals.tasksExecuted}, reused {trace.totals.tasksCacheHit}
                     {improvement > 0 ? `, and finished ${improvement}% faster.` : "."}
                 </p>

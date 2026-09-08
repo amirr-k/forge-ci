@@ -14,7 +14,7 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <Link to="/" className="wordmark">
-          ForgeCI
+          CNBA
         </Link>
       </header>
       <main className="app-main">
@@ -32,7 +32,7 @@ export default function App() {
           // the static build has no control plane to serve /api/benchmarks/latest, so it links to
           // the committed evidence the showcase actually replays instead of a route that would 404
           <a
-            href="https://github.com/amirr-k/forge-ci/blob/main/docs/benchmarks.md"
+            href="https://github.com/amirr-k/cnba-ci/blob/main/docs/benchmarks.md"
             target="_blank"
             rel="noreferrer"
           >
@@ -41,7 +41,7 @@ export default function App() {
         ) : (
           <Link to="/benchmarks">Benchmarks</Link>
         )}
-        <a href="https://github.com/amirr-k/forge-ci" target="_blank" rel="noreferrer">
+        <a href="https://github.com/amirr-k/cnba-ci" target="_blank" rel="noreferrer">
           Source
         </a>
       </footer>

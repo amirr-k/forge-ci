@@ -26,11 +26,11 @@ provider "aws" {
 }
 
 locals {
-  name = "forgeci-bench-${var.run_id}"
+  name = "cnba-bench-${var.run_id}"
 
   // every resource carries these so the post-teardown audit can find anything left behind
   tags = {
-    project    = "forgeci"
+    project    = "cnba"
     owner      = var.owner
     commit     = var.commit
     run_id     = var.run_id
@@ -110,7 +110,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
 // driven over SSH, and nothing here is meant to serve traffic.
 resource "aws_security_group" "bench" {
   name        = local.name
-  description = "ForgeCI temporary benchmark host"
+  description = "CNBA temporary benchmark host"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -210,7 +210,7 @@ resource "aws_instance" "bench" {
     curl -sSL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-    touch /var/lib/cloud/forge-ready
+    touch /var/lib/cloud/cnba-ready
   EOF
 
   tags = {

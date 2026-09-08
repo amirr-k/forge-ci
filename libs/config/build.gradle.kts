@@ -1,4 +1,4 @@
-// libs/config: forgeci.yml parsing/validation.
+// libs/config: cnba.yml parsing/validation.
 
 dependencies {
     implementation(project(":libs:core"))

@@ -5,7 +5,7 @@ Each trial submits a build with a single task ("straggler:build", real javac/jav
 cache key per trial so it always actually executes). Once a worker is genuinely running it, that
 worker's container is `docker pause`d for a fixed STALL_SECONDS -- frozen, not killed, so the lease
 stays valid and the only question is whether something else finishes the task faster. The pause is
-identical in both arms; only FORGE_SCHEDULER_SPECULATION_ENABLED differs.
+identical in both arms; only CNBA_SCHEDULER_SPECULATION_ENABLED differs.
 
 STALL_SECONDS is calibrated between two thresholds so the mechanism under test is unambiguous:
   - above the speculation threshold (so speculation, when enabled, has time to fire), and
@@ -37,15 +37,15 @@ STALL_SECONDS = 9
 HISTORY_WARMUPS = 3  # gives TaskDurationEstimator a median to call anything slow relative to
 
 BASE_ENV = {
-    "FORGE_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
-    "FORGE_WORKER_MAX_CONCURRENCY": "1",
-    "FORGE_SCHEDULER_POLICY": "critical-path",
+    "CNBA_SEED_WORKSPACE_FROM": ds.SCALE_REPO_IN_IMAGE,
+    "CNBA_WORKER_MAX_CONCURRENCY": "1",
+    "CNBA_SCHEDULER_POLICY": "critical-path",
     # raised well past STALL_SECONDS x 3 so a paused-but-alive worker is never declared dead --
     # that would reclaim the lease via the crash-recovery path regardless of speculation, and
     # conflate the two mechanisms this trial is trying to tell apart
-    "FORGE_WORKER_HEARTBEAT_INTERVAL_MS": "6000",
-    "FORGE_SCHEDULER_SPECULATION_MIN_ELAPSED_MS": "3000",
-    "FORGE_SCHEDULER_SPECULATION_MULTIPLIER": "1.5",
+    "CNBA_WORKER_HEARTBEAT_INTERVAL_MS": "6000",
+    "CNBA_SCHEDULER_SPECULATION_MIN_ELAPSED_MS": "3000",
+    "CNBA_SCHEDULER_SPECULATION_MULTIPLIER": "1.5",
 }
 
 
@@ -89,10 +89,10 @@ def submit(project_id: int, revision: str) -> int:
 def busy_worker(build_id: int) -> str | None:
     result = ds.compose(
         [
-            "exec", "-T", "mysql", "mysql", "-uforgeci", "-pforgeci", "--skip-column-names", "-e",
-            "select w.external_id from forgeci.task_attempts a "
-            "join forgeci.workers w on w.id = a.worker_id "
-            "join forgeci.task_runs r on r.id = a.task_run_id "
+            "exec", "-T", "mysql", "mysql", "-ucnba", "-pcnba", "--skip-column-names", "-e",
+            "select w.external_id from cnba.task_attempts a "
+            "join cnba.workers w on w.id = a.worker_id "
+            "join cnba.task_runs r on r.id = a.task_run_id "
             f"where r.build_id = {build_id} and a.state in ('LEASED','RUNNING') "
             "and a.speculative = 0 limit 1",
         ],
@@ -105,10 +105,10 @@ def busy_worker(build_id: int) -> str | None:
 def counters() -> dict:
     m = ds.prometheus()
     return {
-        "submitted": ds.metric(m, "forge_results_submitted_total"),
-        "accepted": ds.metric(m, "forge_results_accepted_total"),
-        "rejected": ds.metric(m, "forge_results_rejected_total"),
-        "speculative_started": ds.metric(m, 'forge_tasks_attempts_total{speculative="true"'),
+        "submitted": ds.metric(m, "cnba_results_submitted_total"),
+        "accepted": ds.metric(m, "cnba_results_accepted_total"),
+        "rejected": ds.metric(m, "cnba_results_rejected_total"),
+        "speculative_started": ds.metric(m, 'cnba_tasks_attempts_total{speculative="true"'),
     }
 
 
@@ -213,7 +213,7 @@ def run_arm(name: str, speculation: bool, trials_wanted: int, state: dict):
         return
 
     env = dict(BASE_ENV)
-    env["FORGE_SCHEDULER_SPECULATION_ENABLED"] = "true" if speculation else "false"
+    env["CNBA_SCHEDULER_SPECULATION_ENABLED"] = "true" if speculation else "false"
     print(f"[{name}] cold start (speculation={speculation})", flush=True)
     ds.down()
     ds.compose(["up", "-d", "mysql", "minio", "kafka", "redis"], env=env)

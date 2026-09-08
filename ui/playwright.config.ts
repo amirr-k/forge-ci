@@ -8,6 +8,6 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: process.env.FORGE_UI_BASE_URL ?? "http://localhost:5173",
+    baseURL: process.env.CNBA_UI_BASE_URL ?? "http://localhost:5173",
   },
 });

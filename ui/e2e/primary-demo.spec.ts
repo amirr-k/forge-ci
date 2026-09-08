@@ -8,7 +8,7 @@ test("load root, click Begin, watch the comparison complete, and see a populated
   await page.getByRole("button", { name: "Begin" }).click();
 
   await expect(page.getByRole("log", { name: "Traditional build" })).toBeVisible();
-  await expect(page.getByRole("log", { name: "ForgeCI build" })).toBeVisible();
+  await expect(page.getByRole("log", { name: "CNBA build" })).toBeVisible();
 
   // the comparison is a real running build, not an animation — give it real time to finish
   await expect(page.locator(".result-headline")).toBeVisible({ timeout: 90_000 });

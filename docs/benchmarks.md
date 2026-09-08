@@ -1,4 +1,4 @@
-# ForgeCI benchmark results
+# CNBA benchmark results
 
 Run `20260805T042748Z` · commit `aab36f6` · profile `local-benchmark`
 
@@ -7,10 +7,10 @@ Run `20260805T042748Z` · commit `aab36f6` · profile `local-benchmark`
 - Command: `JAVA_HOME=<jdk21> python3 benchmarks/scripts/run-benchmarks.py --warmups 3 --trials 10`
 - Workload: `demo/sample-monorepo` — 11-module Java monorepo; every task runs javac, verifies compiled classes by loading them, packages a jar, and hashes it (11 modules, 25 tasks).
 - Hardware: Darwin 25.5.0 / arm64, 10 cores, 16.0 GB RAM.
-- Java: 21.0.12. Build tool: forge 0.1.0-SNAPSHOT.
+- Java: 21.0.12. Build tool: cnba 0.1.0-SNAPSHOT.
 - Method: 3 warm-up runs discarded, 10 measured trials retained per
   scenario. every measured trial is retained; no cherry-picking.
-- `jobs` is the CLI's concurrent-task limit (`forge run -j N`) on one machine. These are parallel
+- `jobs` is the CLI's concurrent-task limit (`cnba run -j N`) on one machine. These are parallel
   local executors, **not** distributed Docker workers — the distributed path is validated
   separately and is not the source of these timings.
 
@@ -39,7 +39,7 @@ All computed from the medians above.
 | Tasks executed vs reused (leaf-module) | **2 ran, 23 reused** | of 25 total |
 | Warm cache, no changes | **270 ms** | all 25 tasks restored |
 
-## Where ForgeCI does not help — and where it costs
+## Where CNBA does not help — and where it costs
 
 - **Shared-library change** — median 4401 ms against a
   4356 ms cold build, i.e. +45 ms against a
@@ -50,7 +50,7 @@ All computed from the medians above.
   +478 ms
   (+11.0%): median
   4834 ms vs 4356 ms. `toolchain.lock` is a declared input
-  to every task, so every cache key changes: ForgeCI hashes 25 sets of inputs,
+  to every task, so every cache key changes: CNBA hashes 25 sets of inputs,
   misses 25 keys, runs the full build anyway, and writes
   25 new entries into an already-populated store. Isolating the starting state
   puts the cost in the populated cache store (+1.4% with the cache primed and outputs cleared),
@@ -87,7 +87,7 @@ Both files in `benchmarks/results/` are regenerated from the run you just did.
 
 # Distributed Docker-worker benchmarks
 
-Everything above measures `forge run -j N` — concurrent **local executors** in one JVM. Everything
+Everything above measures `cnba run -j N` — concurrent **local executors** in one JVM. Everything
 below measures the real `deploy/compose.yaml` stack: MySQL, Kafka, Redis, MinIO, the Spring Boot
 control plane, and Docker worker containers that claim tasks over HTTP and execute each one in its
 own sandbox container. The two sets of numbers are not comparable and are never combined.
@@ -100,7 +100,7 @@ Both arms at 4 Docker workers, same graph, caches cleared between arms and a uni
 revision per trial so every trial genuinely executes.
 
 - Workload: `demo/scale-monorepo` — 50 modules, 5 dependency layers, **150 tasks**, 410 Java sources.
-- `FORGE_WORKER_MAX_CONCURRENCY=1`, so *N workers* means exactly N tasks may run at once.
+- `CNBA_WORKER_MAX_CONCURRENCY=1`, so *N workers* means exactly N tasks may run at once.
 - Hardware: macOS 26.5.2 / arm64, 10 cores, 16 GB RAM.
 - One discarded warm-up per arm; every measured trial retained.
 
@@ -171,7 +171,7 @@ Run `20260805T071155Z` · commit `27934e7` · profile `local-benchmark`
 genuinely executes), waits until a worker is running it, then `docker pause`s that worker for a
 fixed **9 s** — frozen, not killed, so its lease stays valid and the only question is whether
 anything else finishes the work sooner. The pause is identical in both arms; the only difference is
-`forge.scheduler.speculation.enabled`.
+`cnba.scheduler.speculation.enabled`.
 
 The 9 s pause sits deliberately between two thresholds: above the speculation threshold, and well
 below the worker-death threshold (heartbeat interval raised to 6 s here, so 3 missed beats = 18 s).
