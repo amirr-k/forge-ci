@@ -37,13 +37,14 @@ jobs:
       - name: build static demo
         env:
           VITE_STATIC_DEMO: "true"
-          # Keep the published path stable while the hosted repository is being renamed.
-          VITE_BASE: "/cnba-ci/"
+          VITE_BASE: "/${{ github.event.repository.name }}/"
         run: npm run build --prefix ui
 
       # a build served under /<repo>/ but routed at "/" renders an empty page that still returns
       # 200 with the right title — only a browser check against the real base path catches it
       - name: verify the built demo actually renders
+        env:
+          VITE_BASE: "/${{ github.event.repository.name }}/"
         run: |
           npx --prefix ui playwright install --with-deps chromium
           npx --prefix ui playwright test e2e/static-demo.spec.ts --config ui/playwright.config.ts

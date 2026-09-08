@@ -4,10 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Serves ui/dist under /cnba-ci/ — the exact prefix GitHub Pages uses. A demo built for that
+// Serves ui/dist under the repository's Pages prefix. A demo built for that
 // prefix but routed at "/" renders an empty <main>, which is invisible to a curl of index.html,
 // so this has to be a real browser check against the real base path.
-const BASE = "/cnba-ci/";
+const BASE = process.env.VITE_BASE ?? "/cnba-ci/";
 const dist = join(fileURLToPath(new URL("../dist", import.meta.url)));
 
 const TYPES: Record<string, string> = {
