@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 // Serves ui/dist under the repository's Pages prefix. A demo built for that
 // prefix but routed at "/" renders an empty <main>, which is invisible to a curl of index.html,
 // so this has to be a real browser check against the real base path.
-const BASE = process.env.VITE_BASE ?? "/cnba-ci/";
+const BASE = "/forge-ci/";
 const dist = join(fileURLToPath(new URL("../dist", import.meta.url)));
 
 const TYPES: Record<string, string> = {
