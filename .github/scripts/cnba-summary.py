@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parses `forge plan` and `forge run` text output into one machine-readable JSON summary.
+"""Parses `cnba plan` and `cnba run` text output into one machine-readable JSON summary.
 
 Both commands' output formats are fixed and covered by apps/cli's own tests
 (PlanCommandTest, RunCommandTest) — this script is a thin, disposable reader

@@ -37,7 +37,8 @@ jobs:
       - name: build static demo
         env:
           VITE_STATIC_DEMO: "true"
-          VITE_BASE: "/${{ github.event.repository.name }}/"
+          # Keep the published path stable while the hosted repository is being renamed.
+          VITE_BASE: "/cnba-ci/"
         run: npm run build --prefix ui
 
       # a build served under /<repo>/ but routed at "/" renders an empty page that still returns

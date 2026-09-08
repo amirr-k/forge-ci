@@ -19,7 +19,7 @@ jobs:
     # alone the next one would resolve it to "unknown", change the config hash, and silently
     # recreate the control plane without the commit it was released at.
     env:
-      FORGE_GIT_COMMIT: ${{ github.sha }}
+      CNBA_GIT_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,9 +47,9 @@ jobs:
           ./gradlew :apps:cli:installDist :apps:control-plane:bootJar :apps:worker:installDist
       - uses: actions/upload-artifact@v4
         with:
-          name: forge-artifacts-${{ github.sha }}
+          name: cnba-artifacts-${{ github.sha }}
           path: |
-            apps/cli/build/install/forge/**
+            apps/cli/build/install/cnba/**
             apps/control-plane/build/libs/*.jar
             apps/worker/build/install/worker/**
 
@@ -57,8 +57,8 @@ jobs:
       # "latest" that a later push could silently move out from under this release
       - name: build immutable container images
         run: |
-          docker build -f apps/control-plane/Dockerfile -t forgeci/control-plane:${{ github.sha }} .
-          docker build -f apps/worker/Dockerfile -t forgeci/worker:${{ github.sha }} .
+          docker build -f apps/control-plane/Dockerfile -t cnba/control-plane:${{ github.sha }} .
+          docker build -f apps/worker/Dockerfile -t cnba/worker:${{ github.sha }} .
 
       # step 4: apply migrations through the release process. There is no separate migration-only
       # step here because this stack's migrations are Spring Boot/Flyway's startup-time
